@@ -108,11 +108,11 @@ shasum -a 256 dist-single/jared.html ../claude-plugin/app/jared.html
 
 The last command prints one checksum for each file, and the two should be the same. (On Linux, `sha256sum` does the same as `shasum -a 256`.)
 
-GitHub makes the same comparison each time this repository is updated, and shows the result:
+Only `npm run build:single` works in `source/`: the tests and the other scripts of `package.json` are not in this repository.
+
+GitHub makes the same comparison on every push to `main`, and shows the result:
 
 [![Page checksum](https://github.com/snofla/claude-jared/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/snofla/claude-jared/actions/workflows/verify.yml)
-
-Only `npm run build:single` works in `source/`: the tests and the other scripts of `package.json` are not in this repository.
 
 This repository is made by a script from the repository where Jared is developed. Every release is published from there, and never from this repository.
 

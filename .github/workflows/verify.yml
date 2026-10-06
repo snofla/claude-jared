@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   verify:
-    name: The page is built from source/
+    name: The page of the plugin is the one built from source/
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -34,16 +34,17 @@ jobs:
           built=$(sha256sum source/dist-single/jared.html | cut -d ' ' -f 1)
           shipped=$(sha256sum claude-plugin/app/jared.html | cut -d ' ' -f 1)
           {
-            echo '### The page'
+            echo '### Checksums of the page'
             echo
             echo "- sha256 of the page built from source/: \`$built\`"
             echo "- sha256 of claude-plugin/app/jared.html: \`$shipped\`"
-            echo "- git hash of source/ at this commit: \`$(git rev-parse HEAD:source)\`"
+            echo "- git hash of the folder source/ at this commit: \`$(git rev-parse HEAD:source)\`"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$built" != "$shipped" ]; then
             echo 'The page built from source/ is not the one in claude-plugin/app/jared.html.' >&2
-            echo "built:   $built" >&2
-            echo "shipped: $shipped" >&2
+            echo "built from source/: $built" >&2
+            echo "in the plugin:      $shipped" >&2
+            echo 'If source/ changed after the last release, the page in the plugin is built again at the next release.' >&2
             exit 1
           fi
           echo "The page built from source/ is the one in claude-plugin/app/jared.html: $shipped"

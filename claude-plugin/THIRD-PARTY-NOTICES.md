@@ -667,9 +667,9 @@ The colours of the code come from these themes, which are the work of their own 
 - `github-light`: MIT (https://raw.githubusercontent.com/primer/github-vscode-theme/main/LICENSE); from primer/github-vscode-theme (https://github.com/primer/github-vscode-theme/blob/f7a67d67fc2302a0ec36ddfb7bdd57142f4575e8/src/theme.js)
 - `github-dark`: MIT (https://raw.githubusercontent.com/primer/github-vscode-theme/main/LICENSE); from primer/github-vscode-theme (https://github.com/primer/github-vscode-theme/blob/f7a67d67fc2302a0ec36ddfb7bdd57142f4575e8/src/theme.js)
 
-## Other code in the page
+## Other code and icons in the page
 
-Code that is in the page and in no package's license file:
+Code and icons that are in the page and in no package's license file:
 
 ### Oniguruma (BSD-2-Clause)
 
@@ -736,7 +736,7 @@ SOFTWARE.
 
 ### Feather (MIT)
 
-Icons of the page that follow the shapes of these icons of Feather: plus, x, check, edit-3, upload, download, copy, message-square, send, file-text, code, moon and monitor (the page's own icon uses the shape of code). https://github.com/feathericons/feather/blob/main/LICENSE
+Icons in the page, drawn after these icons of Feather: plus, x, check, edit-3, upload, download, copy, message-square, send, file-text, code, moon and monitor; the page's own icon is drawn after `code`. https://github.com/feathericons/feather/blob/main/LICENSE
 
 ```text
 The MIT License (MIT)
@@ -764,7 +764,7 @@ SOFTWARE.
 
 ### Lucide (ISC)
 
-Icons of the page that follow the shapes of these icons of Lucide: sun and panel-right. https://github.com/lucide-icons/lucide/blob/main/LICENSE
+Icons in the page, drawn after these icons of Lucide: sun and panel-right. https://github.com/lucide-icons/lucide/blob/main/LICENSE
 
 ```text
 ISC License
