@@ -1,0 +1,42 @@
+/*
+  The design tokens of the component library: the 21 that a component may use and that are not about reviewing code. The 16 that
+  are (the code, its gutter, the diff and the reviewed mark) are in src/styles.css. A colour is `light-dark(light, dark)`, so that dark mode
+  is a rule and not a script, and a new colour needs both values: scripts/theme.test.ts reads every CSS file under src.
+*/
+
+:root {
+  color-scheme: light dark;
+
+  /* light-dark(light, dark): the first colour is used in the light scheme, the second in the dark one. */
+  --bg: light-dark(#f3f4f6, #090c11);
+  --surface: light-dark(#ffffff, #11161d);
+  --surface-2: light-dark(#f6f7f9, #0d1218);
+  --border: light-dark(#dcdfe4, #2a313b);
+  --border-strong: light-dark(#c3c8cf, #3b4350);
+  /* The edge of a field (3:1 on --surface, WCAG 1.4.11). Buttons have text, so they keep --border-strong. */
+  --field-border: light-dark(#868e98, #657080);
+  --text: light-dark(#1c2128, #e6edf3);
+  --muted: light-dark(#5d6671, #8b949e);
+  --accent: light-dark(#4f46e5, #8b87ff);
+  --accent-ink: light-dark(#ffffff, #0b0d12);
+  --accent-soft: light-dark(rgba(79, 70, 229, 0.1), rgba(139, 135, 255, 0.14));
+  --danger: light-dark(#cf222e, #ff7b72);
+  --warn-bg: light-dark(#fff6dd, rgba(210, 153, 34, 0.16));
+  --warn-fg: light-dark(#7a5b00, #e3b341);
+  --error-bg: light-dark(#fdeeee, rgba(248, 81, 73, 0.14));
+  --error-fg: light-dark(#a1111c, #ff9992);
+  --shadow-near: light-dark(rgba(20, 24, 31, 0.16), rgba(0, 0, 0, 0.55));
+  --shadow-far: light-dark(rgba(20, 24, 31, 0.12), rgba(0, 0, 0, 0.5));
+  --shadow: 0 10px 30px var(--shadow-near), 0 1px 3px var(--shadow-far);
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* A choice made with the button in the header sets data-theme on <html> (src/lib/theme.ts); system leaves it off. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

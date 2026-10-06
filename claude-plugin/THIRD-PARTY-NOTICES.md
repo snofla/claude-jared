@@ -1,6 +1,6 @@
 # Third-party notices
 
-The one-file page of Jared, `claude-plugin/app/jared.html`, contains code and data of the projects below, each under its own license. Jared's own code is under the MIT license, in `LICENSE`.
+The one-file page of Jared, `claude-plugin/app/jared.html`, contains code and data of the projects below, each under its own license. Jared's own code is under the MIT license, in [LICENSE](LICENSE).
 
 ## Packages
 

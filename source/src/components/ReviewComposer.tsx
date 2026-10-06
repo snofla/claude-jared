@@ -3,6 +3,7 @@ import { canSaveDraft } from '../lib/review'
 import { usePlatform } from '../hooks/usePlatform'
 import type { Action } from '../state/reducer'
 import type { Draft } from '../types'
+import { Button } from '../ui'
 
 interface Props {
   draft: Draft
@@ -95,18 +96,16 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
 
         <footer className="card-foot">
           {(canSuggest || draft.suggestion !== null) && (
-            <button type="button" className="btn btn-ghost" onClick={() => dispatch({ type: 'toggleSuggestion' })}>
+            <Button variant="ghost" className="suggestion-toggle" onClick={() => dispatch({ type: 'toggleSuggestion' })}>
               {draft.suggestion === null ? '± Suggest an implementation' : 'Remove suggestion'}
-            </button>
+            </Button>
           )}
           <span className="spacer" />
           <span className="muted hint-keys">⌘↵ to save · Esc to cancel</span>
-          <button type="button" className="btn" onClick={() => dispatch({ type: 'cancelDraft' })}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={!canSave}>
+          <Button onClick={() => dispatch({ type: 'cancelDraft' })}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={!canSave}>
             {draft.id ? 'Update' : 'Add comment'}
-          </button>
+          </Button>
         </footer>
       </form>
     </section>

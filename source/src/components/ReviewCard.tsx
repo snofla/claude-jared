@@ -6,6 +6,7 @@ import { usePlatform } from '../hooks/usePlatform'
 import { formatTime } from '../lib/util'
 import type { Action } from '../state/reducer'
 import type { ReviewComment } from '../types'
+import { Button } from '../ui'
 import { DiffBlock } from './DiffBlock'
 import { IconPencil, IconTrash } from './icons'
 
@@ -43,17 +44,17 @@ export function ReviewCard({ comment, language, fileTokens, onHover, flash, disp
           {confirming ? (
             <>
               <span className="muted">Delete this comment?</span>
-              <button
-                type="button"
-                className="btn btn-sm btn-danger"
+              <Button
+                size="sm"
+                variant="danger"
                 autoFocus
                 onClick={() => dispatch({ type: 'deleteComment', id: comment.id, now: environment.now() })}
               >
                 Delete
-              </button>
-              <button type="button" className="btn btn-sm" onClick={() => setConfirming(false)}>
+              </Button>
+              <Button size="sm" onClick={() => setConfirming(false)}>
                 Keep
-              </button>
+              </Button>
             </>
           ) : (
             <>

@@ -1,0 +1,50 @@
+# The form for reporting a problem. This file is made with the rest of this repository, from the repository where Jared is developed.
+name: Report a problem
+description: Something in the plugin does not work as it should.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues on GitHub are public. **Do not paste private code, passwords or other secrets.** If the problem is about one of your files, describe it, or use a small example instead.
+
+        This form does not promise an answer, a time or a fix.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: The version that the command `/plugin` shows in Claude Code.
+      placeholder: for example 0.11.3
+    validations:
+      required: true
+  - type: dropdown
+    id: opened
+    attributes:
+      label: Where did Jared open your file?
+      description: The browser pane is the browser inside the Claude app. Your own browser is one such as Safari, Chrome or Firefox.
+      options:
+        - In the browser pane of the Claude app
+        - In my own browser
+        - Another way, or I am not sure
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Your computer, and your browser
+      description: For example macOS and Safari, or Linux and Firefox. Leave the browser out if you used the pane of the Claude app.
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened?
+      description: "Say what you did and what you saw. If there was a message, copy it here. If the review did not come back, say how you sent it: **Submit review**, **Copy** or **Download**."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to see the problem again
+      description: The steps, if you know them. Leave out private code.

@@ -116,7 +116,9 @@ GitHub makes the same comparison on every push to `main`, and shows the result:
 
 This repository is made by a script from the repository where Jared is developed. Every release is published from there, and never from this repository.
 
-## Sending a change
+## Problems and changes
+
+To report a problem, [open an issue](https://github.com/snofla/claude-jared/issues/new/choose) on GitHub and choose **Report a problem**. Issues are public: do not paste private code or secrets. An issue does not promise an answer, a time or a fix.
 
 Patches are welcome. A patch that is accepted is merged here and into the repository where Jared is developed, so it stays in the releases that follow.
 

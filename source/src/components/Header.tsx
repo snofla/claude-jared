@@ -2,6 +2,7 @@ import { buttonLabel, statusOf, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
 import type { Review, SourceFile } from '../types'
 import type { Theme } from '../lib/theme'
+import { Button } from '../ui'
 import { IconBrand, IconDownload, IconFile, IconPanel, IconSend, IconUpload } from './icons'
 import { ThemeButton } from './ThemeButton'
 
@@ -60,22 +61,16 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
         {state.text}
       </span>
 
-      <button type="button" className="btn" onClick={onOpen}>
-        <IconUpload /> <span className="btn-label">Open…</span>
-      </button>
-      <button
-        type="button"
-        className={panelOpen ? 'btn is-on' : 'btn'}
-        aria-pressed={panelOpen}
-        onClick={onTogglePanel}
-        title="Toggle comment list"
-      >
-        <IconPanel /> <span className="count">{count}</span>
-      </button>
+      <Button icon={<IconUpload />} onClick={onOpen}>
+        <span className="btn-label">Open…</span>
+      </Button>
+      <Button icon={<IconPanel />} pressed={panelOpen} onClick={onTogglePanel} title="Toggle comment list">
+        <span className="count">{count}</span>
+      </Button>
       <ThemeButton theme={theme} onNext={onTheme} />
-      <button type="button" className="btn btn-primary" onClick={onSubmit} title={label} aria-label={label}>
-        {delivery ? <IconSend /> : <IconDownload />} <span className="submit-label">{label}</span>
-      </button>
+      <Button variant="primary" icon={delivery ? <IconSend /> : <IconDownload />} onClick={onSubmit} title={label} aria-label={label}>
+        <span className="submit-label">{label}</span>
+      </Button>
     </header>
   )
 }

@@ -1,7 +1,7 @@
 {
   "name": "jared",
   "description": "Work through a code review of a file or a diff, exported from Jared, the line-by-line review app",
-  "version": "0.11.3",
+  "version": "0.11.4",
   "author": {
     "name": "Alfons Hoogervorst"
   },

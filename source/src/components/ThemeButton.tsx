@@ -1,4 +1,5 @@
 import { themeLabel, type Theme } from '../lib/theme'
+import { Button } from '../ui'
 import { IconMonitor, IconMoon, IconSun } from './icons'
 
 interface Props {
@@ -11,8 +12,6 @@ interface Props {
 export function ThemeButton({ theme, onNext }: Props) {
   const label = themeLabel(theme)
   return (
-    <button type="button" className="btn btn-icon" onClick={onNext} title={label} aria-label={label}>
-      {theme === 'light' ? <IconSun /> : theme === 'dark' ? <IconMoon /> : <IconMonitor />}
-    </button>
+    <Button iconOnly icon={theme === 'light' ? <IconSun /> : theme === 'dark' ? <IconMoon /> : <IconMonitor />} onClick={onNext} title={label} aria-label={label} />
   )
 }

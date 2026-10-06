@@ -2,6 +2,12 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.11.4 — 2026-10-06
+
+- On a phone or a tablet, buttons in Jared are now 44 px high, so that a finger can press them. The header is taller as a result. With a mouse, nothing changes.
+- `THIRD-PARTY-NOTICES.md` now links to Jared's own license, `LICENSE`.
+- Problems can be reported as an issue on GitHub. The form **Report a problem** asks for what is needed, and the README says how to open it.
+
 ## 0.11.3 — 2026-10-06
 
 First public release.
