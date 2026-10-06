@@ -1,0 +1,1549 @@
+/* ---------- tokens ---------- */
+
+:root {
+  color-scheme: light dark;
+
+  /* light-dark(light, dark): the first colour is used in the light scheme, the second in the dark one. */
+  --bg: light-dark(#f3f4f6, #090c11);
+  --surface: light-dark(#ffffff, #11161d);
+  --surface-2: light-dark(#f6f7f9, #0d1218);
+  --border: light-dark(#dcdfe4, #2a313b);
+  --border-strong: light-dark(#c3c8cf, #3b4350);
+  /* The edge of a field (3:1 on --surface, WCAG 1.4.11). Buttons have text, so they keep --border-strong. */
+  --field-border: light-dark(#868e98, #657080);
+  --text: light-dark(#1c2128, #e6edf3);
+  --muted: light-dark(#5d6671, #8b949e);
+  --accent: light-dark(#4f46e5, #8b87ff);
+  --accent-ink: light-dark(#ffffff, #0b0d12);
+  --accent-soft: light-dark(rgba(79, 70, 229, 0.1), rgba(139, 135, 255, 0.14));
+
+  --code-bg: light-dark(#ffffff, #0d1117);
+  --code-text: light-dark(#24292e, #e1e4e8);
+  /* 4.5:1 on every row that carries a number, with any of the diff tint (none, added, deleted), the reviewed mark and the selection
+     laid over it: a test works out all twelve. The hover overlay and the flash lie under the gutter, so they never reach the
+     numbers. */
+  --gutter-text: light-dark(#5f6770, #98a2b0);
+  /* The number of a selected row, on the same twelve. */
+  --gutter-selected: light-dark(#453cd8, #b3b0ff);
+  --select-bg: light-dark(rgba(79, 70, 229, 0.15), rgba(139, 135, 255, 0.2));
+  --review-bg: light-dark(rgba(212, 167, 44, 0.14), rgba(210, 153, 34, 0.14));
+  --review-bar: light-dark(#a97c00, #d29922);
+
+  --add-bg: light-dark(#e9f8ee, rgba(46, 160, 67, 0.15));
+  /* The sign and the text of an added row: 4.5:1 on the added tint with or without the reviewed mark (a test checks it). */
+  --add-fg: light-dark(#187733, #56d364);
+  --add-line: light-dark(#c5ebd1, rgba(46, 160, 67, 0.3));
+  --del-bg: light-dark(#fdeeee, rgba(248, 81, 73, 0.13));
+  --del-fg: light-dark(#c6212c, #ff7b72);
+  /* The text of a hunk header: --accent is 4.18:1 in dark on the hunk tint with the reviewed mark, so this is a little lighter there. */
+  --hunk-fg: light-dark(#4f46e5, #9591ff);
+  --del-line: light-dark(#f6cfd1, rgba(248, 81, 73, 0.3));
+  --danger: light-dark(#cf222e, #ff7b72);
+  --warn-bg: light-dark(#fff6dd, rgba(210, 153, 34, 0.16));
+  --warn-fg: light-dark(#7a5b00, #e3b341);
+  --error-bg: light-dark(#fdeeee, rgba(248, 81, 73, 0.14));
+  --error-fg: light-dark(#a1111c, #ff9992);
+
+  --shadow-near: light-dark(rgba(20, 24, 31, 0.16), rgba(0, 0, 0, 0.55));
+  --shadow-far: light-dark(rgba(20, 24, 31, 0.12), rgba(0, 0, 0, 0.5));
+  --shadow: 0 10px 30px var(--shadow-near), 0 1px 3px var(--shadow-far);
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --gutter-w: 76px;
+  --row-h: 20px;
+}
+
+/* A choice made with the button in the header sets data-theme on <html> (src/lib/theme.ts); system leaves it off. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* Syntax colours: Shiki gives every token both palettes as custom properties, so theming stays pure CSS. */
+
+.code span,
+.diff-code span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
+}
+
+/* ---------- base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: 14px/1.5 var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--mono);
+}
+
+kbd {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  opacity: 0.75;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* ---------- buttons & small controls ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--muted);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Unavailable, but still focusable, so that the keyboard stays where it was when the button is pressed (a disabled button drops the focus). */
+.btn[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(1.1);
+}
+
+.btn-icon {
+  flex: none;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  color: var(--muted);
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  filter: brightness(1.1);
+}
+
+.btn-sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* A chip is one line of 20px, a pill. The label of a comment on a diff names a file and lines, and can be longer than the room, so a chip may
+   take a second line, and its ends stay round at 10px, which is a pill at one line. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 20px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font: 600 12px/1.3 var(--mono);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.chip-accent {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.chip-add {
+  background: var(--add-bg);
+  border-color: var(--add-line);
+  color: var(--add-fg);
+  font-family: var(--sans);
+  font-weight: 500;
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- header ---------- */
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.brand:hover {
+  background: var(--accent-soft);
+}
+
+.brand-lg {
+  font-size: 18px;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.landing-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.landing-top .brand-lg {
+  margin: 0;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.file-name {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-lines {
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.lang select {
+  height: 32px;
+  max-width: 160px;
+  padding: 0 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.status-pill {
+  display: inline-block;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: 24px;
+  line-height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.status-pill.tone-ok {
+  background: var(--add-bg);
+  border-color: var(--add-line);
+  color: var(--add-fg);
+}
+
+.status-pill.tone-warn {
+  background: var(--warn-bg);
+  border-color: transparent;
+  color: var(--warn-fg);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.banner-warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.banner-error {
+  background: var(--error-bg);
+  color: var(--error-fg);
+}
+
+/* That a review was sent: the chip's ok tone, which the header already uses for Sent. */
+.banner-ok {
+  background: var(--add-bg);
+  color: var(--add-fg);
+}
+
+.banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.banner-text > svg {
+  flex: none;
+}
+
+/* A name that a caller gave may be one long word: it breaks, so that the page does not grow sideways. */
+.banner-text > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- layout ---------- */
+
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.viewer {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12px;
+  background: var(--code-bg);
+}
+
+.viewer-main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.scroller {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  container-type: inline-size; /* lets inline panels size themselves to the viewport (100cqw) */
+  font: 13px/var(--row-h) var(--mono);
+  tab-size: 4;
+}
+
+.scroller.is-dragging {
+  user-select: none;
+  cursor: row-resize;
+}
+
+.inner {
+  width: max-content;
+  min-width: 100%;
+  padding-bottom: 96px;
+}
+
+.inner:focus {
+  outline: none;
+}
+
+.inner:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---------- code rows ---------- */
+
+.row {
+  --sel: transparent;
+  --rev: transparent;
+  position: relative;
+  display: flex;
+  min-height: var(--row-h);
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--row-h);
+  scroll-margin-block: 24px 72px;
+}
+
+.row.is-selected {
+  --sel: var(--select-bg);
+}
+
+.row.is-reviewed {
+  --rev: var(--review-bg);
+}
+
+.gutter,
+.code {
+  background:
+    linear-gradient(var(--sel), var(--sel)),
+    linear-gradient(var(--rev), var(--rev)),
+    linear-gradient(var(--tint), var(--tint)),
+    var(--code-bg);
+}
+
+.gutter {
+  position: sticky;
+  left: 0;
+  z-index: 3; /* over the hover overlay of .row::after (2) */
+  flex: 0 0 var(--gutter-w);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 12px 0 6px;
+  border-right: 1px solid var(--border);
+  color: var(--gutter-text);
+  cursor: pointer;
+  user-select: none;
+  /* A finger dragged down the line numbers selects a range. Without this the browser takes the drag for a scroll,
+     cancels the pointer, and the range never grows. Scrolling starts from the code, not from the numbers. */
+  touch-action: none;
+}
+
+/* The comment bars: one bar for each comment that covers the row, 3px wide, side by side in lanes at the left edge of the gutter, 6px apart
+   (`LANE_WIDTH` and `LANE_STEP` of src/lib/viewer.ts). The class is `lanes-` and the lanes that have a bar on the row as bits: 1 is the first
+   lane, where the one bar always was, 2 the second, 4 the third, so that 3 is the first and the second. A review in which no two comments
+   overlap has only the first lane and looks as it did. The bars are decoration for a screen reader; a press on one is read from the pointer. */
+.row.lanes-1 .gutter::before,
+.row.lanes-2 .gutter::before,
+.row.lanes-3 .gutter::before,
+.row.lanes-4 .gutter::before,
+.row.lanes-5 .gutter::before,
+.row.lanes-6 .gutter::before,
+.row.lanes-7 .gutter::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 16px;
+  pointer-events: none;
+}
+
+.row.lanes-1 .gutter::before {
+  background-image: linear-gradient(90deg, var(--review-bar) 0 3px, transparent 3px);
+}
+
+.row.lanes-2 .gutter::before {
+  background-image: linear-gradient(90deg, transparent 0 6px, var(--review-bar) 6px 9px, transparent 9px);
+}
+
+.row.lanes-3 .gutter::before {
+  background-image:
+    linear-gradient(90deg, var(--review-bar) 0 3px, transparent 3px),
+    linear-gradient(90deg, transparent 0 6px, var(--review-bar) 6px 9px, transparent 9px);
+}
+
+.row.lanes-4 .gutter::before {
+  background-image: linear-gradient(90deg, transparent 0 12px, var(--review-bar) 12px 15px, transparent 15px);
+}
+
+.row.lanes-5 .gutter::before {
+  background-image:
+    linear-gradient(90deg, var(--review-bar) 0 3px, transparent 3px),
+    linear-gradient(90deg, transparent 0 12px, var(--review-bar) 12px 15px, transparent 15px);
+}
+
+.row.lanes-6 .gutter::before {
+  background-image:
+    linear-gradient(90deg, transparent 0 6px, var(--review-bar) 6px 9px, transparent 9px),
+    linear-gradient(90deg, transparent 0 12px, var(--review-bar) 12px 15px, transparent 15px);
+}
+
+.row.lanes-7 .gutter::before {
+  background-image:
+    linear-gradient(90deg, var(--review-bar) 0 3px, transparent 3px),
+    linear-gradient(90deg, transparent 0 6px, var(--review-bar) 6px 9px, transparent 9px),
+    linear-gradient(90deg, transparent 0 12px, var(--review-bar) 12px 15px, transparent 15px);
+}
+
+/* The add button keeps out of the way of a second and a third lane. */
+.row.lanes-2 .gutter-add,
+.row.lanes-3 .gutter-add,
+.row.lanes-4 .gutter-add,
+.row.lanes-5 .gutter-add,
+.row.lanes-6 .gutter-add,
+.row.lanes-7 .gutter-add {
+  left: 20px;
+}
+
+.row.is-selected .gutter {
+  color: var(--gutter-selected);
+  font-weight: 600;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.gutter-add {
+  position: absolute;
+  left: 8px;
+  top: 2px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.row:hover .gutter-add,
+.gutter-add:focus-visible {
+  opacity: 1;
+}
+
+.code {
+  flex: 1 0 auto;
+  padding: 0 16px 0 14px;
+  white-space: pre;
+  color: var(--code-text);
+}
+
+/* A line too long to colour carries a note. It is generated content, so it is not part of the line's text for
+   selection or copying, and it stays in view while the long line is scrolled sideways. */
+.code[data-note]::before {
+  content: attr(data-note);
+  position: sticky;
+  left: calc(var(--gutter-w) + 8px);
+  display: inline-block;
+  margin-right: 10px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font: 12px/18px var(--sans);
+}
+
+/* hover / jump emphasis, drawn over the code and the sign. It lies under the gutter (z-index 2 against the gutter's 3), which is opaque, so that
+   the line numbers keep their contrast: 10% of --accent over the whole row took them to 4.1:1.
+   The code under it is checked for the rows that last and not for this brief state, as for the selection. */
+.row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--accent);
+  opacity: 0;
+}
+
+.row.is-hovered::after {
+  opacity: 0.1;
+}
+
+.row.is-flash::after {
+  animation: flash 1.4s ease-out;
+}
+
+@keyframes flash {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* A card that is pointed at, by a click on a comment bar or in the comments panel, flashes its outline. */
+.panel.is-flash .card {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  animation: card-flash 1.4s ease-out;
+}
+
+@keyframes card-flash {
+  from {
+    outline-color: var(--accent);
+  }
+  to {
+    outline-color: transparent;
+  }
+}
+
+/* ---------- inline panels (cards, composer) ---------- */
+
+.panel {
+  position: sticky;
+  left: 0;
+  width: 100cqw;
+  padding: 10px 20px 12px calc(var(--gutter-w) + 14px);
+  background: var(--surface-2);
+  border-block: 1px solid var(--border);
+  font: 14px/1.5 var(--sans);
+  white-space: normal;
+}
+
+.card {
+  max-width: 820px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  font-size: 13px;
+}
+
+.card-body {
+  padding: 0 12px 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+/* In a narrow code area (a phone, or the comments panel taking half the window) the three buttons do not fit in
+   one row: the suggestion button gets a row of its own and Cancel and Add comment stay in view below it. */
+@container (max-width: 540px) {
+  .card-foot {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .card-foot > .btn-ghost {
+    flex: 1 0 100%;
+    justify-content: flex-start;
+  }
+
+  .card-foot .spacer,
+  .card-foot .hint-keys {
+    display: none;
+  }
+}
+
+.composer .card-head {
+  padding-bottom: 6px;
+}
+
+.field {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px;
+  min-height: 76px;
+  max-height: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--surface);
+  resize: vertical;
+  field-sizing: content;
+}
+
+/* The browser's own placeholder colour is 3.94:1 in dark. Firefox also fades it, so the opacity is set. */
+.field::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.field-code {
+  font: 13px/1.5 var(--mono);
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+  min-height: 0;
+  max-height: 360px;
+}
+
+.suggest {
+  margin: 12px 12px 4px;
+}
+
+.suggest .field {
+  margin: 0;
+  width: 100%;
+}
+
+.suggest-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.suggest-label .muted {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.card > .suggest {
+  margin: 0 12px 12px;
+}
+
+.composer-status > .notice {
+  margin: 0 12px 12px;
+}
+
+.hint-keys {
+  font-size: 12px;
+}
+
+/* diff of original vs suggested lines */
+.diff {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font: 13px/20px var(--mono);
+}
+
+.diff-block {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.diff-block.del {
+  background: var(--del-bg);
+  border-bottom: 1px solid var(--del-line);
+}
+
+.diff-block.add {
+  background: var(--add-bg);
+}
+
+.diff-line {
+  display: flex;
+  min-width: max-content;
+  white-space: pre;
+}
+
+.diff-sign {
+  flex: 0 0 28px;
+  text-align: center;
+  user-select: none;
+}
+
+.del .diff-sign {
+  color: var(--del-fg);
+}
+
+.add .diff-sign {
+  color: var(--add-fg);
+}
+
+.diff-code {
+  padding-right: 12px;
+}
+
+/* ---------- floating selection bar ---------- */
+
+.selbar {
+  position: absolute;
+  /* Centred with auto margins and as wide as its content, up to the viewer: `left: 50%` would leave it half the viewer to be in. */
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: max-content;
+  bottom: 18px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* On a diff the label names a file and lines, which can be wider than a phone: the bar stays inside the viewer and the label wraps. */
+  max-width: calc(100% - 24px);
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  user-select: none;
+}
+
+/* A text drag that ends over the bar must not end inside it: the bar is outside the code container, which would
+   never see the mouse-up. So while a press that began in the code is held, the bar lets the pointer through. */
+.viewer:has(.inner:active) .selbar {
+  pointer-events: none;
+}
+
+.selbar-label {
+  min-width: 0;
+  font: 600 13px/1.3 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.selbar kbd {
+  border-color: light-dark(rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.5));
+  color: inherit;
+  margin-left: 2px;
+}
+
+/* ---------- overview ruler ---------- */
+
+.ruler {
+  position: relative;
+  background: var(--surface-2);
+  border-left: 1px solid var(--border);
+}
+
+.tick {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: var(--review-bar);
+}
+
+.tick-selection {
+  background: var(--accent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* ---------- side panel ---------- */
+
+.side {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.side-close {
+  display: none;
+}
+
+.side-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 24px 16px;
+  color: var(--muted);
+}
+
+.side-list {
+  flex: 1;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  overflow: auto;
+}
+
+.side-item {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+}
+
+.side-item:hover,
+.side-item.is-active {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.side-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.side-item-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- landing ---------- */
+
+.landing {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  overflow: auto;
+}
+
+.landing-inner {
+  width: min(640px, 100%);
+}
+
+.landing h1 {
+  font-size: clamp(28px, 5vw, 40px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: 14px 0 28px;
+  color: var(--muted);
+  font-size: 16px;
+  max-width: 54ch;
+}
+
+.dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 36px 20px;
+  border: 2px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dropzone-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.landing-alt {
+  margin-top: 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.recent {
+  margin-top: 36px;
+}
+
+.recent h2 {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.recent ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.recent li {
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+}
+
+.recent li + li {
+  border-top: 1px solid var(--border);
+}
+
+.recent-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--muted);
+}
+
+.recent-open:hover {
+  background: var(--surface-2);
+}
+
+.recent-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- dialog ---------- */
+
+.dialog {
+  width: min(720px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.dialog::backdrop {
+  background: rgba(8, 10, 14, 0.55);
+}
+
+.dialog-body {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.dialog-head h2 {
+  font-size: 18px;
+}
+
+.dialog-head code {
+  font-size: 13px;
+}
+
+.dialog-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.dialog .field {
+  width: 100%;
+  margin: 0;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.notice-info,
+.notice-warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+}
+
+.seg-btn {
+  padding: 2px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* A choice of two is a radio group (the control inside is visually hidden): the arrow keys move it, and it shows where the focus is. */
+.seg-btn:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.seg-btn.is-on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.preview {
+  margin: 0;
+  max-height: 280px;
+  padding: 12px 14px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--code-bg);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dialog-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+/* Words that a sender gave have no break in them when they are all wide, so they may break anywhere rather than widen the dialog. */
+.dialog-foot .status {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The buttons wrap as a group, to the right, so that a fourth one does not end up alone on the left. */
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.dialog-dest {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* The other ways to export, kept quiet under the main button in a group that is closed until it is needed. */
+.dialog-keep {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.dialog-keep summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dialog-keep-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.dialog-keep .dialog-actions {
+  justify-content: flex-start;
+  margin-left: 0;
+}
+
+/* The title and the × that closes the dialog. */
+.dialog-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* The caller's own words are put on the page, so a long label is cut here (the whole label is in the button's title and name) and
+   never reaches the layout; the dialog's title wraps. */
+.submit-label {
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-head h2 {
+  overflow-wrap: anywhere;
+}
+
+.status-error {
+  color: var(--error-fg);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+/* ---------- drag overlay ---------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 14, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.drop-card {
+  padding: 28px 40px;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background: var(--surface);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ---------- touch ---------- */
+
+/* iOS Safari zooms the page when a field whose text is under 16px takes focus, and it stays zoomed until the reader
+   pinches back. Fields are 16px on touch devices; zooming is not blocked, which would be an accessibility loss. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .field-code {
+    font-size: 16px;
+  }
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 899px) {
+  .side {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 30;
+    width: min(360px, 92vw);
+    box-shadow: var(--shadow);
+  }
+
+  .side-close {
+    display: inline-grid;
+  }
+}
+
+@media (max-width: 720px) {
+  .file-lines,
+  .hint-keys {
+    display: none;
+  }
+
+  /* The Open button shows only its icon here. Its text stays in the accessibility tree: `display: none` would
+     leave the button with no name. Measured in Chrome: empty with display:none, "Open…" with this. */
+  .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  /* file name gets its own row so it isn't squeezed to "use…" */
+  .file {
+    order: 10;
+    flex: 1 0 100%;
+  }
+
+  .lang select {
+    max-width: 128px;
+  }
+
+  .panel {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row.is-flash::after {
+    animation: none;
+  }
+
+  /* No fade: the outline stays as long as the card is pointed at. */
+  .panel.is-flash .card {
+    animation: none;
+    outline-color: var(--accent);
+  }
+}
+
+/* ---------- a diff in the code viewer ---------- */
+
+/* Two numbers in the gutter, the old file's and the new file's, so the gutter is wider. */
+.inner.is-diff {
+  --gutter-w: 100px;
+}
+
+.is-diff .num {
+  min-width: 4ch;
+  text-align: right;
+}
+
+.is-diff .num + .num {
+  margin-left: 6px;
+}
+
+/* A row of a diff is tinted by what it is. The tint is a layer of the same background as the selection and the reviewed
+   marks, so they show through it, and the gutter, which stays in place when the code is scrolled sideways, stays opaque. */
+.row {
+  --tint: transparent;
+}
+
+.row.is-add {
+  --tint: var(--add-bg);
+}
+
+.row.is-del {
+  --tint: var(--del-bg);
+}
+
+.row.is-hunk {
+  --tint: var(--accent-soft);
+}
+
+.row.is-file {
+  --tint: var(--border);
+}
+
+.sign {
+  flex: 0 0 22px;
+  padding-left: 4px;
+  text-align: center;
+  user-select: none;
+  color: var(--code-text);
+  background:
+    linear-gradient(var(--sel), var(--sel)),
+    linear-gradient(var(--rev), var(--rev)),
+    linear-gradient(var(--tint), var(--tint)),
+    var(--code-bg);
+}
+
+.row.is-add .sign {
+  color: var(--add-fg);
+}
+
+.row.is-del .sign {
+  color: var(--del-fg);
+}
+
+.sign + .code {
+  padding-left: 4px;
+}
+
+.row.is-hunk .code {
+  color: var(--hunk-fg);
+}
+
+.row.is-meta .code,
+.row.is-note .code {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.row.is-file .code {
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
+.row.is-file .code .file-path {
+  color: var(--text);
+}
+
+.row.is-file .chip {
+  margin-left: 10px;
+  font-weight: 500;
+}

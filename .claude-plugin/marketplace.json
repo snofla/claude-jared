@@ -1,0 +1,14 @@
+{
+  "name": "claude-jared",
+  "description": "Jared, the line-by-line review app: a skill that opens a file in it and brings the review back into the session.",
+  "owner": {
+    "name": "Alfons Hoogervorst"
+  },
+  "plugins": [
+    {
+      "name": "jared",
+      "source": "./claude-plugin",
+      "description": "Review a source file in Jared and work through the review in the session"
+    }
+  ]
+}

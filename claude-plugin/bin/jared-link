@@ -1,0 +1,474 @@
+#!/bin/sh
+# jared-link: make the link that opens a file in Jared, as a protocol "open" request in the link's fragment; or, with --file, open the
+# file in the one-file Jared, which is a page opened from a path, with the request in a script beside it; or, with --serve, put the file
+# in a review folder that a small service on this computer serves over http, so that a browser tool can show it.
+# Uses only sh, perl (JSON::PP, MIME::Base64, IO::Socket::INET, IO::Select and POSIX are in perl's core) and the common tools wc, date, basename
+# and tr, and for --file and --serve also dirname, mkdir, mktemp, find, ln, cp, rm, kill and sleep. Run it with --help for the options and the exit statuses.
+
+usage() {
+  cat <<'USAGE'
+Usage: jared-link <file> [--jared <address>] [--open] [--max <bytes>]
+       jared-link <file> --file [--page <path>] [--max <bytes>]
+       jared-link <file> --serve [--label <words>] [--closes moment|now|never] [--message <words>] [--banner true|false]
+                               [--port <number>] [--page <path>] [--max <bytes>]
+       jared-link --stop
+
+Prints a link that opens <file> in Jared: Jared's address, then #jared=<base64url JSON of an "open" request>.
+The fragment never goes to a server, so the file stays between the browser and whoever has the link.
+The request also names Claude as the one to tell (submitTarget), which only changes what the dialog says; it asks for no button.
+
+  --jared <address>   where Jared runs (default: $JARED_URL, or http://localhost:5173/)
+  --open              open the link in the system's browser (open, or xdg-open) instead of printing it; prints one sentence
+  --max <bytes>       the largest file to take (default 524288, which is what Jared opens)
+
+  --file              open <file> in the one-file Jared (a page that opens from a path) instead of making a link. The helper makes
+                      a folder for this review in the cache ($JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared), puts the page
+                      and a script, jared-boot.js, that gives the page the file, in it, opens the page with open or xdg-open, and
+                      prints one sentence. The script is removed after $JARED_BOOT_KEEP seconds (default 600), and review folders
+                      more than an hour old are removed the next time. The file may be as big as Jared opens.
+  --page <path>       the one-file page (default: $JARED_PAGE; else app/jared.html in the plugin, which a published copy has;
+                      else dist-single/jared.html of the repository that this plugin is in, which npm run build:single makes)
+
+  --serve             make the review folder as --file does, make sure that the Jared service is running, and print the address
+                      http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. The
+                      service is one process that every review uses: it listens on 127.0.0.1 only, answers GET and HEAD for the
+                      page and the script of a review folder and nothing else, and ends by itself after $JARED_SERVICE_IDLE
+                      seconds (default 1800) without a request. Its port, secret and pid are in the file "service" in the cache folder.
+  --label <words>     the words on the button that hands the review to the caller (1 to 40 characters), so that the page has a
+                      button and the caller can wait for the review with window.jared.waitForSubmit; for --serve only
+  --closes, --message, --banner
+                      what happens once the review is taken, as in the receiver; for --serve only
+  --port <number>     the port for a service that has to be started (default: any free port); for --serve only
+  --stop              stop the Jared service, if one is running, and say so
+
+Exit status: 0 done; 1 the file cannot be read; 2 a mistake in the command line; 3 too big (for a link, or for Jared);
+4 the file is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
+6 --file or --serve, and the one-file page is not there; 7 --file or --serve, and a folder or a file for the review cannot be made;
+8 --serve, and the service could not be started (the port is in use, or sockets cannot be opened).
+USAGE
+}
+
+fail() {
+  echo "jared-link: $1" >&2
+  exit "$2"
+}
+
+file=
+jared=${JARED_URL:-http://localhost:5173/}
+open=0
+fileway=0
+serve=0
+stop=0
+label=
+closes=
+message=
+banner=
+port=
+page=${JARED_PAGE:-}
+max=524288
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    --help | -h) usage; exit 0 ;;
+    --open) open=1 ;;
+    --file) fileway=1 ;;
+    --serve) serve=1 ;;
+    --stop) stop=1 ;;
+    --label)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--label needs the words for the button.' 2
+      # A plugin setting that was never set reaches the skill unfilled; a label that is still the setting's own name is no words, and the
+      # way on is the setting's default (leaving the label out would leave the page with no button).
+      case $2 in '${user_config.'*) fail "--label is still $2, which means that the plugin setting was never set. Use its default: --label \"Submit review\"." 2 ;; esac
+      label=$2
+      shift
+      ;;
+    --closes)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--closes needs moment, now or never.' 2
+      closes=$2
+      shift
+      ;;
+    --message)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--message needs the words that tell the reviewer that the review was sent.' 2
+      message=$2
+      shift
+      ;;
+    --banner)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--banner needs true or false.' 2
+      banner=$2
+      shift
+      ;;
+    --port)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--port needs a port number.' 2
+      port=$2
+      shift
+      ;;
+    --page)
+      [ $# -ge 2 ] || fail '--page needs the path of the page.' 2
+      page=$2
+      shift
+      ;;
+    --jared)
+      [ $# -ge 2 ] || fail '--jared needs an address.' 2
+      jared=$2
+      shift
+      ;;
+    --max)
+      [ $# -ge 2 ] || fail '--max needs a number of bytes.' 2
+      max=$2
+      shift
+      ;;
+    --*) fail "Unknown option \"$1\"." 2 ;;
+    *)
+      [ -z "$file" ] || fail 'Give one file, not several.' 2
+      file=$1
+      ;;
+  esac
+  shift
+done
+
+case $max in '' | *[!0-9]*) fail '--max must be a whole number of bytes.' 2 ;; esac
+case $jared in http://* | https://*) ;; *) fail 'The address of Jared must be an http or https address.' 2 ;; esac
+if [ "$stop" = 1 ]; then
+  { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--stop takes nothing else.' 2
+fi
+{ [ "$serve" = 0 ] || [ "$fileway" = 0 ]; } || fail '--serve and --file are two ways: give one.' 2
+if [ "$serve" = 0 ] && [ -n "$label$closes$message$banner$port" ]; then
+  fail '--label, --closes, --message, --banner and --port are for --serve.' 2
+fi
+case $closes in '' | moment | now | never) ;; *) fail '--closes must be moment, now or never.' 2 ;; esac
+case $banner in '' | true | false) ;; *) fail '--banner must be true or false.' 2 ;; esac
+case $port in '' | *[!0-9]*) [ -z "$port" ] || fail '--port must be a whole number.' 2 ;; *) [ "$port" -le 65535 ] || fail '--port must be at most 65535.' 2 ;; esac
+
+# The folder for the reviews: $JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared. Sets base.
+cache_base() {
+  if [ -n "${JARED_CACHE:-}" ]; then
+    base=$JARED_CACHE
+  elif [ -n "${XDG_CACHE_HOME:-}" ]; then
+    base=$XDG_CACHE_HOME/jared
+  elif [ -n "${HOME:-}" ]; then
+    base=$HOME/.cache/jared
+  else
+    fail 'There is no place for the review: set JARED_CACHE to a folder.' 7
+  fi
+}
+
+# Whether the service that the file "service" tells of answers on its port with its own pid: service_alive <port> <secret> <pid>.
+# A pid that a file names is never trusted by itself.
+service_alive() {
+  case $3 in '' | *[!0-9]* | 0*) return 1 ;; esac # a pid is a number that does not begin with 0: kill 0 is the whole process group
+  perl -MIO::Socket::INET -e '
+    my ($port, $token, $pid) = @ARGV;
+    alarm 3;
+    my $s = IO::Socket::INET->new(PeerAddr => "127.0.0.1", PeerPort => $port, Timeout => 2) or exit 1;
+    print $s "GET /$token/health HTTP/1.1\r\nHost: 127.0.0.1:$port\r\nConnection: close\r\n\r\n";
+    local $/;
+    my $r = <$s>;
+    exit(defined $r && $r =~ m{^HTTP/1\.1 200 [^\r]*\r\n.*\r\n\r\njared-service $pid\n}s ? 0 : 1);
+  ' "$1" "$2" "$3" > /dev/null 2>&1
+}
+
+# Makes sure that the Jared service is running, and sets svc_port and svc_token: the one that the file "service" tells of when it
+# answers, else a new one, started in the background, which writes the file and prints its port and secret.
+service_started() {
+  svc_port= svc_token= svc_pid=
+  if [ -f "$base/service" ]; then
+    read -r svc_port svc_token svc_pid < "$base/service" 2> /dev/null
+    service_alive "$svc_port" "$svc_token" "$svc_pid" && return 0
+  fi
+  idle=${JARED_SERVICE_IDLE:-1800}
+  case $idle in '' | *[!0-9]*) idle=1800 ;; esac
+  started=$(perl - "$base" "$idle" "${port:-0}" <<'PERL'
+    use strict;
+    use warnings;
+    use IO::Socket::INET;
+    use IO::Select;
+    use POSIX qw(setsid);
+    my ($base, $idle, $want) = @ARGV;
+    open(my $rnd, "<:raw", "/dev/urandom") or exit 8;
+    (read($rnd, my $bytes, 16) // 0) == 16 or exit 8;
+    close $rnd;
+    my $token = unpack("H*", $bytes);
+    my $srv = IO::Socket::INET->new(Listen => 20, LocalAddr => "127.0.0.1", LocalPort => $want, ReuseAddr => 1) or exit 8;
+    my $port = $srv->sockport;
+    my $state = "$base/service";
+    my $daemon = 0;
+    pipe(my $ready_r, my $ready_w) or exit 8;
+    my $pid = fork;
+    defined $pid or exit 8;
+    if ($pid) {
+      close $ready_w;
+      my $ok = <$ready_r>;
+      defined $ok && $ok eq "ok\n" or exit 8;
+      print "$port $token\n";
+      exit 0;
+    }
+    close $ready_r;
+    setsid();
+    open(STDIN, "<", "/dev/null");
+    open(STDOUT, ">", "/dev/null");
+    open(STDERR, ">", "/dev/null");
+    $daemon = $$;
+    sub mine {
+      open(my $f, "<", $state) or return 0;
+      my $line = <$f>;
+      return defined $line && $line eq "$port $token $daemon\n";
+    }
+    sub finish {
+      unlink $state if mine();
+      exit 0;
+    }
+    sub reply {
+      my ($c, $code, $text, $type, $body, $head, $extra) = @_;
+      my $out = "HTTP/1.1 $code $text\r\nContent-Type: $type\r\nContent-Length: " . length($body) . "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n" . ($extra // "") . "\r\n";
+      $out .= $body unless $head;
+      my $off = 0;
+      while ($off < length $out) {
+        my $n = syswrite($c, $out, 65536, $off);
+        defined $n or return;
+        $off += $n;
+      }
+    }
+    sub answer {
+      my $c = shift;
+      my $sel = IO::Select->new($c);
+      my $buf = "";
+      until ($buf =~ /\r\n\r\n/) {
+        length($buf) < 8192 or return reply($c, 431, "Request Header Fields Too Large", "text/plain", "Too large\n");
+        $sel->can_read(5) or return;
+        sysread($c, my $chunk, 4096) or return;
+        $buf .= $chunk;
+      }
+      my ($line, @headers) = split /\r\n/, $buf;
+      defined $line && $line =~ m{^([A-Z]+) (\S+) HTTP/1\.[01]$} or return reply($c, 400, "Bad Request", "text/plain", "Bad request\n");
+      my ($method, $target) = ($1, $2);
+      $method eq "GET" || $method eq "HEAD" or return reply($c, 405, "Method Not Allowed", "text/plain", "Method not allowed\n", 0, "Allow: GET, HEAD\r\n");
+      my ($host) = map { /^host:\s*(.*?)\s*$/i ? lc($1) : () } @headers;
+      defined $host && ($host eq "127.0.0.1:$port" || $host eq "localhost:$port") or return reply($c, 403, "Forbidden", "text/plain", "Forbidden\n");
+      my $head = $method eq "HEAD";
+      return reply($c, 200, "OK", "text/plain; charset=utf-8", "jared-service $daemon\n", $head) if $target eq "/$token/health";
+      if ($target =~ m{^/$token/(review\.[A-Za-z0-9]{6})/(jared\.html|jared-boot\.js)$}) {
+        my ($folder, $name) = ($1, $2);
+        my $path = "$base/$folder/$name";
+        my $type = $name eq "jared.html" ? "text/html; charset=utf-8" : "text/javascript; charset=utf-8";
+        if (-f $path && !-l $path && open(my $f, "<:raw", $path)) {
+          local $/;
+          my $body = <$f>;
+          close $f;
+          return reply($c, 200, "OK", $type, $body, $head);
+        }
+      }
+      reply($c, 404, "Not Found", "text/plain", "Not found\n", $head);
+    }
+    {
+      my $tmp = "$state.$$";
+      open(my $o, ">", $tmp) or exit 8;
+      print $o "$port $token $daemon\n";
+      close($o) or exit 8;
+      rename($tmp, $state) or exit 8;
+    }
+    print $ready_w "ok\n";
+    close $ready_w;
+    $SIG{TERM} = \&finish;
+    $SIG{INT} = \&finish;
+    $SIG{ALRM} = \&finish;
+    $SIG{CHLD} = "IGNORE";
+    alarm $idle;
+    while (my $c = $srv->accept) {
+      alarm $idle;
+      my $kid = fork;
+      if (defined $kid && $kid == 0) {
+        close $srv;
+        $SIG{TERM} = "DEFAULT";
+        $SIG{ALRM} = "DEFAULT";
+        alarm 10;
+        answer($c);
+        exit 0;
+      }
+      close $c;
+    }
+PERL
+  ) || return 1
+  read -r svc_port svc_token <<EOF
+$started
+EOF
+}
+
+if [ "$stop" = 1 ]; then
+  cache_base
+  svc_port= svc_token= svc_pid=
+  [ -f "$base/service" ] && read -r svc_port svc_token svc_pid < "$base/service" 2> /dev/null
+  if service_alive "$svc_port" "$svc_token" "$svc_pid"; then
+    kill "$svc_pid" 2> /dev/null
+    waited=0
+    while kill -0 "$svc_pid" 2> /dev/null && [ "$waited" -lt 20 ]; do
+      sleep 0.1
+      waited=$((waited + 1))
+    done
+    echo 'Stopped the Jared service.'
+  else
+    rm -f "$base/service"
+    echo 'No Jared service is running.'
+  fi
+  exit 0
+fi
+
+[ -n "$file" ] || { usage >&2; exit 2; }
+[ -f "$file" ] && [ -r "$file" ] || fail "\"$file\" is not a file that can be read." 1
+
+size=$(wc -c < "$file" | tr -d ' ')
+if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
+  [ "$size" -le "$max" ] || fail "\"$file\" is $size bytes, and $max is the most that Jared opens." 3
+else
+  [ "$size" -le "$max" ] || fail "\"$file\" is $size bytes, and $max is the most for a link." 3
+fi
+
+name=$(basename "$file")
+now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+
+if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
+  if [ "$serve" = 1 ]; then
+    opener=
+  elif command -v open > /dev/null 2>&1; then
+    opener=open
+  elif command -v xdg-open > /dev/null 2>&1; then
+    opener=xdg-open
+  else
+    fail 'There is no way to open a browser here (open or xdg-open).' 5
+  fi
+
+  if [ -z "$page" ]; then
+    here=$(cd "$(dirname "$0")" 2> /dev/null && pwd)
+    # A published copy of the plugin carries the page, at app/jared.html; in the repository it is the one that npm run build:single made.
+    page=$here/../app/jared.html
+    [ -f "$page" ] || page=$here/../../dist-single/jared.html
+  fi
+  { [ -f "$page" ] && [ -r "$page" ]; } || fail "The one-file page is not at \"$page\". Reinstall the plugin, or, in the Jared source, build it with npm run build:single, or give --page <path>." 6
+
+  cache_base
+  umask 077
+  mkdir -p "$base" 2> /dev/null || fail "The cache folder \"$base\" cannot be made. Set JARED_CACHE to another folder." 7
+  # Folders of earlier reviews, left for more than an hour, are removed, and only a folder that holds a page of ours.
+  find "$base" -maxdepth 1 -name 'review.*' -mmin +60 2> /dev/null | while IFS= read -r old; do
+    [ -f "$old/jared.html" ] && rm -rf "$old"
+  done
+  dir=$(mktemp -d "$base/review.XXXXXX" 2> /dev/null) || fail "A folder for the review cannot be made in \"$base\"." 7
+  # A hard link, so that a review costs no copy of the page; a copy where a link cannot be made (another volume).
+  if ! { ln "$page" "$dir/jared.html" 2> /dev/null || cp "$page" "$dir/jared.html" 2> /dev/null; }; then
+    rm -rf "$dir"
+    fail "The page cannot be copied into \"$dir\"." 7
+  fi
+
+  # The request, as the script that sets window.__JARED_BOOT: perl does the JSON, in ASCII, so that no byte of the file is for the browser to decode.
+  # With --serve the request also has the button's words and what happens when the review is taken (empty words are left out).
+  perl -MJSON::PP -e '
+    my ($file, $name, $now, $out, $label, $closes, $message, $banner) = @ARGV;
+    open(my $in, "<:raw", $file) or exit 1;
+    local $/;
+    my $text = <$in>;
+    utf8::decode($text) or exit 4;
+    my $request = { protocol => 1, id => "boot1", type => "open", name => $name, text => $text, review => undef, now => $now, submitTarget => "Claude" };
+    # The words as the page takes them (src/engine/protocol.ts, words): trimmed, something that can be seen in them, no control or
+    # invisible characters but a joiner and a non-joiner, at most $max characters, and (here) not starting with two hyphens.
+    my $clean = sub {
+      my ($words, $max) = @_;
+      utf8::decode($words);
+      $words =~ s/^\s+|\s+$//g;
+      return undef if length($words) > $max || $words !~ /[^\s\p{Cf}]/ || $words =~ /^--/;
+      (my $shown = $words) =~ s/[\x{200c}\x{200d}]//g;
+      return undef if $shown =~ /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}\p{Cf}]/;
+      return $words;
+    };
+    if (length $label) {
+      $request->{submitLabel} = $clean->($label, 40) // exit 9;
+    }
+    my %options;
+    $options{closes} = $closes if length $closes;
+    if (length $message) {
+      $options{message} = $clean->($message, 80) // exit 10;
+    }
+    $options{banner} = $banner eq "true" ? JSON::PP::true : JSON::PP::false if length $banner;
+    $request->{submitOptions} = \%options if %options;
+    my $json = JSON::PP->new->ascii->canonical->encode([$request]);
+    open(my $o, ">", $out) or exit 7;
+    print $o "window.__JARED_BOOT = $json\n";
+    close($o) or exit 7;
+  ' "$file" "$name" "$now" "$dir/jared-boot.js" "$label" "$closes" "$message" "$banner" || {
+    status=$?
+    rm -rf "$dir"
+    case $status in
+      4) fail "\"$file\" is not text in UTF-8." 4 ;;
+      7) fail "The script for the review cannot be written in \"$dir\"." 7 ;;
+      9) fail '--label must be 1 to 40 characters, with no control or invisible characters, and must not start with two hyphens.' 2 ;;
+      10) fail '--message must be 1 to 80 characters, with no control or invisible characters, and must not start with two hyphens.' 2 ;;
+      *) fail "\"$file\" could not be turned into a request (status $status)." 1 ;;
+    esac
+  }
+
+  keep=${JARED_BOOT_KEEP:-600}
+  case $keep in *[!0-9]*) keep=600 ;; esac
+
+  if [ "$serve" = 1 ]; then
+    service_started || {
+      rm -rf "$dir"
+      fail 'The Jared service could not be started (the port is in use, or sockets cannot be opened).' 8
+    }
+    (
+      sleep "$keep"
+      rm -f "$dir/jared-boot.js"
+    ) > /dev/null 2>&1 < /dev/null &
+    echo "http://127.0.0.1:$svc_port/$svc_token/$(basename "$dir")/jared.html"
+    exit 0
+  fi
+
+  "$opener" "$dir/jared.html" || {
+    rm -rf "$dir"
+    fail "The page could not be opened with $opener." 5
+  }
+  # The page has read the script by then, unless its tab was slow to load, and the file need not stay in the cache.
+  (
+    sleep "$keep"
+    rm -f "$dir/jared-boot.js"
+  ) > /dev/null 2>&1 < /dev/null &
+  echo "Opened $name in Jared from $dir/jared.html."
+  exit 0
+fi
+
+# The whole request, as JSON, as base64url: perl does the JSON, which sh cannot do for any text.
+link=$(perl -MJSON::PP -MMIME::Base64 -e '
+  my ($file, $name, $now, $base) = @ARGV;
+  open(my $in, "<:raw", $file) or exit 1;
+  local $/;
+  my $text = <$in>;
+  utf8::decode($text) or exit 4;
+  my $json = JSON::PP->new->utf8->canonical->encode({ protocol => 1, id => "link1", type => "open", name => $name, text => $text, review => undef, now => $now, submitTarget => "Claude" });
+  my $value = encode_base64($json, "");
+  $value =~ tr{+/}{-_};
+  $value =~ s/=+$//;
+  exit 3 if length($value) > 1000000;
+  $base =~ s/#.*//s;
+  print "$base#jared=$value";
+' "$file" "$name" "$now" "$jared") || {
+  status=$?
+  case $status in
+    4) fail "\"$file\" is not text in UTF-8." 4 ;;
+    3) fail "\"$file\" is too big for a link once it is written out." 3 ;;
+    *) fail "\"$file\" could not be turned into a link (status $status)." 1 ;;
+  esac
+}
+
+if [ "$open" = 0 ]; then
+  printf '%s\n' "$link"
+  exit 0
+fi
+
+# Opening goes through the command line, which takes a link of some length only: a single argument may be 128 KB.
+[ "${#link}" -le 100000 ] || fail "The link is ${#link} characters, too long to open from the command line. Print it instead, or use the receiver." 3
+if command -v open > /dev/null 2>&1; then
+  opener=open
+elif command -v xdg-open > /dev/null 2>&1; then
+  opener=xdg-open
+else
+  fail 'There is no way to open a browser here (open or xdg-open). Print the link instead.' 5
+fi
+"$opener" "$link" || fail "$opener could not open the link." 5
+echo "Opened $name in Jared at ${jared%%\#*}."

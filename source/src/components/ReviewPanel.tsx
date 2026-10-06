@@ -1,0 +1,60 @@
+import { commentLabel } from '../lib/review'
+import type { ReviewComment } from '../types'
+import { IconMessage, IconX } from './icons'
+
+interface Props {
+  comments: ReviewComment[]
+  hoveredId: string | null
+  onHover: (id: string | null) => void
+  onJump: (comment: ReviewComment) => void
+  onClose: () => void
+}
+
+export function ReviewPanel({ comments, hoveredId, onHover, onJump, onClose }: Props) {
+  return (
+    <aside className="side" aria-label="Review comments">
+      <header className="side-head">
+        <h2>
+          Comments <span className="count">{comments.length}</span>
+        </h2>
+        <button type="button" className="icon-btn side-close" aria-label="Close panel" onClick={onClose}>
+          <IconX />
+        </button>
+      </header>
+
+      {comments.length === 0 ? (
+        <div className="side-empty">
+          <IconMessage />
+          <p>
+            <strong>Nothing yet.</strong>
+          </p>
+          <p>
+            Click a line number, drag across several, or shift-click to extend. Then press <kbd>C</kbd> to comment.
+          </p>
+        </div>
+      ) : (
+        <ol className="side-list">
+          {comments.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                className={c.id === hoveredId ? 'side-item is-active' : 'side-item'}
+                onClick={() => onJump(c)}
+                onMouseEnter={() => onHover(c.id)}
+                onMouseLeave={() => onHover(null)}
+                onFocus={() => onHover(c.id)}
+                onBlur={() => onHover(null)}
+              >
+                <span className="side-item-top">
+                  <span className="chip">{commentLabel(c)}</span>
+                  {c.suggestion !== null && <span className="chip chip-add">± suggestion</span>}
+                </span>
+                <span className="side-item-text">{c.comment || 'Suggested change'}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </aside>
+  )
+}

@@ -1,0 +1,49 @@
+# Builds the page from source/ and compares it with the page that the plugin carries.
+# This file is made with the rest of this repository, from the repository where Jared is developed.
+name: Page checksum
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: The page is built from source/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Node 26
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+
+      - name: Build the page from source/
+        working-directory: source
+        run: |
+          npm ci
+          npm run build:single
+
+      - name: Compare the built page with the one in the plugin
+        run: |
+          built=$(sha256sum source/dist-single/jared.html | cut -d ' ' -f 1)
+          shipped=$(sha256sum claude-plugin/app/jared.html | cut -d ' ' -f 1)
+          {
+            echo '### The page'
+            echo
+            echo "- sha256 of the page built from source/: \`$built\`"
+            echo "- sha256 of claude-plugin/app/jared.html: \`$shipped\`"
+            echo "- git hash of source/ at this commit: \`$(git rev-parse HEAD:source)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$built" != "$shipped" ]; then
+            echo 'The page built from source/ is not the one in claude-plugin/app/jared.html.' >&2
+            echo "built:   $built" >&2
+            echo "shipped: $shipped" >&2
+            exit 1
+          fi
+          echo "The page built from source/ is the one in claude-plugin/app/jared.html: $shipped"

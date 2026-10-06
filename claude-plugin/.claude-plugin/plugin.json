@@ -1,0 +1,25 @@
+{
+  "name": "jared",
+  "description": "Work through a code review of a file or a diff, exported from Jared, the line-by-line review app",
+  "version": "0.11.3",
+  "author": {
+    "name": "Alfons Hoogervorst"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/snofla/claude-jared",
+  "repository": "https://github.com/snofla/claude-jared",
+  "userConfig": {
+    "jared_url": {
+      "type": "string",
+      "title": "Where Jared runs",
+      "description": "The address of a Jared that runs somewhere already. Leave it empty to use the copy of Jared that this plugin carries, which needs nothing else to run. Set it only for a Jared that you run yourself or trust: the plugin opens your file there, and the page at that address receives it. This works for a file of up to about 75 KB.",
+      "default": ""
+    },
+    "submit_label": {
+      "type": "string",
+      "title": "Words on Jared's review button",
+      "description": "What Jared calls the button that hands the review back to Claude (1 to 40 characters). The default is Submit review.",
+      "default": "Submit review"
+    }
+  }
+}
