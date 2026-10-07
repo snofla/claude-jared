@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, type Dispatch } from 'react'
 import { useLatest } from './useTokens'
 import type { Outbox } from '../engine/outbox'
 import { handleAppMessage, waitForSubmit } from '../engine/page-host'
-import { PROTOCOL_VERSION, type Reply, type SubmittedEvent } from '../engine/protocol'
+import { PROTOCOL_VERSION, type Event, type Reply } from '../engine/protocol'
 import { usePlatform } from './usePlatform'
+import { declinedNotice } from '../state/declined'
 import { reducer, type Action, type AppState } from '../state/reducer'
 import type { SourceFile } from '../types'
 
@@ -13,10 +14,11 @@ export interface PageApi {
   /** Send a request as plain JSON and get its replies, as `Engine.handleMessage` does. */
   handleMessage(value: unknown): Reply[]
   /**
-   * Take the review that the reviewer hands over, waiting up to `timeoutMs` (default 40 s, at most 10 minutes): the `submitted`
-   * message, or `{ type: "timeout" }`. A review handed over before the call is kept for it.
+   * Take what the page has for the script, waiting up to `timeoutMs` (default 40 s, at most 10 minutes): the `submitted` message when the
+   * reviewer hands the review over, the `cancelled` message when the reviewer gives it up, or `{ type: "timeout" }`. An event that came
+   * before the call is kept for it.
    */
-  waitForSubmit(timeoutMs?: number): Promise<SubmittedEvent | { type: 'timeout' }>
+  waitForSubmit(timeoutMs?: number): Promise<Event | { type: 'timeout' }>
 }
 
 declare global {
@@ -29,7 +31,9 @@ declare global {
  * Offer the protocol to scripts on the page (a browser tool, a test, the console) as `window.jared`. All the rules are in
  * `handleAppMessage`; this keeps a copy of the page's state that a call replaces at once, so that two calls in one script
  * see each other, and gives what a call changes to the page. `onAdopted` says what the page also does for a file that a
- * request has opened or closed: the file, or `null`, and whether it is another file than before.
+ * request has opened or closed: the file, or `null`, and whether it is another file than before. `onDeclined` is given the words for
+ * the reviewer when a script's `open` or `close` through `window.jared.handleMessage` is declined: the script gets the reply, and the
+ * reviewer would be told nothing. A request that the page's own code applies is not told this way, as that code asks the reviewer itself.
  *
  * It returns the function behind `window.jared.handleMessage`, which the page's own code may also call with `discard`: the
  * request is then run as if no reviewer were at work, for when the reviewer has just agreed to give that work up.
@@ -38,7 +42,8 @@ export function usePageApi(
   state: AppState,
   dispatch: Dispatch<Action>,
   onAdopted: (file: SourceFile | null, another: boolean) => void,
-  outbox: Outbox<SubmittedEvent>,
+  outbox: Outbox<Event>,
+  onDeclined: (text: string) => void,
 ): (value: unknown, discard?: boolean) => Reply[] {
   const { reviews } = usePlatform()
   const mirror = useRef(state)
@@ -46,6 +51,7 @@ export function usePageApi(
     mirror.current = state // whatever the reviewer has done is what a call sees next
   }, [state])
   const adopted = useLatest(onAdopted)
+  const declined = useLatest(onDeclined)
 
   const apply = useCallback(
     (value: unknown, discard = false): Reply[] => {
@@ -64,12 +70,19 @@ export function usePageApi(
   )
 
   useEffect(() => {
-    const api: PageApi = { protocol: PROTOCOL_VERSION, handleMessage: (value) => apply(value), waitForSubmit: (timeoutMs) => waitForSubmit(outbox, timeoutMs) }
+    const handleMessage = (value: unknown): Reply[] => {
+      const page = { fileName: mirror.current.file?.name ?? null, submitTarget: mirror.current.submitTarget }
+      const replies = apply(value)
+      const text = declinedNotice(value, replies, page)
+      if (text !== null) declined.current(text)
+      return replies
+    }
+    const api: PageApi = { protocol: PROTOCOL_VERSION, handleMessage, waitForSubmit: (timeoutMs) => waitForSubmit(outbox, timeoutMs) }
     window.jared = api
     return () => {
       if (window.jared === api) delete window.jared
     }
-  }, [apply, outbox])
+  }, [apply, outbox, declined])
 
   return apply
 }

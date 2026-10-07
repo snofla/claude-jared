@@ -39,6 +39,17 @@ export function closeFile(platform: Platform): void {
   platform.reviews.setLast(null)
 }
 
+/** Whether giving the review up needs a question first: there is something to lose: saved comments, an overall summary or a comment being written. An empty review is given up at once. */
+export function mustAskBeforeCancel(session: OpenSession): boolean {
+  return (session.review?.comments.length ?? 0) > 0 || (session.review?.summary.trim() ?? '') !== '' || draftHasText(session.draft)
+}
+
+/** Give a review up: forget the file and its review, as Forget does on the start page, and remember that no file is open. */
+export function cancelReview(platform: Platform, hash: string): void {
+  platform.reviews.forget(hash)
+  closeFile(platform)
+}
+
 /** The file, kept, with the review that was kept for it (a file that was reviewed before comes back as it was, language included). */
 function open(platform: Platform, incoming: SourceFile): Extract<OpenOutcome, { kind: 'opened' }> {
   const stored = platform.reviews.review(incoming.hash)

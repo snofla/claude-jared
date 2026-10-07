@@ -1,7 +1,7 @@
 import { StrictMode, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as ui from './ui'
-import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconPencil, IconPlus, IconSend, IconTrash, IconX, Kbd, LinkButton, LiveStatus, Notice, Select, SegmentedControl, TextField, type SegmentedOption } from './ui'
+import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption } from './ui'
 import './styles.css'
 import './gallery.css'
 
@@ -176,6 +176,8 @@ function ComponentStates() {
   const [message, setMessage] = useState<string | null>('Review sent to Claude.')
   const [shown, setShown] = useState(true)
   const [modal, setModal] = useState(false)
+  const [scheme, setScheme] = useState<'system' | 'light' | 'dark'>('system')
+  const [chosen, setChosen] = useState('nothing yet')
   return (
     <>
       <h3 className="gallery-component">IconButton</h3>
@@ -316,6 +318,62 @@ function ComponentStates() {
         </div>
       </Group>
 
+      <h3 className="gallery-component">Menu</h3>
+      <Group title="A button that opens a list: press it, then use the arrow keys, Home, End, Enter, Escape, Tab and a press outside; the last choice is written beside it">
+        <div className="gallery-menu">
+          <span className="muted gallery-menu-said">Last chosen: {chosen}</span>
+          <Menu label="More actions" icon={<IconMore />}>
+            <MenuItem icon={<IconUpload />} onSelect={() => setChosen('Open…')}>
+              Open…
+            </MenuItem>
+            <MenuSeparator />
+            <MenuGroup label="Colour scheme">
+              {(['system', 'light', 'dark'] as const).map((choice) => (
+                <MenuRadioItem
+                  key={choice}
+                  checked={scheme === choice}
+                  onSelect={() => {
+                    setScheme(choice)
+                    setChosen(`colour scheme ${choice}`)
+                  }}
+                >
+                  {choice[0].toUpperCase() + choice.slice(1)}
+                </MenuRadioItem>
+              ))}
+            </MenuGroup>
+            <MenuSeparator />
+            <MenuItem icon={<IconX />} onSelect={() => setChosen('Cancel review')}>
+              Cancel review
+            </MenuItem>
+          </Menu>
+        </div>
+      </Group>
+      <Group title="Drawn open, lined up with the end of its button as in a bar (the list is over the page, so the gallery leaves it room)">
+        <div className="gallery-menu">
+          <Menu label="More actions" icon={<IconMore />} defaultOpen>
+            <MenuItem icon={<IconUpload />} onSelect={() => {}}>
+              Open…
+            </MenuItem>
+            <MenuSeparator />
+            <MenuGroup label="Colour scheme">
+              <MenuRadioItem checked={false} onSelect={() => {}}>
+                System
+              </MenuRadioItem>
+              <MenuRadioItem checked onSelect={() => {}}>
+                Light
+              </MenuRadioItem>
+              <MenuRadioItem checked={false} onSelect={() => {}}>
+                Dark
+              </MenuRadioItem>
+            </MenuGroup>
+            <MenuSeparator />
+            <MenuItem icon={<IconX />} onSelect={() => {}}>
+              Cancel review
+            </MenuItem>
+          </Menu>
+        </div>
+      </Group>
+
       <h3 className="gallery-component">FloatingToolbar</h3>
       <Group title="A bar of controls in a pill (placed in the flow here: where it floats is the caller's), and one whose words take a second line (it stays round)">
         <div className="gallery-cards">
@@ -380,7 +438,7 @@ function ComponentStates() {
       </Group>
 
       <h3 className="gallery-component">Icons</h3>
-      <Group title="All sixteen, at their size (the trash can is the app's own; the others follow Feather and Lucide)">
+      <Group title="All seventeen, at their size (the trash can is the app's own; the others follow Feather and Lucide)">
         {Object.entries(ui)
           .filter(([name]) => /^Icon[A-Z]/.test(name) && name !== 'IconButton')
           .map(([name, Icon]) => {

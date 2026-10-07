@@ -1,9 +1,9 @@
+import { COPY } from '../lib/copy'
 import { buttonLabel, statusOf, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
 import type { Review, SourceFile } from '../types'
-import type { Theme } from '../lib/theme'
-import { Badge, Button, IconBrand, IconDownload, IconFile, IconPanel, IconSend, IconUpload, Select } from '../ui'
-import { ThemeButton } from './ThemeButton'
+import { THEMES, type Theme } from '../lib/theme'
+import { Badge, Button, IconBrand, IconDownload, IconFile, IconMore, IconPanel, IconSend, IconUpload, IconX, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
 import { Version } from './Version'
 
 /** The tone of a status, as `statusOf` names it, in the words of `Badge`. */
@@ -19,16 +19,19 @@ interface Props {
   onLanguage: (language: string) => void
   /** Opens the dialog. What the button is called, and its icon, follow what takes the review (`delivery`); the default is Export. */
   onSubmit: () => void
+  /** Called when the reviewer presses Cancel review; the page asks first when there is something to lose. */
+  onCancel: () => void
   delivery: Delivery | null
   /** The review is with a script that drives the page, which has not taken it yet. */
   handedOver: boolean
   /** When the review was last sent to its delivery; `null` if never (it may still have been exported). */
   sentAt: string | null
   theme: Theme
-  onTheme: () => void
+  /** Called when the reviewer chooses a colour scheme in the menu. */
+  onTheme: (theme: Theme) => void
 }
 
-export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen, onLanguage, onSubmit, delivery, handedOver, sentAt, theme, onTheme }: Props) {
+export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen, onLanguage, onSubmit, onCancel, delivery, handedOver, sentAt, theme, onTheme }: Props) {
   const state = statusOf(review, delivery, handedOver, sentAt)
   const label = buttonLabel(delivery)
   const count = review.comments.length
@@ -61,13 +64,26 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
         {state.text}
       </Badge>
 
-      <Button icon={<IconUpload />} onClick={onOpen}>
-        <span className="btn-label">Open…</span>
-      </Button>
       <Button icon={<IconPanel />} pressed={panelOpen} onClick={onTogglePanel} title="Toggle comment list">
         <Badge variant="count">{count}</Badge>
       </Button>
-      <ThemeButton theme={theme} onNext={onTheme} />
+      <Menu label={COPY.moreActions} icon={<IconMore />}>
+        <MenuItem icon={<IconUpload />} onSelect={onOpen}>
+          Open…
+        </MenuItem>
+        <MenuSeparator />
+        <MenuGroup label={COPY.colourScheme}>
+          {THEMES.map((choice) => (
+            <MenuRadioItem key={choice} checked={theme === choice} onSelect={() => onTheme(choice)}>
+              {COPY.themeChoice[choice]}
+            </MenuRadioItem>
+          ))}
+        </MenuGroup>
+        <MenuSeparator />
+        <MenuItem icon={<IconX />} onSelect={onCancel}>
+          {COPY.cancelReview}
+        </MenuItem>
+      </Menu>
       <Button variant="primary" icon={delivery ? <IconSend /> : <IconDownload />} onClick={onSubmit} title={label} aria-label={label}>
         <span className="submit-label">{label}</span>
       </Button>

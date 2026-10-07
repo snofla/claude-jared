@@ -126,3 +126,20 @@
   margin: 0 0 12px;
   width: min(720px, 100%);
 }
+
+/* A menu, whose list is over the page: the gallery gives it room under its button, and puts the button at the right end of its row, as in a bar. */
+.gallery-menu {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: flex-start;
+  min-height: 270px;
+}
+
+.gallery-menu-said {
+  margin-right: auto;
+}
+
+.gallery-menu > .jared-menu {
+  margin-left: auto;
+}
+

@@ -30,6 +30,7 @@ export {
   IconMessage,
   IconMonitor,
   IconMoon,
+  IconMore,
   IconPanel,
   IconPencil,
   IconPlus,
@@ -42,6 +43,8 @@ export {
 export { Kbd } from './Kbd.tsx'
 export { LinkButton } from './LinkButton.tsx'
 export { LiveStatus } from './LiveStatus.tsx'
+export { Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator } from './Menu.tsx'
+export type { MenuItemProps, MenuProps, MenuRadioItemProps } from './Menu.tsx'
 export { Notice } from './Notice.tsx'
 export type { NoticeTone } from './Notice.tsx'
 export { SegmentedControl } from './SegmentedControl.tsx'

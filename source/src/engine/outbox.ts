@@ -16,8 +16,11 @@ export interface Outbox<T> {
   post(message: T): Promise<boolean>
   /** Take the oldest message, waiting up to `timeoutMs` for one; `null` when none came in time. */
   next(timeoutMs: number): Promise<T | null>
-  /** Drop what is kept, so that whoever posted it hears `false`; a caller that is waiting goes on waiting for the next message. */
-  clear(): void
+  /**
+   * Drop what is kept, so that whoever posted it hears `false`; a caller that is waiting goes on waiting for the next message. A message that
+   * `keep` says yes to stays, in its place in the order.
+   */
+  clear(keep?: (message: T) => boolean): void
   /** How many messages are kept. */
   size(): number
 }
@@ -54,8 +57,13 @@ export function createOutbox<T>(timers: Timers = realTimers): Outbox<T> {
         waiting.push(entry)
       })
     },
-    clear() {
-      for (const { taken } of kept.splice(0)) taken(false)
+    clear(keep) {
+      const stay: typeof kept = []
+      for (const entry of kept.splice(0)) {
+        if (keep?.(entry.message)) stay.push(entry)
+        else entry.taken(false)
+      }
+      kept.push(...stay)
     },
     size: () => kept.length,
   }

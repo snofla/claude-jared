@@ -69,6 +69,17 @@ export function lastDelivery(review: Review, delivery: Delivery | null, sentAt: 
 /** Whether the review is as it was when the button was pressed, at `pressedAt`: nothing was changed since (`updatedAt` moves with every edit, and sending does not move it). */
 export const sentUnchanged = (review: Review, pressedAt: string): boolean => review.updatedAt <= pressedAt
 
+/** Whether a program has taken the review as it is: it was sent, at `sentAt`, and nothing has changed since. The review has then been delivered, and the dialog does not offer to give it up. */
+export const takenAsItIs = (review: Review, sentAt: string | null): boolean => sentAt !== null && sentUnchanged(review, sentAt)
+
+/**
+ * Whom giving the review up tells: the program that started the review, as long as it has not taken the review as it is. The answer is the name
+ * that the program gave for whoever receives the review, `null` when it gave none, and `undefined` when nobody is told: no program started the
+ * review, or the one that did has the review as it is and waits for nothing.
+ */
+export const toldOfCancel = (delivery: Delivery | null, review: Review, sentAt: string | null): string | null | undefined =>
+  delivery === null || takenAsItIs(review, sentAt) ? undefined : delivery.target
+
 /**
  * What a caller said about what happens once its delivery has taken the review, with the defaults filled in: when the dialog closes
  * by itself, the words of the message that tells the reviewer (`null`: Jared's own), and whether the message is drawn as a banner. This is the one

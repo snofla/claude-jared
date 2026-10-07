@@ -223,8 +223,8 @@ export interface ErrorReply extends ReplyBase {
 export type Reply = SessionReply | SourceReply | ExportedReply | ErrorReply
 
 /**
- * A message from the engine's side that answers no request: something happened that its peer may want to know. The first is
- * `submitted`, sent when the reviewer hands the review over on a page that a script drives. `seq` counts them from 1 within a page.
+ * A message from the engine's side that answers no request: something happened that its peer may want to know. `submitted` is sent when
+ * the reviewer hands the review over on a page that a script drives. `seq` counts the events of a page, of both kinds, from 1.
  */
 export interface SubmittedEvent extends Envelope {
   type: 'submitted'
@@ -232,9 +232,18 @@ export interface SubmittedEvent extends Envelope {
   review: Review
 }
 
-export type Event = SubmittedEvent
+/**
+ * `cancelled`, sent when the reviewer gives the review up on a page that a caller started the review in: to the script that drives the page,
+ * or to the receiver that gave the page its file. It carries no review, because the review is gone.
+ */
+export interface CancelledEvent extends Envelope {
+  type: 'cancelled'
+  seq: number
+}
 
-export const EVENT_TYPES = ['submitted'] as const
+export type Event = SubmittedEvent | CancelledEvent
+
+export const EVENT_TYPES = ['submitted', 'cancelled'] as const
 
 /** Whether a value that arrived from a peer has the shape of an event. */
 export function isEvent(value: unknown): value is Event {

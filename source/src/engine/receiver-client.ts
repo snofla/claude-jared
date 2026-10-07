@@ -1,7 +1,7 @@
 import { COPY } from '../lib/copy.ts'
 import type { Review } from '../types.ts'
 import { httpClientTransport } from './http-client.ts'
-import { submitOptions, words, type ErrorReply, type Reply, type SubmitOptions } from './protocol.ts'
+import { PROTOCOL_VERSION, submitOptions, words, type ErrorReply, type Reply, type SubmitOptions } from './protocol.ts'
 import { createClient, type RequestInput } from './transport.ts'
 
 export interface ReceiverClientOptions {
@@ -73,4 +73,17 @@ export async function sendReview(address: string, review: Review, now: string, o
   const { reply } = answer
   if (reply.type === 'session') return { ok: true }
   return { ok: false, error: reply.type === 'error' ? refusal(reply, options.target ?? null) : COPY.unexpectedAnswer(options.target ?? null) }
+}
+
+/**
+ * Tell a receiver that the reviewer gave the review up, as one `cancelled` message that answers nothing: there is no stream to open and no reply
+ * to wait for, only the receiver's word that it took the message. It is not tried again.
+ */
+export async function sendCancelled(address: string, seq: number, options: ReceiverClientOptions = {}): Promise<SendResult> {
+  try {
+    await httpClientTransport(address, { fetch: options.fetch }).send({ protocol: PROTOCOL_VERSION, type: 'cancelled', seq }) // no listener, so no stream to close
+    return { ok: true }
+  } catch {
+    return { ok: false, error: COPY.couldNotReach(options.target ?? null, new URL(address).host) }
+  }
 }

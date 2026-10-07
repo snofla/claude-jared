@@ -1,0 +1,93 @@
+/*
+  Menu: a button that opens a list of actions over the page. Colours are design tokens and sizes are steps of the scale, both from tokens.css.
+*/
+
+.jared-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The button while the list is open. */
+.jared-menu > .jared-btn[aria-expanded='true'] {
+  background: var(--accent-soft);
+}
+
+.jared-menu-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + var(--space-4));
+  box-sizing: border-box;
+  min-width: 220px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.jared-menu-list[data-align='end'] {
+  right: 0;
+}
+
+.jared-menu-list[data-align='start'] {
+  left: 0;
+}
+
+.jared-menu-item {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-10);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.jared-menu-item:hover {
+  background: var(--accent-soft);
+}
+
+.jared-menu-item:focus-visible {
+  background: var(--accent-soft);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The column before the words: an icon, or the check of the choice that is on. It is as wide as an icon, so that the words line up whether or not an item has one. */
+.jared-menu-mark {
+  display: inline-flex;
+  flex: none;
+  width: var(--font-size-lg);
+  color: var(--muted);
+}
+
+.jared-menu-item[aria-checked='true'] .jared-menu-mark {
+  color: var(--accent);
+}
+
+.jared-menu-label {
+  padding: var(--space-6) var(--space-10) var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+
+.jared-menu-separator {
+  height: 1px; /* raw: a hairline */
+  margin: var(--space-4) 0;
+  background: var(--border);
+}
+
+@media (pointer: coarse) {
+  .jared-menu-item {
+    min-height: var(--control-height-lg);
+  }
+}

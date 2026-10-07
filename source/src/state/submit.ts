@@ -130,6 +130,13 @@ export const statusLine = (state: SubmitState, waiting: boolean, delivery: Deliv
   state.status ?? (waiting ? COPY.waiting(delivery?.target ?? null) : last)
 
 /**
+ * Whether the dialog offers to give the review up. It does not while a send to a receiver is in flight, and not once a program has `taken` the
+ * review and nothing has changed since, because the review has been delivered. It does while a program has been handed the review and has not
+ * taken it (`waiting`): `sending` is set then as well, and `waiting` lifts it, which is when a reviewer is most likely to want the button.
+ */
+export const canCancel = (state: SubmitState, waiting: boolean, taken: boolean): boolean => (!state.sending || waiting) && !taken
+
+/**
  * Whether the group of the other ways to export is open. They are kept out of the way, and come out by themselves when the delivery has not
  * worked or has not been received; once open, by the reviewer or by the dialog, it stays open: it is not closed again under a reviewer who
  * may be about to press something in it.

@@ -1,28 +1,30 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent } from 'react'
 import { CodeViewer } from './components/CodeViewer'
+import { CancelDialog } from './components/CancelDialog'
 import { Header } from './components/Header'
 import { Alert, IconCheck } from './ui'
 import { Landing } from './components/Landing'
 import { ReviewPanel } from './components/ReviewPanel'
 import { SubmitDialog } from './components/SubmitDialog'
 import { createOutbox } from './engine/outbox'
-import { PROTOCOL_VERSION, type SubmittedEvent } from './engine/protocol'
-import { fetchSource, sendReview } from './engine/receiver-client'
+import { PROTOCOL_VERSION, type Event, type SubmittedEvent } from './engine/protocol'
+import { fetchSource, sendCancelled, sendReview } from './engine/receiver-client'
 import { useMediaQuery } from './hooks/useMediaQuery'
 import { usePlatform } from './hooks/usePlatform'
 import { usePageApi } from './hooks/usePageApi'
 import { useDiffTokens, useLatest, useTokens } from './hooks/useTokens'
 import { COPY } from './lib/copy'
-import { afterSent, afterSentSettings, canTryAgain, closeDelayMs, deliveryOf, sentMessage, sentUnchanged } from './lib/delivery'
+import { afterSent, afterSentSettings, canTryAgain, closeDelayMs, deliveryOf, sentMessage, sentUnchanged, toldOfCancel } from './lib/delivery'
 import { diffOf } from './lib/diff'
 import { BOOT_KEY, readBoot, readFragment } from './lib/fragment-link'
 import { hostFromSearch } from './lib/host-link'
 import type { Platform, Picked } from './lib/platform'
 import { PLAIN_TEXT } from './lib/language'
+import { draftHasText } from './lib/review'
 import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/sample'
 import { buildSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
-import { closeFile, keepOpen, mayDiscard, openFile, openPicked, openRecent, openText, replaceQuestion, type OpenOutcome } from './state/flows'
+import { cancelReview, closeFile, keepOpen, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openRecent, openText, replaceQuestion, type OpenOutcome } from './state/flows'
 import { emptyState, reducer, type AppState } from './state/reducer'
 import type { ReviewComment } from './types'
 
@@ -46,6 +48,9 @@ function init(platform: Platform): AppState {
   return last ? reducer(emptyState, { type: 'open', name: last.file.name, text: last.file.content, review: last.review, now: platform.environment.now() }) : emptyState
 }
 
+/** Whether an event of the page is the reviewer's cancel, which the outbox keeps when the page is left with no file open. */
+const isCancelled = (event: Event): boolean => event.type === 'cancelled'
+
 export default function App() {
   const services = usePlatform()
   const [state, dispatch] = useReducer(reducer, services, init)
@@ -56,9 +61,12 @@ export default function App() {
   const [panelChoice, setPanelChoice] = useState<boolean | null>(null)
   const panelOpen = panelChoice ?? wide
   const [submitOpen, setSubmitOpen] = useState(false)
+  // The question before a review is given up.
+  const [cancelOpen, setCancelOpen] = useState(false)
   // Reviews that the reviewer has handed over to a script that drives the page, and that it has not taken yet.
-  const outbox = useMemo(() => createOutbox<SubmittedEvent>(), [])
-  const submitted = useRef(0)
+  const outbox = useMemo(() => createOutbox<Event>(), [])
+  // What the page has told its peer, of both kinds, counted from 1.
+  const events = useRef(0)
   // When, and for which file (by its hash), the reviewer handed a review over to a script that has not taken it yet.
   const [handed, setHandedAt] = useState<{ at: number; hash: string } | null>(null)
   // The colour scheme: the choice is kept, and applied to the page as an attribute that the CSS selects on (`index.html` has
@@ -78,6 +86,8 @@ export default function App() {
   const tellOnClose = useRef(false)
   // The red banner of a send that failed after its dialog was closed: the next send takes it away, so that it is never beside the message that says it was sent.
   const failedSend = useRef<Notice | null>(null)
+  // The warning that a script's request was declined. Cancel review takes it away with the review that it says was kept.
+  const declinedNote = useRef<Notice | null>(null)
   const sentTimer = useRef(0)
   const [dragActive, setDragActive] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -132,7 +142,7 @@ export default function App() {
     if (host) {
       outcome = await sendReview(host, current, now, { target: stateRef.current.submitTarget })
     } else {
-      const event: SubmittedEvent = { protocol: PROTOCOL_VERSION, type: 'submitted', seq: ++submitted.current, review: { ...current, submittedAt: now } }
+      const event: SubmittedEvent = { protocol: PROTOCOL_VERSION, type: 'submitted', seq: ++events.current, review: { ...current, submittedAt: now } }
       setHandedAt({ at: Date.now(), hash })
       const taken = await outbox.post(event)
       setHandedAt(null)
@@ -155,10 +165,11 @@ export default function App() {
     return { ok: true, closeAfterMs: next === 'closes' ? closeDelayMs(settings.closes) : null }
   }, [host, outbox, stateRef, services, submitOpenRef, clearSent, tellSent])
   // A review handed over for a file that is no longer open is of no use to whoever asks next, and is not waited for: whichever way the
-  // file was replaced (the reviewer's, a script's, a link's).
+  // file was replaced (the reviewer's, a script's, a link's). A cancel is the one thing that stays when the page is left with no file open: it
+  // is about the file that was just given up, and it is for the script that is waiting or asks next. Opening a file drops it.
   const fileHash = file?.hash
   useEffect(() => {
-    outbox.clear()
+    outbox.clear(fileHash === undefined ? isCancelled : undefined)
   }, [fileHash, outbox])
   const waitingSince = handed !== null && handed.hash === fileHash ? handed.at : null
   const unsaved = useSyncExternalStore(services.reviews.subscribe, services.reviews.failed)
@@ -187,6 +198,10 @@ export default function App() {
       }
     },
     outbox,
+    (text) => {
+      declinedNote.current = { kind: 'warn', text }
+      setNotice(declinedNote.current)
+    },
   )
 
   useEffect(() => {
@@ -318,6 +333,33 @@ export default function App() {
     dispatch({ type: 'close' })
   }
 
+  // Tell the program that started the review that the reviewer gave it up, so that it stops waiting: the receiver, at the address that the
+  // page was given, or the script that drives the page, through the outbox. The page does not wait for an answer, and tries once.
+  const tellOfCancel = () => {
+    const seq = ++events.current
+    if (host) void sendCancelled(host, seq, { target: state.submitTarget })
+    else void outbox.post({ protocol: PROTOCOL_VERSION, type: 'cancelled', seq })
+  }
+
+  // Give the review of the open file up: the program that started it is told, it is forgotten as Forget does on the start page, and the page goes back to the start.
+  const cancelCurrent = () => {
+    if (!file) return
+    const { review: current, sentAt } = stateRef.current
+    if (current && toldOfCancel(delivery, current, sentAt) !== undefined) tellOfCancel()
+    cancelReview(services, file.hash)
+    const stale = declinedNote.current
+    declinedNote.current = null
+    if (stale) setNotice((shown) => (shown === stale ? null : shown))
+    setCancelOpen(false)
+    setSubmitOpen(false)
+    clearSent()
+    dispatch({ type: 'close' })
+    refreshRecent()
+  }
+
+  // Asked for from the header and from the submit dialog: a question first when there is something to lose, and nothing to ask otherwise.
+  const askToCancel = () => (mustAskBeforeCancel(stateRef.current) ? setCancelOpen(true) : cancelCurrent())
+
   const openKept = (hash: string) => applyOutcome(openRecent(services, hash))
   const openSample = (name: string, text: string) => applyOutcome(openFile(services, stateRef.current, buildSource(name, text)))
 
@@ -342,11 +384,12 @@ export default function App() {
             onOpen={() => inputRef.current?.click()}
             onLanguage={(language) => dispatch({ type: 'setLanguage', language })}
             onSubmit={() => setSubmitOpen(true)}
+            onCancel={askToCancel}
             delivery={delivery}
             handedOver={waitingSince !== null}
             sentAt={state.sentAt}
             theme={theme}
-            onTheme={() => setTheme(nextTheme)}
+            onTheme={setTheme}
           />
           {banner && <Banner notice={banner} onDismiss={() => setNotice(null)} />}
           <SentBanner message={sentText} drawn={afterSentSettings(state.submitOptions).banner} onDismiss={clearSent} />
@@ -392,6 +435,18 @@ export default function App() {
               linkTarget={state.submitTarget}
               onClose={() => setSubmitOpen(false)}
               onSentClosed={() => (tellOnClose.current = true)}
+              onCancel={askToCancel}
+            />
+          )}
+          {cancelOpen && (
+            <CancelDialog
+              comments={review.comments.length}
+              summary={review.summary.trim() !== ''}
+              writing={draftHasText(draft)}
+              tells={toldOfCancel(delivery, review, state.sentAt)}
+              fileName={file.name}
+              onKeep={() => setCancelOpen(false)}
+              onCancel={cancelCurrent}
             />
           )}
         </>

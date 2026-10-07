@@ -39,6 +39,38 @@ export const COPY = {
   close: 'Close',
   closeTitle: (key: string): string => `Close (${key})`,
   keyEscape: 'Esc',
+  /** The ⋯ button of the header: its accessible name and its tooltip. The menu holds the actions that are needed now and then, which have no place in the header all the time. */
+  moreActions: 'More actions',
+  /** The heading of the choice of colour scheme in that menu. */
+  colourScheme: 'Colour scheme',
+  /** The names of its three choices. */
+  themeChoice: { system: 'System', light: 'Light', dark: 'Dark' },
+  /** The button that gives a review up, and the danger button of its question. */
+  cancelReview: 'Cancel review',
+  /** The safe button of that question: nothing is discarded and nobody is told. */
+  keepReviewing: 'Keep reviewing',
+  cancelTitle: 'Cancel this review?',
+  /** What giving a review up discards: the comments saved on the open file. */
+  cancelDiscards: (count: number, name: string): string => `${COPY.commentCount(count)} on ${name} will be discarded.`,
+  /** What giving a review up discards when a comment is being written. */
+  cancelDiscardsDraft: 'The comment you are writing will be discarded.',
+  /** What giving a review up discards when it has an overall summary, whether or not it has comments. */
+  cancelDiscardsSummary: 'The overall summary will be discarded.',
+  /** What giving a review up tells whoever waits for it: the caller's name for them, or the program that opened Jared when there is none. */
+  cancelTells: (target: string | null): string => (target === null ? 'The program that opened Jared will be told that you cancelled.' : `${target} will be told that you cancelled.`),
+  /**
+   * What the banner says when a program asked, through the page's own interface, to open another file and the page kept the open review
+   * (`kept` is the name of that file): who asked (the caller's name for itself, or a program when it gave none) and the file it asked for.
+   */
+  declinedOpen: (asker: string | null, name: string, kept: string | null): string => {
+    const who = asker ?? 'A program'
+    return kept === null ? `${who} asked to open ${name}. Your review was kept.` : `${who} asked to open ${name}. Your review of ${kept} was kept.`
+  },
+  /** The same for a program that asked to close the open file, which it names when the page has its name. */
+  declinedClose: (asker: string | null, kept: string | null): string => {
+    const who = asker ?? 'A program'
+    return kept === null ? `${who} asked to close the file. Your review was kept.` : `${who} asked to close ${kept}. Your review was kept.`
+  },
   /** The dialog's one line when nothing takes the review, and when a link asked for the review on the clipboard (with who to tell). */
   lineExport: 'This review stays in this browser until you copy or download it.',
   lineLink: (target: string | null): string =>

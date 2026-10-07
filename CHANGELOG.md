@@ -2,6 +2,14 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.13.0 — 2026-10-07
+
+- The header has less in it. **Open…**, the colour scheme and **Cancel review** are now in a **⋯** menu (*More actions*), and at a width of 900 px the header fits on one line, where it took two. The colour scheme is a choice of **System**, **Light** and **Dark**, with the one that is on checked; the start page keeps its button that cycles through them. Keys work as in any menu: the arrows, `Home` and `End` move, `Enter` or `Space` chooses, `Esc` closes.
+- **Cancel review**, in that menu and in the foot of the **Export review** or **Submit review** window, gives a review up: it forgets the file and its review and goes back to the start page. It asks first when the review has comments, an overall summary or a comment being written, with **Keep reviewing** (or `Esc`) to leave everything as it was; a review with nothing in it is given up at once.
+- When Claude started the review with `/jared:review` and is waiting for it, **Cancel review** tells it that you cancelled: Claude stops waiting and tells you, instead of waiting until the time is up. The question says who will be told. A program that has already taken the review, with nothing changed since, is not told.
+- When Claude asks Jared to open or close a file while you have comments or are writing one, the page still does not throw your work away, and now shows a warning banner that says who asked and that your review was kept, for example "Claude asked to open a.ts. Your review of sample.ts was kept." `/jared:review` tells you about the banner too. When a link opens a file, Jared still asks you, as before.
+- In Claude in Chrome, when the tool hides the text of a comment's `code` (it hides text that looks like a cookie or a query string, such as `for (let i = 0; i <= n; i++) {`), `/jared:review` says once that the text was hidden and that the comments were not compared, marks them as unchecked, and applies a suggestion of such a comment only when you say so. It used to take such a comment for changed, and to ask without saying why.
+
 ## 0.12.1 — 2026-10-07
 
 - On a phone or a tablet, the small icon buttons are 44 px square, like the other buttons, so that a finger can press them: the pencil and the trash can on a comment, and the crosses that close the comments panel, dismiss a message, forget a kept review under **Continue reviewing** and close the review dialog. With a mouse they look as before.

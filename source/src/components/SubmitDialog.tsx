@@ -2,10 +2,11 @@ import { useEffect, useReducer, useRef } from 'react'
 import { usePlatform } from '../hooks/usePlatform'
 import { useLatest } from '../hooks/useTokens'
 import { COPY } from '../lib/copy'
-import { buttonLabel, destinationLine, lastDelivery, type Delivery } from '../lib/delivery'
+import { buttonLabel, destinationLine, lastDelivery, takenAsItIs, type Delivery } from '../lib/delivery'
 import { reviewFileName, toJson, toMarkdown } from '../lib/export'
 import {
   busy,
+  canCancel,
   closeAfterMs,
   groupOpen,
   initialSubmitState,
@@ -52,6 +53,8 @@ interface Props {
   onClose: () => void
   /** The dialog closed by itself, because the review was taken and nothing was changed: the page tells the reviewer, once the dialog is gone. */
   onSentClosed: () => void
+  /** Called when the reviewer presses Cancel review in the foot. The question comes over the dialog, and the dialog is still there when the reviewer keeps the review. */
+  onCancel: () => void
 }
 
 const FORMATS: readonly SegmentedOption<Format>[] = [
@@ -59,7 +62,7 @@ const FORMATS: readonly SegmentedOption<Format>[] = [
   { value: 'json', label: 'JSON' },
 ]
 
-export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, sentAt, forClaude, linkTarget, onClose, onSentClosed }: Props) {
+export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, sentAt, forClaude, linkTarget, onClose, onSentClosed, onCancel }: Props) {
   const { submit } = usePlatform()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [state, dispatch] = useReducer(submitReducer, initialSubmitState)
@@ -90,6 +93,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
   const count = review.comments.length
   const label = buttonLabel(delivery)
   const waiting = waitingSince !== null
+  const taken = takenAsItIs(review, sentAt)
   const last = lastDelivery(review, delivery, sentAt)
   const line = statusLine(state, waiting, delivery, last)
   const unavailable = busy(state, waiting)
@@ -176,6 +180,11 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
       )}
 
       <DialogFoot>
+        {canCancel(state, waiting, taken) && (
+          <Button variant="ghost" onClick={onCancel}>
+            {COPY.cancelReview}
+          </Button>
+        )}
         <span className={state.failed ? 'status status-error dialog-status' : 'status muted dialog-status'} role="status" aria-live="polite">
           {line && (
             <>

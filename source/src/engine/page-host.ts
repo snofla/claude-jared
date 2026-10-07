@@ -3,7 +3,7 @@ import { draftHasText } from '../lib/review.ts'
 import { prepareSource } from '../lib/source.ts'
 import { emptyEngineState, handle, type EngineState } from './engine.ts'
 import type { Outbox } from './outbox.ts'
-import { errorReply, parseRequest, PROTOCOL_VERSION, sameSubmitOptions, type Reply, type SubmitOptions, type SubmittedEvent } from './protocol.ts'
+import { errorReply, parseRequest, PROTOCOL_VERSION, sameSubmitOptions, type Event, type Reply, type SubmitOptions } from './protocol.ts'
 
 /**
  * The protocol on a page: what a script on the page (a browser tool, a test, a console) can ask of the interface the way
@@ -112,10 +112,11 @@ export const DEFAULT_SUBMIT_WAIT_MS = 40_000
 export const MAX_SUBMIT_WAIT_MS = 600_000
 
 /**
- * What `window.jared.waitForSubmit(timeoutMs)` does: take the oldest review that the reviewer has handed over, waiting for one up to
- * `timeoutMs`, and say `{ type: "timeout" }` if none came. A review handed over before the call is kept for it.
+ * What `window.jared.waitForSubmit(timeoutMs)` does: take the oldest event that the page has for the script, a review that the reviewer has
+ * handed over or the reviewer's cancel, waiting for one up to `timeoutMs`, and say `{ type: "timeout" }` if none came. An event that came
+ * before the call is kept for it.
  */
-export async function waitForSubmit(outbox: Outbox<SubmittedEvent>, timeoutMs?: number): Promise<SubmittedEvent | { type: 'timeout' }> {
+export async function waitForSubmit(outbox: Outbox<Event>, timeoutMs?: number): Promise<Event | { type: 'timeout' }> {
   const wanted = Number.isFinite(timeoutMs) ? (timeoutMs as number) : DEFAULT_SUBMIT_WAIT_MS // not a number, whatever a script passes in, is not finite
   return (await outbox.next(Math.min(Math.max(wanted, 0), MAX_SUBMIT_WAIT_MS))) ?? { type: 'timeout' }
 }

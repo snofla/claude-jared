@@ -736,7 +736,7 @@ SOFTWARE.
 
 ### Feather (MIT)
 
-Icons in the page, drawn after these icons of Feather: plus, x, check, edit-3, upload, download, copy, message-square, send, file-text, code, moon and monitor; the page's own icon is drawn after `code`. https://github.com/feathericons/feather/blob/main/LICENSE
+Icons in the page, drawn after these icons of Feather: plus, x, check, edit-3, upload, download, copy, message-square, send, file-text, code, moon, monitor and more-horizontal; the page's own icon is drawn after `code`. https://github.com/feathericons/feather/blob/main/LICENSE
 
 ```text
 The MIT License (MIT)

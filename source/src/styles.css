@@ -870,6 +870,10 @@ pre {
   margin-left: 0;
 }
 
+.cancel-text {
+  margin: 0;
+}
+
 .dialog-dest {
   margin: 0;
   font-size: 13px;
@@ -954,17 +958,6 @@ pre {
   /* The header has no room for the version here; the start page, which has, still shows it. */
   .header .version {
     display: none;
-  }
-
-  /* The Open button shows only its icon here. Its text stays in the accessibility tree: `display: none` would
-     leave the button with no name. Measured in Chrome: empty with display:none, "Open…" with this. */
-  .btn-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 
   .header {
