@@ -1,13 +1,14 @@
 {
   "name": "jared",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.12.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:single": "tsc -b && node scripts/single/build-single.ts",
     "build:plugin": "tsc -b && node scripts/publish/build-plugin.ts",
+    "release:branch": "node scripts/publish/release-branch.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",

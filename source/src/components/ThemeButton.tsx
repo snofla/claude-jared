@@ -1,6 +1,5 @@
 import { themeLabel, type Theme } from '../lib/theme'
-import { Button } from '../ui'
-import { IconMonitor, IconMoon, IconSun } from './icons'
+import { Button, IconMonitor, IconMoon, IconSun } from '../ui'
 
 interface Props {
   theme: Theme

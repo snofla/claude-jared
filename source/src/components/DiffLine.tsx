@@ -2,7 +2,7 @@ import { memo, type PointerEvent } from 'react'
 import { bodyOf, rowName, signOf, type RowKind } from '../lib/diff'
 import type { LineTokens } from '../lib/highlight'
 import { cx } from '../lib/util'
-import { IconPlus } from './icons'
+import { Badge, IconPlus } from '../ui'
 import { Tokens } from './Tokens'
 
 interface Props {
@@ -80,7 +80,7 @@ export const DiffLine = memo(function DiffLine({
         {kind === 'file' ? (
           <>
             <span className="file-path">{title}</span>
-            {badge && <span className="chip">{badge}</span>}
+            {badge && <Badge className="file-badge">{badge}</Badge>}
           </>
         ) : isCode ? (
           <Tokens tokens={tokens} fallback={bodyOf(text, kind)} />

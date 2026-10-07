@@ -1,7 +1,7 @@
 import { memo, type PointerEvent } from 'react'
 import type { LineTokens } from '../lib/highlight'
 import { cx } from '../lib/util'
-import { IconPlus } from './icons'
+import { IconPlus } from '../ui'
 import { Tokens } from './Tokens'
 
 interface Props {

@@ -29,10 +29,9 @@ import {
 import { commentAtLane, commentLanes, commentsByEnd, hasOverlap, laneAtOffset, laneMasks, maxColumns, pressesBar } from '../lib/viewer'
 import type { Action } from '../state/reducer'
 import type { Draft, LineSelection, ReviewComment, SourceFile } from '../types'
-import { Button, Kbd } from '../ui'
+import { Button, FloatingToolbar, IconButton, IconMessage, IconX, Kbd } from '../ui'
 import { CodeLine } from './CodeLine'
 import { DiffLine } from './DiffLine'
-import { IconMessage, IconX } from './icons'
 import { ReviewCard } from './ReviewCard'
 import { ReviewComposer } from './ReviewComposer'
 import { Ruler } from './Ruler'
@@ -394,21 +393,18 @@ export function CodeViewer({
         </div>
 
         {sel && !draft && (
-          <div className="selbar" role="toolbar" aria-label="Selection actions">
+          <FloatingToolbar label="Selection actions" className="selbar">
             <span className="selbar-label">{labelOfRange(diff, sel.start, sel.end)}</span>
             <Button variant="primary" size="sm" icon={<IconMessage />} onClick={() => dispatch({ type: 'startDraft' })}>
               Comment <Kbd>C</Kbd>
             </Button>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Clear selection"
+            <IconButton
+              label="Clear selection"
               title="Clear selection (Esc)"
+              icon={<IconX />}
               onClick={() => dispatch({ type: 'select', selection: null })}
-            >
-              <IconX />
-            </button>
-          </div>
+            />
+          </FloatingToolbar>
         )}
       </div>
 

@@ -1,0 +1,38 @@
+/*
+  IconButton: a flat icon button. The look of the icon buttons of the bars and the heads of cards.
+*/
+
+.jared-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+}
+
+.jared-icon-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.jared-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Unavailable: faded, as a disabled Button is. */
+.jared-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* A finger needs about 44 px: the same size as every Button, written once here. */
+@media (pointer: coarse) {
+  .jared-icon-btn {
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
+  }
+}

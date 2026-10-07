@@ -6,9 +6,8 @@ import { usePlatform } from '../hooks/usePlatform'
 import { formatTime } from '../lib/util'
 import type { Action } from '../state/reducer'
 import type { ReviewComment } from '../types'
-import { Button } from '../ui'
+import { Badge, Button, Card, CardBody, CardHead, IconButton, IconPencil, IconTrash } from '../ui'
 import { DiffBlock } from './DiffBlock'
-import { IconPencil, IconTrash } from './icons'
 
 interface Props {
   comment: ReviewComment
@@ -34,9 +33,9 @@ export function ReviewCard({ comment, language, fileTokens, onHover, flash, disp
       onMouseEnter={() => onHover(comment.id)}
       onMouseLeave={() => onHover(null)}
     >
-      <article className="card">
-        <header className="card-head">
-          <span className="chip">{commentLabel(comment)}</span>
+      <Card className="panel-card">
+        <CardHead>
+          <Badge>{commentLabel(comment)}</Badge>
           <time className="muted" dateTime={comment.updatedAt}>
             {formatTime(comment.updatedAt)}
           </time>
@@ -58,29 +57,18 @@ export function ReviewCard({ comment, language, fileTokens, onHover, flash, disp
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className="icon-btn"
+              <IconButton
                 title="Edit"
-                aria-label="Edit comment"
+                label="Edit comment"
+                icon={<IconPencil />}
                 onClick={() => dispatch({ type: 'editComment', id: comment.id })}
-              >
-                <IconPencil />
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                title="Delete"
-                aria-label="Delete comment"
-                onClick={() => setConfirming(true)}
-              >
-                <IconTrash />
-              </button>
+              />
+              <IconButton title="Delete" label="Delete comment" icon={<IconTrash />} onClick={() => setConfirming(true)} />
             </>
           )}
-        </header>
+        </CardHead>
 
-        {comment.comment && <p className="card-body">{comment.comment}</p>}
+        {comment.comment && <CardBody>{comment.comment}</CardBody>}
 
         {comment.suggestion !== null && (
           <div className="suggest">
@@ -93,7 +81,7 @@ export function ReviewCard({ comment, language, fileTokens, onHover, flash, disp
             />
           </div>
         )}
-      </article>
+      </Card>
     </section>
   )
 }

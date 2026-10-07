@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent } from 'react'
 import { CodeViewer } from './components/CodeViewer'
 import { Header } from './components/Header'
-import { IconCheck, IconX } from './components/icons'
+import { Alert, IconCheck } from './ui'
 import { Landing } from './components/Landing'
 import { ReviewPanel } from './components/ReviewPanel'
 import { SubmitDialog } from './components/SubmitDialog'
@@ -427,12 +427,9 @@ export default function App() {
 
 function Banner({ notice, onDismiss }: { notice: Notice; onDismiss: () => void }) {
   return (
-    <div className={`banner banner-${notice.kind}`} role="alert">
-      <span>{notice.text}</span>
-      <button type="button" className="icon-btn" aria-label={COPY.dismiss} onClick={onDismiss}>
-        <IconX />
-      </button>
-    </div>
+    <Alert tone={notice.kind} dismissLabel={COPY.dismiss} onDismiss={onDismiss}>
+      {notice.text}
+    </Alert>
   )
 }
 
@@ -450,20 +447,8 @@ function SentBanner({ message, drawn, onDismiss }: { message: string | null; dra
     )
   }
   return (
-    <div className={message === null ? 'banner-slot' : 'banner banner-ok'}>
-      <span className="banner-text" role="status">
-        {message !== null && (
-          <>
-            <IconCheck />
-            <span>{message}</span>
-          </>
-        )}
-      </span>
-      {message !== null && (
-        <button type="button" className="icon-btn" aria-label={COPY.dismiss} onClick={onDismiss}>
-          <IconX />
-        </button>
-      )}
-    </div>
+    <Alert tone="ok" icon={<IconCheck />} dismissLabel={COPY.dismiss} onDismiss={onDismiss}>
+      {message}
+    </Alert>
   )
 }

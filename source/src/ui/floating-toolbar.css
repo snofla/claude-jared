@@ -1,0 +1,15 @@
+/*
+  FloatingToolbar: a row of controls in a pill, for a bar that floats. Where it floats is the caller's.
+*/
+
+.jared-floating-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-6) var(--space-8) var(--space-6) var(--space-14);
+  border: 1px solid var(--border-strong);
+  border-radius: calc(var(--control-height-lg) / 2); /* a pill of the height of a touch control: it stays round if its words take a second line */
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  user-select: none; /* a press or a drag on the bar does not select its words, which would change the selection that the bar acts on */
+}

@@ -1,0 +1,32 @@
+/*
+  SegmentedControl: a choice of a few in a box. The choice that is on is drawn from the radio's checked state.
+*/
+
+.jared-segmented {
+  display: inline-flex;
+  padding: var(--space-2);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-md);
+}
+
+.jared-segmented-option {
+  padding: var(--space-2) var(--space-10);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* The radio inside is hidden, so the focus is shown on the word: the arrow keys move it, and it shows where it is. */
+.jared-segmented-option:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.jared-segmented-option:has(input:checked) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}

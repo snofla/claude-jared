@@ -2,9 +2,9 @@ import { MAX_BYTES } from '../lib/source'
 import type { RecentEntry } from '../lib/storage'
 import type { Theme } from '../lib/theme'
 import { formatBytes } from '../lib/util'
-import { LinkButton } from '../ui'
-import { IconBrand, IconFile, IconUpload, IconX } from './icons'
+import { IconBrand, IconButton, IconFile, IconUpload, IconX, LinkButton } from '../ui'
 import { ThemeButton } from './ThemeButton'
+import { Version } from './Version'
 
 interface Props {
   recent: RecentEntry[]
@@ -23,7 +23,7 @@ export function Landing({ recent, onPick, onSample, onSampleDiff, onOpenRecent, 
       <div className="landing-inner">
         <div className="landing-top">
           <div className="brand brand-lg">
-            <IconBrand /> Jared
+            <IconBrand /> Jared <Version />
           </div>
           <ThemeButton theme={theme} onNext={onTheme} />
         </div>
@@ -60,15 +60,12 @@ export function Landing({ recent, onPick, onSample, onSampleDiff, onOpenRecent, 
                       {r.submittedAt ? ' · exported' : ''}
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label={`Forget ${r.name}`}
+                  <IconButton
+                    label={`Forget ${r.name}`}
                     title="Forget this file and its review"
+                    icon={<IconX />}
                     onClick={() => onForget(r.hash)}
-                  >
-                    <IconX />
-                  </button>
+                  />
                 </li>
               ))}
             </ul>

@@ -1,0 +1,45 @@
+/*
+  Alert: a message across the page. Three tones: warn, error and ok.
+*/
+
+.jared-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-16);
+  font-size: var(--font-size-sm);
+}
+
+.jared-alert-warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.jared-alert-error {
+  background: var(--error-bg);
+  color: var(--error-fg);
+}
+
+.jared-alert-ok {
+  background: var(--add-bg);
+  color: var(--add-fg);
+}
+
+.jared-alert-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.jared-alert-text > svg {
+  flex: none;
+}
+
+/* A message may hold a file name that is one long word: it breaks, so that the page does not grow sideways. */
+.jared-alert-text > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

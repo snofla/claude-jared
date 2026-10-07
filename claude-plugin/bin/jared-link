@@ -14,6 +14,8 @@ Usage: jared-link <file> [--jared <address>] [--open] [--max <bytes>]
                                [--port <number>] [--page <path>] [--max <bytes>]
        jared-link --rev <commit> [--max <bytes>]
        jared-link --stop
+       jared-link --status
+       jared-link --version
 
 Prints a link that opens <file> in Jared: Jared's address, then #jared=<base64url JSON of an "open" request>.
 The fragment never goes to a server, so the file stays between the browser and whoever has the link.
@@ -35,13 +37,16 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. The
                       service is one process that every review uses: it listens on 127.0.0.1 only, answers GET and HEAD for the
                       page and the script of a review folder and nothing else, and ends by itself after $JARED_SERVICE_IDLE
-                      seconds (default 1800) without a request. Its port, secret and pid are in the file "service" in the cache folder.
+                      seconds (default 1800) without a request. Its port, secret, pid and the time of its start are in the file "service" in the cache folder.
   --label <words>     the words on the button that hands the review to the caller (1 to 40 characters), so that the page has a
                       button and the caller can wait for the review with window.jared.waitForSubmit; for --serve only
   --closes, --message, --banner
                       what happens once the review is taken, as in the receiver; for --serve only
   --port <number>     the port for a service that has to be started (default: any free port); for --serve only
-  --stop              stop the Jared service, if one is running, and say so
+  --stop              stop the Jared service, if one is running, and say so and how long it had run
+  --status            say whether the Jared service is running, on which port, since when, and when it ends by itself; asking is a
+                      request like any other, which puts the end off
+  --version           say the version of the plugin that this helper belongs to
 
   --rev <commit>      write the change of one commit of the git repository that this folder is in to a file, which Jared shows as changes, and
                       print its path on one line; give that file to this helper or to Jared as any other. <commit> is whatever git takes for
@@ -70,6 +75,8 @@ open=0
 fileway=0
 serve=0
 stop=0
+status=0
+version=0
 rev=
 label=
 closes=
@@ -86,6 +93,8 @@ while [ $# -gt 0 ]; do
     --file) fileway=1 ;;
     --serve) serve=1 ;;
     --stop) stop=1 ;;
+    --status) status=1 ;;
+    --version) version=1 ;;
     --rev)
       [ $# -ge 2 ] && [ -n "$2" ] || fail '--rev needs a commit.' 2
       rev=$2
@@ -145,14 +154,21 @@ done
 
 case $max in '' | *[!0-9]*) fail '--max must be a whole number of bytes.' 2 ;; esac
 case $jared in http://* | https://*) ;; *) fail 'The address of Jared must be an http or https address.' 2 ;; esac
+[ $((stop + status + version)) -le 1 ] || fail 'Give one of --stop, --status and --version, and not more.' 2
 if [ "$stop" = 1 ]; then
   { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--stop takes nothing else.' 2
+fi
+if [ "$status" = 1 ]; then
+  { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--status takes no file and no option.' 2
+fi
+if [ "$version" = 1 ]; then
+  { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--version takes no file and no option.' 2
 fi
 { [ "$serve" = 0 ] || [ "$fileway" = 0 ]; } || fail '--serve and --file are two ways: give one.' 2
 if [ -n "$rev" ]; then
   # What the commit is called goes to git, which would take a word that begins with a hyphen for an option of its own.
   case $rev in -*) fail "A commit does not begin with a hyphen, and \"$rev\" does." 2 ;; esac
-  { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ -z "$label$closes$message$banner$port" ]; } || fail '--rev takes no file and no option but --max.' 2
+  { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ -z "$label$closes$message$banner$port" ]; } || fail '--rev takes no file and no option but --max.' 2
 fi
 if [ "$serve" = 0 ] && [ -n "$label$closes$message$banner$port" ]; then
   fail '--label, --closes, --message, --banner and --port are for --serve.' 2
@@ -189,13 +205,39 @@ service_alive() {
   ' "$1" "$2" "$3" > /dev/null 2>&1
 }
 
+# Whether the file "service" tells of a service that answers: sets svc_port, svc_token, svc_pid and svc_started (the time of its start in
+# seconds, or nothing for a file that an older helper wrote).
+service_running() {
+  svc_port= svc_token= svc_pid= svc_started=
+  [ -f "$base/service" ] || return 1
+  read -r svc_port svc_token svc_pid svc_started < "$base/service" 2> /dev/null
+  service_alive "$svc_port" "$svc_token" "$svc_pid"
+}
+
 # Makes sure that the Jared service is running, and sets svc_port and svc_token: the one that the file "service" tells of when it
-# answers, else a new one, started in the background, which writes the file and prints its port and secret.
+# answers, else a new one, started in the background, which writes the file and prints its port and secret. Reviews that begin at the
+# same moment would each find no service and each start one, so one helper at a time looks and starts, under a lock that mkdir makes
+# (it is atomic) in the cache folder. A lock more than a minute old was left by a helper that was killed, and is taken over. After ten
+# seconds without it a helper looks once more and, when there is still no service, goes on without the lock, so that a review is never held up by it.
 service_started() {
-  svc_port= svc_token= svc_pid=
-  if [ -f "$base/service" ]; then
-    read -r svc_port svc_token svc_pid < "$base/service" 2> /dev/null
-    service_alive "$svc_port" "$svc_token" "$svc_pid" && return 0
+  service_running && return 0
+  locked=0
+  tries=0
+  while [ "$tries" -lt 100 ]; do
+    if mkdir "$base/service.lock" 2> /dev/null; then
+      locked=1
+      break
+    fi
+    if [ -n "$(find "$base/service.lock" -maxdepth 0 -mmin +1 2> /dev/null)" ]; then
+      rmdir "$base/service.lock" 2> /dev/null
+      continue
+    fi
+    tries=$((tries + 1))
+    perl -e 'select(undef, undef, undef, 0.1)'
+  done
+  if service_running; then
+    if [ "$locked" = 1 ]; then rmdir "$base/service.lock" 2> /dev/null; fi
+    return 0
   fi
   idle=${JARED_SERVICE_IDLE:-1800}
   case $idle in '' | *[!0-9]*) idle=1800 ;; esac
@@ -214,6 +256,8 @@ service_started() {
     my $port = $srv->sockport;
     my $state = "$base/service";
     my $daemon = 0;
+    my $started = time;
+    my ($previous, $latest) = ($started, $started);
     pipe(my $ready_r, my $ready_w) or exit 8;
     my $pid = fork;
     defined $pid or exit 8;
@@ -233,7 +277,7 @@ service_started() {
     sub mine {
       open(my $f, "<", $state) or return 0;
       my $line = <$f>;
-      return defined $line && $line eq "$port $token $daemon\n";
+      return defined $line && $line eq "$port $token $daemon $started\n";
     }
     sub finish {
       unlink $state if mine();
@@ -268,6 +312,7 @@ service_started() {
       defined $host && ($host eq "127.0.0.1:$port" || $host eq "localhost:$port") or return reply($c, 403, "Forbidden", "text/plain", "Forbidden\n");
       my $head = $method eq "HEAD";
       return reply($c, 200, "OK", "text/plain; charset=utf-8", "jared-service $daemon\n", $head) if $target eq "/$token/health";
+      return reply($c, 200, "OK", "application/json; charset=utf-8", "{\"pid\":$daemon,\"started\":$started,\"now\":" . time . ",\"previous\":$previous,\"idle\":$idle}\n", $head) if $target eq "/$token/status";
       if ($target =~ m{^/$token/(review\.[A-Za-z0-9]{6})/(jared\.html|jared-boot\.js)$}) {
         my ($folder, $name) = ($1, $2);
         my $path = "$base/$folder/$name";
@@ -284,7 +329,7 @@ service_started() {
     {
       my $tmp = "$state.$$";
       open(my $o, ">", $tmp) or exit 8;
-      print $o "$port $token $daemon\n";
+      print $o "$port $token $daemon $started\n";
       close($o) or exit 8;
       rename($tmp, $state) or exit 8;
     }
@@ -297,6 +342,7 @@ service_started() {
     alarm $idle;
     while (my $c = $srv->accept) {
       alarm $idle;
+      ($previous, $latest) = ($latest, time);
       my $kid = fork;
       if (defined $kid && $kid == 0) {
         close $srv;
@@ -309,28 +355,100 @@ service_started() {
       close $c;
     }
 PERL
-  ) || return 1
+  )
+  code=$?
+  if [ "$locked" = 1 ]; then rmdir "$base/service.lock" 2> /dev/null; fi
+  [ "$code" = 0 ] || return 1
   read -r svc_port svc_token <<EOF
 $started
 EOF
 }
 
+# A length of time in words, for --stop and --status: "20 seconds", "1 minute", "27 minutes", "1 hour and 5 minutes". Needs perl, as the service does.
+SPAN_PERL='sub span {
+  my $s = int(shift);
+  return "$s second" . ($s == 1 ? "" : "s") if $s < 60;
+  my $m = int($s / 60);
+  return "$m minute" . ($m == 1 ? "" : "s") if $m < 60;
+  my $h = int($m / 60);
+  $m %= 60;
+  my $t = "$h hour" . ($h == 1 ? "" : "s");
+  $t .= " and $m minute" . ($m == 1 ? "" : "s") if $m;
+  return $t;
+}'
+
 if [ "$stop" = 1 ]; then
   cache_base
-  svc_port= svc_token= svc_pid=
-  [ -f "$base/service" ] && read -r svc_port svc_token svc_pid < "$base/service" 2> /dev/null
+  service_running || true
   if service_alive "$svc_port" "$svc_token" "$svc_pid"; then
+    ran=
+    case $svc_started in
+      '' | *[!0-9]*) ;;
+      *) ran=$(perl -e "$SPAN_PERL"' print span(time - $ARGV[0]);' "$svc_started" 2> /dev/null) ;;
+    esac
     kill "$svc_pid" 2> /dev/null
     waited=0
     while kill -0 "$svc_pid" 2> /dev/null && [ "$waited" -lt 20 ]; do
       sleep 0.1
       waited=$((waited + 1))
     done
-    echo 'Stopped the Jared service.'
+    if [ -n "$ran" ]; then echo "Stopped the Jared service, which had run for $ran."; else echo 'Stopped the Jared service.'; fi
   else
     rm -f "$base/service"
     echo 'No Jared service is running.'
   fi
+  exit 0
+fi
+
+if [ "$status" = 1 ]; then
+  cache_base
+  svc_port= svc_token= svc_pid= svc_started=
+  [ -f "$base/service" ] && read -r svc_port svc_token svc_pid svc_started < "$base/service" 2> /dev/null
+  # The service is asked for its status and for nothing before it, so that the request before this one that it reports is not the helper's own.
+  { printf '%s\n' "$SPAN_PERL"; cat <<'PERL'
+      use strict;
+      use warnings;
+      use IO::Socket::INET;
+      use JSON::PP;
+      use POSIX qw(strftime);
+      my ($port, $token, $pid) = @ARGV;
+      sub ask {
+        my $path = shift;
+        my $s = IO::Socket::INET->new(PeerAddr => "127.0.0.1", PeerPort => $port, Timeout => 2) or return undef;
+        print $s "GET /$token/$path HTTP/1.1\r\nHost: 127.0.0.1:$port\r\nConnection: close\r\n\r\n";
+        local $/;
+        my $r = <$s>;
+        return defined $r && $r =~ m{^HTTP/1\.1 200 [^\r]*\r\n.*?\r\n\r\n(.*)$}s ? $1 : undef;
+      }
+      alarm 5;
+      my $none = 0;
+      $none = 1 unless defined $port && $port =~ /^\d+\z/ && defined $token && $token =~ /^[0-9a-f]+\z/ && defined $pid && $pid =~ /^[1-9][0-9]*\z/;
+      if (!$none) {
+        my $body = ask("status");
+        my $data = defined $body ? eval { decode_json($body) } : undef;
+        if (ref $data eq "HASH" && defined $data->{pid} && $data->{pid} eq $pid && defined $data->{started} && defined $data->{now} && defined $data->{previous} && defined $data->{idle}) {
+          print "The Jared service is running, on port $port (process $pid).\n";
+          print "It started at " . strftime("%H:%M", localtime($data->{started})) . ", " . span($data->{now} - $data->{started}) . " ago.\n";
+          print "The request before this one came " . span($data->{now} - $data->{previous}) . " ago. This one puts the end off: it ends by itself in " . span($data->{idle}) . " if no other request comes.\n";
+          exit 0;
+        }
+        my $health = ask("health");
+        if (defined $health && $health eq "jared-service $pid\n") {
+          print "The Jared service is running, on port $port (process $pid). It is of an older version, and cannot say since when, or when it ends.\n";
+          exit 0;
+        }
+      }
+      print "No Jared service is running.\n";
+PERL
+  } | perl - "$svc_port" "$svc_token" "$svc_pid"
+  exit 0
+fi
+
+if [ "$version" = 1 ]; then
+  manifest=$(cd "$(dirname "$0")" && pwd)/../.claude-plugin/plugin.json
+  number=$(perl -ne 'if (/"version"\s*:\s*"([^"]+)"/) { print $1; exit }' "$manifest" 2> /dev/null)
+  [ -n "$number" ] || fail "The version of this plugin cannot be read: $manifest is missing, or has no version." 1
+  echo "Jared plugin $number"
   exit 0
 fi
 

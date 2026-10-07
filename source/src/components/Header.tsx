@@ -2,9 +2,12 @@ import { buttonLabel, statusOf, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
 import type { Review, SourceFile } from '../types'
 import type { Theme } from '../lib/theme'
-import { Button, Select } from '../ui'
-import { IconBrand, IconDownload, IconFile, IconPanel, IconSend, IconUpload } from './icons'
+import { Badge, Button, IconBrand, IconDownload, IconFile, IconPanel, IconSend, IconUpload, Select } from '../ui'
 import { ThemeButton } from './ThemeButton'
+import { Version } from './Version'
+
+/** The tone of a status, as `statusOf` names it, in the words of `Badge`. */
+const STATUS_TONE = { ok: 'ok', warn: 'warn', muted: 'neutral' } as const
 
 interface Props {
   file: SourceFile
@@ -33,7 +36,7 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
   return (
     <header className="header">
       <button type="button" className="brand" onClick={onHome} title="Back to start. Your review is saved.">
-        <IconBrand /> Jared
+        <IconBrand /> Jared <Version />
       </button>
 
       <div className="file">
@@ -54,15 +57,15 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
 
       <span className="spacer" />
 
-      <span className={`status-pill tone-${state.tone}`} title={state.text}>
+      <Badge variant="status" tone={STATUS_TONE[state.tone]} title={state.text}>
         {state.text}
-      </span>
+      </Badge>
 
       <Button icon={<IconUpload />} onClick={onOpen}>
         <span className="btn-label">Open…</span>
       </Button>
       <Button icon={<IconPanel />} pressed={panelOpen} onClick={onTogglePanel} title="Toggle comment list">
-        <span className="count">{count}</span>
+        <Badge variant="count">{count}</Badge>
       </Button>
       <ThemeButton theme={theme} onNext={onTheme} />
       <Button variant="primary" icon={delivery ? <IconSend /> : <IconDownload />} onClick={onSubmit} title={label} aria-label={label}>

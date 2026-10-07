@@ -3,7 +3,7 @@ import { canSaveDraft } from '../lib/review'
 import { usePlatform } from '../hooks/usePlatform'
 import type { Action } from '../state/reducer'
 import type { Draft } from '../types'
-import { Button, LiveStatus, Notice, TextField } from '../ui'
+import { Badge, Button, Card, CardFoot, CardHead, LiveStatus, Notice, TextField } from '../ui'
 
 interface Props {
   draft: Draft
@@ -55,11 +55,11 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
   return (
     // While a saved comment is edited its card is not drawn, and the composer is where a press on its comment bar goes (`data-comment`).
     <section className={flash ? 'panel is-flash' : 'panel'} data-comment={draft.id ?? undefined} ref={rootRef} onKeyDown={onKeyDown}>
-      <form className="card composer" onSubmit={onSubmit}>
-        <header className="card-head">
-          <span className="chip chip-accent">{label}</span>
+      <Card as="form" className="composer panel-card" onSubmit={onSubmit}>
+        <CardHead className="composer-head">
+          <Badge tone="accent">{label}</Badge>
           <span className="muted">{draft.id ? 'Editing comment' : 'Select other lines to change the range'}</span>
-        </header>
+        </CardHead>
 
         <TextField
           ref={commentRef}
@@ -90,7 +90,7 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
         {/* The live region is in the page and empty before the warning is put in it: a region that arrives holding its text is not always announced. */}
         <LiveStatus>{warning !== null && <Notice tone="warn" className="composer-notice">{warning}</Notice>}</LiveStatus>
 
-        <footer className="card-foot">
+        <CardFoot className="composer-foot">
           {(canSuggest || draft.suggestion !== null) && (
             <Button variant="ghost" className="suggestion-toggle" onClick={() => dispatch({ type: 'toggleSuggestion' })}>
               {draft.suggestion === null ? '± Suggest an implementation' : 'Remove suggestion'}
@@ -102,8 +102,8 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
           <Button type="submit" variant="primary" disabled={!canSave}>
             {draft.id ? 'Update' : 'Add comment'}
           </Button>
-        </footer>
-      </form>
+        </CardFoot>
+      </Card>
     </section>
   )
 }

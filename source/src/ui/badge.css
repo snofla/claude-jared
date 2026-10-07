@@ -1,0 +1,78 @@
+/*
+  Badge: a small label in a pill, in three variants: the chip, the status and the count.
+*/
+
+/* A chip is a pill 20px high. The label of a comment on a diff names a file and lines, and can be longer than the room, so a chip may
+   take a second line, and its ends stay round at 10px, which is a pill at one line. */
+.jared-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--badge-height-sm);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font: 600 var(--font-size-xs) / 1.3 var(--mono);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.jared-badge-chip.jared-badge-accent {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+/* A word, and not the label of lines: set in the sans face, a little lighter. */
+.jared-badge-chip.jared-badge-ok {
+  background: var(--add-bg);
+  border-color: var(--add-line);
+  color: var(--add-fg);
+  font-family: var(--sans);
+  font-weight: 500;
+}
+
+.jared-badge-status {
+  display: inline-block;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: var(--badge-height-md);
+  line-height: calc(var(--badge-height-md) - 2px);
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.jared-badge-status.jared-badge-ok {
+  background: var(--add-bg);
+  border-color: var(--add-line);
+  color: var(--add-fg);
+}
+
+.jared-badge-status.jared-badge-warn {
+  background: var(--warn-bg);
+  border-color: transparent;
+  color: var(--warn-fg);
+}
+
+.jared-badge-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--badge-height-sm);
+  height: var(--badge-height-sm);
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

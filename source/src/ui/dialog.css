@@ -1,0 +1,73 @@
+/*
+  Dialog: a modal on the browser's own <dialog>, with a heading, a cross and a foot that stays in reach.
+*/
+
+.jared-dialog {
+  width: min(720px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.jared-dialog::backdrop {
+  background: var(--backdrop);
+}
+
+.jared-dialog-body {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-20);
+}
+
+.jared-dialog-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+/* Under a finger the cross is 44 px, taller than a line of the heading: the two are centred on each other, and the cross is not left hanging from the top. */
+@media (pointer: coarse) {
+  .jared-dialog-title {
+    align-items: center;
+  }
+}
+
+/* The caller's words may be one long word: the heading breaks, so that the dialog does not grow sideways. */
+.jared-dialog-title h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  overflow-wrap: anywhere;
+}
+
+.jared-dialog-title h2:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.jared-dialog-subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.jared-dialog-subtitle code {
+  font-size: var(--font-size-sm);
+}
+
+.jared-dialog-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-6);
+  padding: var(--space-8) 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}

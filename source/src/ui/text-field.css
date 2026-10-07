@@ -19,6 +19,23 @@
   font-weight: 400;
 }
 
+/* The label of a field in a dialog: bold words in the text colour, and the hint at the far end of the row. */
+.jared-field-label-plain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-10);
+  font-size: var(--font-size-sm);
+  text-transform: none;
+  letter-spacing: 0;
+  color: inherit;
+}
+
+.jared-field-label-plain .jared-field-hint {
+  font-weight: inherit;
+  color: var(--muted);
+}
+
 .jared-field {
   display: block;
   box-sizing: border-box;

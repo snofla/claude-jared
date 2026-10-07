@@ -71,3 +71,58 @@
 .gallery-wide {
   flex: 1 1 100%;
 }
+
+.gallery-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.gallery-narrow {
+  max-width: 220px;
+}
+
+.gallery-alerts {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.gallery-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 150px;
+}
+
+.gallery-start {
+  align-self: flex-start;
+}
+
+.gallery-cards {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gallery-card-field {
+  margin: 0 12px;
+}
+
+.gallery-toolbar-narrow {
+  max-width: 400px;
+}
+
+/* A dialog left in the flow of the page, where the library's own would sit over the page: the gallery shows it beside the others. */
+.gallery-dialog {
+  position: static;
+  margin: 0 0 12px;
+  width: min(720px, 100%);
+}

@@ -1,7 +1,6 @@
 import { commentLabel } from '../lib/review'
 import type { ReviewComment } from '../types'
-import { Kbd } from '../ui'
-import { IconMessage, IconX } from './icons'
+import { Badge, IconButton, IconMessage, IconX, Kbd } from '../ui'
 
 interface Props {
   comments: ReviewComment[]
@@ -16,11 +15,9 @@ export function ReviewPanel({ comments, hoveredId, onHover, onJump, onClose }: P
     <aside className="side" aria-label="Review comments">
       <header className="side-head">
         <h2>
-          Comments <span className="count">{comments.length}</span>
+          Comments <Badge variant="count">{comments.length}</Badge>
         </h2>
-        <button type="button" className="icon-btn side-close" aria-label="Close panel" onClick={onClose}>
-          <IconX />
-        </button>
+        <IconButton className="side-close" label="Close panel" icon={<IconX />} onClick={onClose} />
       </header>
 
       {comments.length === 0 ? (
@@ -47,8 +44,8 @@ export function ReviewPanel({ comments, hoveredId, onHover, onJump, onClose }: P
                 onBlur={() => onHover(null)}
               >
                 <span className="side-item-top">
-                  <span className="chip">{commentLabel(c)}</span>
-                  {c.suggestion !== null && <span className="chip chip-add">± suggestion</span>}
+                  <Badge>{commentLabel(c)}</Badge>
+                  {c.suggestion !== null && <Badge tone="ok">± suggestion</Badge>}
                 </span>
                 <span className="side-item-text">{c.comment || 'Suggested change'}</span>
               </button>

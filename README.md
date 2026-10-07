@@ -51,13 +51,15 @@ A commit is opened as its change, with its message above it; the plugin looks it
 
 You can also ask in words: "review `path/to/file.ts` in Jared" or "review commit `74664abd` in Jared".
 
+To see which version of the plugin you have, run `/jared:version`.
+
 Jared opens with your file, in the browser pane of the Claude app if your session has one, and otherwise in your own browser. Write your comments there. How the review comes back depends on which of the two it is.
 
 ### In the browser pane of the Claude app
 
 Press **Submit review**. The review goes to the session.
 
-The pane gets Jared from a small service on your computer. It stops by itself after half an hour without use. To stop it sooner, run `/jared:stop`.
+The pane gets Jared from a small service on your computer. It stops by itself after half an hour without use. To see whether it is running, and when it ends, run `/jared:status`. To stop it sooner, run `/jared:stop`.
 
 ### In your own browser
 
