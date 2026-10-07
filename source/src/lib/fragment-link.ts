@@ -78,6 +78,15 @@ function requestsIn(parsed: unknown, fail: (error: string) => FragmentRead): Fra
 export const BOOT_KEY = '__JARED_BOOT'
 
 /**
+ * What the helper writes into `jared-boot.js` when the time of the review is up, in place of the requests, so that the file that they held does not
+ * stay in the cache: `window.__JARED_BOOT_EXPIRED = true`. A page that finds it was opened for a review whose file it can no longer be given.
+ */
+export const BOOT_EXPIRED_KEY = '__JARED_BOOT_EXPIRED'
+
+/** Whether the script beside the page said that its review has expired: only `true` says so. */
+export const bootExpired = (value: unknown): boolean => value === true
+
+/**
  * The requests that came with the page, from the value of `window.__JARED_BOOT`. `null` when there is none (`undefined`), so
  * that a page opened any other way carries on as before; otherwise the requests, or a sentence saying what is wrong with them.
  */

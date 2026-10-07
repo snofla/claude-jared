@@ -16,7 +16,7 @@ import { useDiffTokens, useLatest, useTokens } from './hooks/useTokens'
 import { COPY } from './lib/copy'
 import { afterSent, afterSentSettings, canTryAgain, closeDelayMs, deliveryOf, sentMessage, sentUnchanged, toldOfCancel } from './lib/delivery'
 import { diffOf } from './lib/diff'
-import { BOOT_KEY, readBoot, readFragment } from './lib/fragment-link'
+import { BOOT_EXPIRED_KEY, BOOT_KEY, bootExpired, readBoot, readFragment } from './lib/fragment-link'
 import { hostFromSearch } from './lib/host-link'
 import type { Platform, Picked } from './lib/platform'
 import { PLAIN_TEXT } from './lib/language'
@@ -250,8 +250,8 @@ export default function App() {
   // work is put to the reviewer, who is here, as a dropped file is. A page that is a file opened from a path has no fragment to
   // read: its requests are in `window.__JARED_BOOT`, put there by a script beside it, and taken once.
   useEffect(() => {
+    const page = window as unknown as Record<string, unknown>
     const takeBoot = () => {
-      const page = window as unknown as Record<string, unknown>
       const value = page[BOOT_KEY]
       delete page[BOOT_KEY]
       return readBoot(value)
@@ -260,8 +260,13 @@ export default function App() {
       const fromAddress = readFragment(window.location.hash)
       if (fromAddress) window.history.replaceState(null, '', window.location.pathname + window.location.search)
       const fromScript = takeBoot()
+      const expired = bootExpired(page[BOOT_EXPIRED_KEY])
+      delete page[BOOT_EXPIRED_KEY]
       const link = fromAddress ?? fromScript
-      if (!link) return
+      if (!link) {
+        if (expired) setNotice({ kind: 'warn', text: COPY.bootExpired }) // a page whose file the helper has taken back: the last session is not its answer
+        return
+      }
       if (!link.ok) return setNotice({ kind: 'error', text: link.error })
       for (const message of link.messages) {
         let replies = applyRequest(message)

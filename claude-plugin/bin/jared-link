@@ -28,7 +28,7 @@ The request also names Claude as the one to tell (submitTarget), which only chan
   --file              open <file> in the one-file Jared (a page that opens from a path) instead of making a link. The helper makes
                       a folder for this review in the cache ($JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared), puts the page
                       and a script, jared-boot.js, that gives the page the file, in it, opens the page with open or xdg-open, and
-                      prints one sentence. The script is removed after $JARED_BOOT_KEEP seconds (default 600), and review folders
+                      prints one sentence. The script is replaced after $JARED_BOOT_KEEP seconds (default 3600) by one that says that the review has expired, so that a page opened later can tell, and review folders
                       more than an hour old are removed the next time. The file may be as big as Jared opens.
   --page <path>       the one-file page (default: $JARED_PAGE; else app/jared.html in the plugin, which a published copy has;
                       else dist-single/jared.html of the repository that this plugin is in, which npm run build:single makes)
@@ -577,8 +577,8 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
     esac
   }
 
-  keep=${JARED_BOOT_KEEP:-600}
-  case $keep in *[!0-9]*) keep=600 ;; esac
+  keep=${JARED_BOOT_KEEP:-3600}
+  case $keep in *[!0-9]*) keep=3600 ;; esac
 
   if [ "$serve" = 1 ]; then
     service_started || {
@@ -587,7 +587,7 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
     }
     (
       sleep "$keep"
-      rm -f "$dir/jared-boot.js"
+      printf '%s\n' 'window.__JARED_BOOT_EXPIRED = true' > "$dir/jared-boot.js"
     ) > /dev/null 2>&1 < /dev/null &
     echo "http://127.0.0.1:$svc_port/$svc_token/$(basename "$dir")/jared.html"
     exit 0
@@ -600,7 +600,7 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
   # The page has read the script by then, unless its tab was slow to load, and the file need not stay in the cache.
   (
     sleep "$keep"
-    rm -f "$dir/jared-boot.js"
+    printf '%s\n' 'window.__JARED_BOOT_EXPIRED = true' > "$dir/jared-boot.js"
   ) > /dev/null 2>&1 < /dev/null &
   echo "Opened $name in Jared from $dir/jared.html."
   exit 0

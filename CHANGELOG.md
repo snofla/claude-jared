@@ -2,6 +2,10 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.13.1 — 2026-10-07
+
+- The page of a review that Claude opened for you keeps its file for an hour, where it kept it for ten minutes: you can reload it, or open it again, within that time. After that the page says so in a warning banner, "This review has expired, so what the page shows may be another one. Ask Claude to open the file again.", where it used to show the last session without a word.
+
 ## 0.13.0 — 2026-10-07
 
 - The header has less in it. **Open…**, the colour scheme and **Cancel review** are now in a **⋯** menu (*More actions*), and at a width of 900 px the header fits on one line, where it took two. The colour scheme is a choice of **System**, **Light** and **Dark**, with the one that is on checked; the start page keeps its button that cycles through them. Keys work as in any menu: the arrows, `Home` and `End` move, `Enter` or `Space` chooses, `Esc` closes.
