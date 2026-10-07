@@ -1,18 +1,18 @@
 /*
-  Button. The rules of the `btn` family of src/styles.css, moved here with the prefix `jared-` and no other change: a snapshot of the computed style
-  of every instance is empty before and after. Only design tokens are used for colour, and the sizes are still raw numbers (a scale for them is planned).
-  It needs nothing of the page but the tokens of tokens.css, so a host with no base styles gets the same button.
+  Button. The rules of the `btn` family of src/styles.css, moved here with the prefix `jared-`. Colours are design tokens and sizes are steps of the
+  scale, both from tokens.css (a raw size needs a reason on the same line, and a test refuses one without it). It needs nothing of the page but those tokens, so a host
+  with no base styles gets the same button.
 */
 
 .jared-btn {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
+  gap: var(--space-6);
+  height: var(--control-height-md);
+  padding: 0 var(--space-12);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: inherit;
   font: inherit;
@@ -49,6 +49,17 @@
   border-color: var(--accent);
 }
 
+/*
+  A toggle that is on keeps its look under the pointer, and only its border thickens. The rule for a hovered button is more specific than the rule for a
+  toggle that is on, so without this rule the toggle would take the colours of any hovered button and look off while the pointer is over it. The thicker
+  border is an inset ring, so that the button does not change size.
+*/
+.jared-btn[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 .jared-btn-primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -65,7 +76,7 @@
 .jared-btn-icon {
   flex: none;
   justify-content: center;
-  width: 32px;
+  width: var(--control-height-md);
   padding: 0;
   color: var(--muted);
 }
@@ -83,7 +94,7 @@
 .jared-btn-danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
+  color: var(--danger-fg);
 }
 
 .jared-btn-danger:hover:not(:disabled) {
@@ -91,20 +102,30 @@
   filter: brightness(1.1);
 }
 
+/* A key hint inside a button: close to the label and in its colour. On a primary button its border is pale in the light scheme and dark in the dark scheme, so that it shows on the colour. */
+.jared-btn .jared-kbd {
+  margin-left: var(--space-2);
+  color: inherit;
+}
+
+.jared-btn-primary .jared-kbd {
+  border-color: var(--key-hint-border);
+}
+
 .jared-btn-sm {
-  height: 26px;
-  padding: 0 9px;
-  font-size: 13px;
-  border-radius: 6px;
+  height: var(--control-height-sm);
+  padding: 0 9px; /* raw: a layout number of the small button, 9px, which is not a step of the scale */
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
 }
 
 /* A finger needs about 44 px (WCAG 2.5.8 asks 24): every button, the small one too, and the icon-only square, written once here. */
 @media (pointer: coarse) {
   .jared-btn {
-    height: 44px;
+    height: var(--control-height-lg);
   }
 
   .jared-btn-icon {
-    width: 44px;
+    width: var(--control-height-lg);
   }
 }

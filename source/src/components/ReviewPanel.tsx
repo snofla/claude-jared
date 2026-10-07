@@ -1,5 +1,6 @@
 import { commentLabel } from '../lib/review'
 import type { ReviewComment } from '../types'
+import { Kbd } from '../ui'
 import { IconMessage, IconX } from './icons'
 
 interface Props {
@@ -29,7 +30,7 @@ export function ReviewPanel({ comments, hoveredId, onHover, onJump, onClose }: P
             <strong>Nothing yet.</strong>
           </p>
           <p>
-            Click a line number, drag across several, or shift-click to extend. Then press <kbd>C</kbd> to comment.
+            Click a line number, drag across several, or shift-click to extend. Then press <Kbd>C</Kbd> to comment.
           </p>
         </div>
       ) : (

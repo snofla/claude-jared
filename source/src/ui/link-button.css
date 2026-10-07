@@ -1,0 +1,26 @@
+/*
+  LinkButton: an action that reads as a link in a line of text. It sets its own font, cursor and focus ring, so that it needs nothing of the page but the
+  design tokens.
+*/
+
+.jared-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.jared-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Unavailable: faded, as a disabled Button is. Without this the accent colour would hide that it is disabled. */
+.jared-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

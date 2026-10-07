@@ -1,0 +1,13 @@
+/*
+  Kbd: the hint for a key. The box takes the colour of the text around it, a little faded.
+*/
+
+.jared-kbd {
+  font-family: var(--mono);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  padding: var(--space-2) 5px; /* raw: 5px across is a layout number of the key hint, not a step of the scale */
+  border-radius: var(--radius-xs);
+  border: 1px solid currentColor;
+  opacity: 0.75;
+}

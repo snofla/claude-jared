@@ -2,6 +2,7 @@ import { MAX_BYTES } from '../lib/source'
 import type { RecentEntry } from '../lib/storage'
 import type { Theme } from '../lib/theme'
 import { formatBytes } from '../lib/util'
+import { LinkButton } from '../ui'
 import { IconBrand, IconFile, IconUpload, IconX } from './icons'
 import { ThemeButton } from './ThemeButton'
 
@@ -40,13 +41,9 @@ export function Landing({ recent, onPick, onSample, onSampleDiff, onOpenRecent, 
 
         <p className="landing-alt">
           No file handy?{' '}
-          <button type="button" className="link" onClick={onSample}>
-            Try a sample
-          </button>{' '}
+          <LinkButton onClick={onSample}>Try a sample</LinkButton>{' '}
           or{' '}
-          <button type="button" className="link" onClick={onSampleDiff}>
-            a sample diff
-          </button>
+          <LinkButton onClick={onSampleDiff}>a sample diff</LinkButton>
         </p>
 
         {recent.length > 0 && (

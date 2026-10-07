@@ -4,7 +4,7 @@ Jared /ˈdʒær.əd/ is not Gerrit /ˈɡɛr.ɪt/.
 
 Syntax-highlighted, file-based review for Claude.
 
-A Claude Code plugin. It opens a source file or a diff in Jared, a line-by-line review app, and brings your review back into the session.
+A Claude Code plugin. It opens a source file, a diff or a commit in Jared, a line-by-line review app, and brings your review back into the session.
 
 ## What it looks like
 
@@ -40,13 +40,16 @@ claude plugin install jared@claude-jared
 
 ## Use
 
-In a Claude Code session, give the plugin a source file or a diff:
+In a Claude Code session, give the plugin a source file, a diff or a commit:
 
 ```
 /jared:review path/to/file.ts
+/jared:review 74664abd
 ```
 
-You can also ask in words: "review `path/to/file.ts` in Jared".
+A commit is opened as its change, with its message above it; the plugin looks it up in the git repository of the folder your session is in.
+
+You can also ask in words: "review `path/to/file.ts` in Jared" or "review commit `74664abd` in Jared".
 
 Jared opens with your file, in the browser pane of the Claude app if your session has one, and otherwise in your own browser. Write your comments there. How the review comes back depends on which of the two it is.
 

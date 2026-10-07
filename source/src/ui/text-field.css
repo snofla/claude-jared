@@ -1,0 +1,73 @@
+/*
+  TextField: a label, a text area and a hint. The text area has the look of a field; its width is the width of the box around it, and the margin around it
+  is the page's (a class given to the box).
+*/
+
+.jared-field-label {
+  display: block;
+  margin-bottom: var(--space-6);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.jared-field-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.jared-field {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  min-height: 76px; /* raw: the height of three lines of text and its padding, which is not a step of the scale */
+  max-height: 280px;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+  field-sizing: content;
+}
+
+/* The browser's own placeholder colour is 3.94:1 in dark. Firefox also fades it, so the opacity is set to 1. */
+.jared-field::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.jared-field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+/* Unavailable: faded, as a disabled Button is. Without this the colour of the text would hide that the field is disabled. */
+.jared-field:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.jared-field-code {
+  font: var(--font-size-sm) / 1.5 var(--mono);
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+  min-height: 0;
+  max-height: 360px;
+}
+
+/* iOS Safari zooms the page when a field whose text is under 16px takes focus, and it stays zoomed until the reader pinches back. Fields are 16px on touch
+   devices; zooming is not blocked, which would be an accessibility loss. */
+@media (pointer: coarse) {
+  .jared-field,
+  .jared-field-code {
+    font-size: var(--font-size-lg);
+  }
+}

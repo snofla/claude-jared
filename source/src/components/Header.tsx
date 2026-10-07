@@ -2,7 +2,7 @@ import { buttonLabel, statusOf, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
 import type { Review, SourceFile } from '../types'
 import type { Theme } from '../lib/theme'
-import { Button } from '../ui'
+import { Button, Select } from '../ui'
 import { IconBrand, IconDownload, IconFile, IconPanel, IconSend, IconUpload } from './icons'
 import { ThemeButton } from './ThemeButton'
 
@@ -44,16 +44,13 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
         <span className="muted file-lines">{file.lines.length.toLocaleString()} lines</span>
       </div>
 
-      <label className="lang">
-        <span className="sr-only">Language</span>
-        <select value={file.language} onChange={(e) => onLanguage(e.target.value)}>
-          {LANGUAGE_OPTIONS.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select label="Language" labelHidden className="lang-select" value={file.language} onChange={(e) => onLanguage(e.target.value)}>
+        {LANGUAGE_OPTIONS.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
+          </option>
+        ))}
+      </Select>
 
       <span className="spacer" />
 

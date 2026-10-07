@@ -1,0 +1,10 @@
+/* A text that a screen reader reads and the page does not draw. `display: none` would take it out of the accessibility tree too. */
+
+.jared-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px; /* raw: the box of a hidden text is one pixel, which is not a size of the page */
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

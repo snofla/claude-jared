@@ -1,0 +1,15 @@
+/*
+  Notice: a message in the page, in a box. Both tones are drawn in the warning colours today.
+*/
+
+.jared-notice {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.jared-notice-info,
+.jared-notice-warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}

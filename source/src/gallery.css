@@ -67,3 +67,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.gallery-wide {
+  flex: 1 1 100%;
+}

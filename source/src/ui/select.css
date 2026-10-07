@@ -1,0 +1,34 @@
+/*
+  Select: a native select with the look of a field.
+*/
+
+.jared-select-label {
+  display: block;
+  margin-bottom: var(--space-6);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.jared-select {
+  height: var(--control-height-md);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
+/* Unavailable: faded, as a disabled Button is. */
+.jared-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* iOS Safari zooms the page when a field whose text is under 16px takes focus (see the comment in text-field.css): a select is 16px on touch devices too. */
+@media (pointer: coarse) {
+  .jared-select {
+    font-size: var(--font-size-lg);
+  }
+}

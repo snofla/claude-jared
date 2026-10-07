@@ -3,7 +3,7 @@ import { canSaveDraft } from '../lib/review'
 import { usePlatform } from '../hooks/usePlatform'
 import type { Action } from '../state/reducer'
 import type { Draft } from '../types'
-import { Button } from '../ui'
+import { Button, LiveStatus, Notice, TextField } from '../ui'
 
 interface Props {
   draft: Draft
@@ -61,10 +61,11 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
           <span className="muted">{draft.id ? 'Editing comment' : 'Select other lines to change the range'}</span>
         </header>
 
-        <textarea
+        <TextField
           ref={commentRef}
-          className="field"
-          aria-label="Comment"
+          className="composer-field"
+          label="Comment"
+          labelHidden
           placeholder="Leave a comment on these lines…"
           rows={3}
           value={draft.comment}
@@ -72,27 +73,22 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
         />
 
         {draft.suggestion !== null && (
-          <div className="suggest">
-            <label className="suggest-label" htmlFor="suggestion">
-              Suggested implementation <span className="muted">replaces the selected lines</span>
-            </label>
-            <textarea
-              id="suggestion"
-              className="field field-code"
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              rows={suggestionRows}
-              value={draft.suggestion}
-              onChange={(e) => dispatch({ type: 'patchDraft', patch: { suggestion: e.target.value } })}
-            />
-          </div>
+          <TextField
+            className="suggest"
+            label="Suggested implementation"
+            hint="replaces the selected lines"
+            variant="code"
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            rows={suggestionRows}
+            value={draft.suggestion}
+            onChange={(e) => dispatch({ type: 'patchDraft', patch: { suggestion: e.target.value } })}
+          />
         )}
 
         {/* The live region is in the page and empty before the warning is put in it: a region that arrives holding its text is not always announced. */}
-        <div className="composer-status" role="status">
-          {warning !== null && <p className="notice notice-warn">{warning}</p>}
-        </div>
+        <LiveStatus>{warning !== null && <Notice tone="warn" className="composer-notice">{warning}</Notice>}</LiveStatus>
 
         <footer className="card-foot">
           {(canSuggest || draft.suggestion !== null) && (

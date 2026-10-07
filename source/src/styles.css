@@ -79,18 +79,8 @@ p {
 }
 
 code,
-kbd,
 pre {
   font-family: var(--mono);
-}
-
-kbd {
-  font-size: 11px;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: 4px;
-  border: 1px solid currentColor;
-  opacity: 0.75;
 }
 
 .muted {
@@ -184,15 +174,6 @@ kbd {
 .icon-btn:hover {
   background: var(--surface-2);
   color: var(--text);
-}
-
-.link {
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 /* A chip is one line of 20px, a pill. The label of a comment on a diff names a file and lines, and can be longer than the room, so a chip may
@@ -308,13 +289,9 @@ kbd {
   font-size: 13px;
 }
 
-.lang select {
-  height: 32px;
+/* The width that the header allows the language choice. Its look is the library's Select. */
+.lang-select {
   max-width: 160px;
-  padding: 0 8px;
-  border: 1px solid var(--field-border);
-  border-radius: 8px;
-  background: var(--surface);
 }
 
 .status-pill {
@@ -720,6 +697,8 @@ kbd {
   padding-bottom: 6px;
 }
 
+/* The rules of the library's TextField that SubmitDialog still uses by their old class names, `field` here and `notice` below (and `dialog .field`):
+   it moves to the library with Dialog, and these go then. */
 .field {
   display: block;
   width: calc(100% - 24px);
@@ -746,22 +725,8 @@ kbd {
   border-color: transparent;
 }
 
-.field-code {
-  font: 13px/1.5 var(--mono);
-  tab-size: 4;
-  white-space: pre;
-  overflow: auto;
-  min-height: 0;
-  max-height: 360px;
-}
-
 .suggest {
   margin: 12px 12px 4px;
-}
-
-.suggest .field {
-  margin: 0;
-  width: 100%;
 }
 
 .suggest-label {
@@ -784,7 +749,11 @@ kbd {
   margin: 0 12px 12px;
 }
 
-.composer-status > .notice {
+.composer-field {
+  margin: 0 12px;
+}
+
+.composer-notice {
   margin: 0 12px 12px;
 }
 
@@ -872,12 +841,6 @@ kbd {
   min-width: 0;
   font: 600 13px/1.3 var(--mono);
   overflow-wrap: anywhere;
-}
-
-.selbar kbd {
-  border-color: light-dark(rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.5));
-  color: inherit;
-  margin-left: 2px;
 }
 
 /* ---------- overview ruler ---------- */
@@ -1321,8 +1284,7 @@ kbd {
 @media (pointer: coarse) {
   input,
   select,
-  textarea,
-  .field-code {
+  textarea {
     font-size: 16px;
   }
 }
@@ -1372,7 +1334,7 @@ kbd {
     flex: 1 0 100%;
   }
 
-  .lang select {
+  .lang-select {
     max-width: 128px;
   }
 

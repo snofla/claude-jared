@@ -13,6 +13,8 @@
   --surface-2: light-dark(#f6f7f9, #0d1218);
   --border: light-dark(#dcdfe4, #2a313b);
   --border-strong: light-dark(#c3c8cf, #3b4350);
+  /* The border of a key hint on a primary button: pale in the light scheme, and dark in the dark scheme, where the label is dark ink. */
+  --key-hint-border: light-dark(rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.5));
   /* The edge of a field (3:1 on --surface, WCAG 1.4.11). Buttons have text, so they keep --border-strong. */
   --field-border: light-dark(#868e98, #657080);
   --text: light-dark(#1c2128, #e6edf3);
@@ -21,15 +23,59 @@
   --accent-ink: light-dark(#ffffff, #0b0d12);
   --accent-soft: light-dark(rgba(79, 70, 229, 0.1), rgba(139, 135, 255, 0.14));
   --danger: light-dark(#cf222e, #ff7b72);
+  /* The label on --danger: 5.36:1 in light and 7.71:1 in dark (white on the dark red is 2.52:1). */
+  --danger-fg: light-dark(#ffffff, #0b0d12);
   --warn-bg: light-dark(#fff6dd, rgba(210, 153, 34, 0.16));
   --warn-fg: light-dark(#7a5b00, #e3b341);
   --error-bg: light-dark(#fdeeee, rgba(248, 81, 73, 0.14));
   --error-fg: light-dark(#a1111c, #ff9992);
   --shadow-near: light-dark(rgba(20, 24, 31, 0.16), rgba(0, 0, 0, 0.55));
   --shadow-far: light-dark(rgba(20, 24, 31, 0.12), rgba(0, 0, 0, 0.5));
+  /* The colour of the shadow under a card: the same in both schemes, as it is drawn today. Not used until the card moves into the library. */
+  --shadow-card: light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.06));
+  /* The scrim behind a dialog and a drop target: dark in both schemes. Not used until the dialog moves into the library. */
+  --backdrop: light-dark(rgba(8, 10, 14, 0.55), rgba(8, 10, 14, 0.55));
   --shadow: 0 10px 30px var(--shadow-near), 0 1px 3px var(--shadow-far);
   --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /*
+    The scale: the sizes that a component may use. They are lengths, so they have no light and dark value. A name begins with its kind (--radius-, --font-size-,
+    --space-, --control-height-, --badge-height-). A step is named for its size (xs to xl, or sm, md and lg) or its shape (pill) or, for space, which has no such
+    names, for its length in px: --space-8 is 8px. A new value is a new step and never a change to an old one. Arithmetic is written out with calc(),
+    as calc(var(--space-2) * 2).
+  */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+
+  /* md is the size of the page's text. */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-20: 20px;
+
+  /* lg is the size for a finger, which a control takes under (pointer: coarse). */
+  --control-height-sm: 28px;
+  --control-height-md: 32px;
+  --control-height-lg: 44px;
+
+  --badge-height-sm: 20px;
+  --badge-height-md: 24px;
 }
 
 /* A choice made with the button in the header sets data-theme on <html> (src/lib/theme.ts); system leaves it off. */

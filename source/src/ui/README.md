@@ -1,10 +1,24 @@
 # `src/ui`: the component library
 
-The component library of Jared: the buttons, fields and dialogs that the interface is built from, and the design tokens they are drawn with. It is for the people who build Jared's interface, which today is this one app. It is not a package of its own: nothing outside this repository uses it, and it has no version of its own. Its classes start with `jared-`. Today it holds one component, `Button`, and the design tokens that are not about reviewing code.
+The component library of Jared: the buttons, fields and dialogs that the interface is built from, and the design tokens they are drawn with. It is for the people who build Jared's interface, which today is this one app. It is not a package of its own: nothing outside this repository uses it, and it has no version of its own. Its classes start with `jared-`. Today it holds `Button`, `Kbd`, `LinkButton`, `LiveStatus`, `Notice`, `Select` and `TextField`, and the design tokens that are not about reviewing code.
 
 Some of what this guide points to (the lint configuration, the tests and the gallery page) is in the repository where Jared is developed, and not in the published copy of the page's source.
 
-This file answers, in order: what belongs here; how to add a component; what a component's interface is; what it promises about accessibility; which states it shows in the gallery; how it is styled; what things are called; what a change costs; how to see and check it; what is known not to work; `Button` as one complete example; and a note on logic.
+This file answers, in order: what is in it; what belongs here; how to add a component; what a component's interface is; what it promises about accessibility; which states it shows in the gallery; how it is styled; the scale of sizes; what things are called; what a change costs; how to see and check it; what is known not to work; `Button` as one complete example; and a note on logic.
+
+## What is in it
+
+| Component | What it is | Its props, besides the native ones |
+|---|---|---|
+| `Button` | A button: default, primary, ghost, danger, small, with an icon, or an icon alone; it can be a toggle, or busy. | `variant`, `size`, `pressed`, `busy`, `icon`, `iconOnly` (then `aria-label` is required) |
+| `Kbd` | The name of a key, drawn in a box, such as `C` or `Esc`. | none |
+| `LinkButton` | An action that reads as a link in a line of text. It is a button: it does something on this page. | none |
+| `LiveStatus` | A region that is announced politely when its text changes. | none |
+| `Notice` | A message in the page, in a box, that is not announced by itself. | `tone` (`info` or `warn`; both are drawn the same today) |
+| `Select` | A native select, with a label that names it. | `label` (required), `labelHidden` |
+| `TextField` | A text area with a label and an optional hint, in a plain or a code variant. It makes its own `id`. | `label` (required), `labelHidden`, `hint`, `variant` (`text` or `code`) |
+
+Every component takes `className`, for layout only: the look is the component's. It goes to the one element the component draws, except for `TextField`, where it goes to the box around the label and the field, and `Select`, where it goes to the `select` inside its label.
 
 ## What belongs here, and what does not
 
@@ -42,11 +56,13 @@ What follows can be checked, and each line says where. It is the least a compone
 
 - **An accessible name.** A button's name is its text. An icon-only button has no text, so its type requires `aria-label` (`Button.test.ts` holds two lines that `tsc` must reject; `npm run build` runs `tsc`).
 - **`aria-disabled`, not `disabled`, while an action is under way.** A disabled button drops the keyboard focus. A busy `Button` is `aria-disabled`, keeps the focus, ignores a click and the keys, and stops a submit (`busy`; tested in `Button.test.ts`, and shown in the gallery, where the counter of the busy buttons stays at 0). `disabled` is for a button that cannot be used yet.
+- **A field is named.** `TextField` and `Select` require `label`: it is the field's name for a screen reader. It is drawn above the field, or, with `labelHidden`, not drawn, when the page already names the field to the eye. A hint is part of the label, so it is read with it.
+- **A live region is in the page before its text.** `LiveStatus` is always rendered, empty when there is nothing to say, because a region that arrives already holding its text is not always announced. A `Notice` has no role of its own: put one in a `LiveStatus` when it must be heard.
 - **Keys and focus.** The component is a native element, so it has its keys (Enter and Space for a button). A visible focus ring comes with `:focus-visible`: 2 px in `--accent`, 6.06:1 or more on the surface in both schemes.
 - **Roles.** A native element where there is one. A toggle is `aria-pressed`, drawn from the attribute and from nothing else. A component invents no role.
 - **Touch.** Under `(pointer: coarse)` every button is 44 px high, the icon-only square 44 px wide, written once in `button.css`. WCAG 2.5.8 asks for 24 px.
-- **Contrast.** The label of every `Button` is 4.5:1 or more on its own background, resting, in light and in dark (each pair below is light, then dark): default 16.18 and 15.37, primary 6.29 and 6.49, ghost and icon-only 5.83 and 5.90, pressed 13.93 and 12.61. They are pinned in `scripts/theme.test.ts`, worked out from the design tokens, so a change to a design token that changes one fails the test. **One does not meet it, in dark:** the white label of the danger button on `--danger` is 2.52:1 in dark (5.36:1 in light), as it was before the library; a later change gives it a design token of its own. The edge of a default button, `--border-strong`, is 1.68:1 in light and 1.82:1 in dark on the surface: the label is what identifies the button, as the comment on `--field-border` in `tokens.css` says.
-- **`Alert` and `Notice`** (not built yet) are two different things. An `Alert` is announced the moment it appears (`role="alert"`, with a dismiss button); a `Notice` is a message in the page that is not (no role). Take the one that says what the situation needs.
+- **Contrast.** The label of every `Button` is 4.5:1 or more on its own background, resting, in light and in dark (each pair below is light, then dark): default 16.18 and 15.37, primary 6.29 and 6.49, ghost and icon-only 5.83 and 5.90, pressed 13.93 and 12.61, danger 5.36 and 7.71 (its label is `--danger-fg`, which is dark in the dark scheme: white on that red would be 2.52:1). They are pinned in `scripts/theme.test.ts`, worked out from the design tokens, so a change to a design token that changes one fails the test. The edge of a default button, `--border-strong`, is 1.68:1 in light and 1.82:1 in dark on the surface: the label is what identifies the button, as the comment on `--field-border` in `tokens.css` says.
+- **`Alert` (not built yet) and `Notice`** are two different things. An `Alert` is announced the moment it appears (`role="alert"`, with a dismiss button); a `Notice` is a message in the page that is not (no role). Take the one that says what the situation needs.
 
 ## States in the gallery
 
@@ -56,16 +72,33 @@ What follows can be checked, and each line says where. It is the least a compone
 
 - **The prefix is `jared-`**, and each component has one family of classes: `jared-btn`, `jared-btn-primary`. The class is the component's own, not an API: a host does not write rules for it.
 - **Colours are design tokens, and only design tokens**, each `light-dark(light, dark)` in `tokens.css`. A new colour needs both values (`scripts/theme.test.ts` reads every CSS file under `src` and fails without them). There is no `prefers-color-scheme` anywhere: the reviewer's switch sets `data-theme` on `<html>`, and `light-dark()` follows it.
-- **Sizes are raw numbers today** (radii, font sizes, gaps, heights), and so is the white of the danger button: a scale for them is planned, and they move onto it when it is built.
+- **Sizes are steps of the scale** (radii, type sizes, space, heights), from `tokens.css`: see *The scale*. A raw size needs a reason on the same line, and a test refuses one without it.
 - **No `!important`.**
 - **A host changes the look with the design tokens**: set them on `:root` or on any ancestor. The library needs nothing else from the page: `index.ts` brings `tokens.css` with it, and a button sets its own box model, font, cursor and focus ring.
+
+## The scale
+
+The sizes that a component draws with are design tokens too, in `tokens.css`. Use these steps and write no raw number. If none fits, add a step to the scale: never change an old one, because every component that uses it would change with it.
+
+| Kind | Steps |
+|---|---|
+| Radius | `--radius-xs` 4, `-sm` 6, `-md` 8, `-lg` 10, `-xl` 14 and `--radius-pill` 999 px |
+| Type size | `--font-size-xs` 12, `-sm` 13, `-md` 14 (the page's text), `-lg` 16 and `-xl` 18 px |
+| Space (gap, padding, margin) | `--space-2`, `-4`, `-6`, `-8`, `-10`, `-12`, `-14`, `-16` and `-20`, each named for its length in px |
+| Height of a control | `--control-height-sm` 28, `-md` 32 and `-lg` 44 px (`-lg` is the size for a finger, which a control takes under `(pointer: coarse)`) |
+| Height of a badge | `--badge-height-sm` 20 and `-md` 24 px |
+
+- **Arithmetic is written out:** `calc(var(--space-2) * 2)`. There is no step for a multiple.
+- **A name with a kind word is a length** and has no light and dark value; every other name is a colour and has both, but for the five older names below. `scripts/theme.test.ts` checks both, and that `--space-8` is 8 px.
+- **The guard.** In the CSS files of this folder, `scripts/theme.test.ts` fails a radius, type size, gap, height, padding or margin that is a number with a unit (`px`, `rem`, `em`, `vw`, `vh`, `ch` or `pt`) and is not inside `var(...)`. A raw size is allowed when a comment on its line begins `raw:` and gives the reason, as in `padding: 0 9px; /* raw: a layout number, not a step */`; a `raw:` comment with no reason fails too. What the guard cannot see is under *Known not to work*.
+- **Not on the scale:** the families (`--mono`, `--sans`), the shadow (`--shadow`) and the two sizes of the code viewer (`--gutter-w`, `--row-h`) keep their older names.
 
 ## Names
 
 - **A component** is a PascalCase noun, `Button`, in `Button.tsx` with its rules in `button.css`.
 - **Props** say what the caller means, not how it looks: `variant` (default, primary, ghost, danger), `size` (`md`, `sm`), `pressed` (a toggle that is on or off), `busy` (an action is under way), `icon`, `iconOnly`. A boolean is an adjective. A state is an ARIA attribute and never a class.
-- **A design token** that is not a colour is named `--<kind>-<name>`, where the kind says what it holds (`--radius-md`, `--space-8`, `--font-size-md`, `--control-height-md`); a colour has no kind word and is named for its role (`--surface`, `--accent`). Five older design tokens keep their names, which do not follow this rule (`--mono`, `--sans`, `--gutter-w`, `--row-h`, `--shadow`). Today the sizes are still raw numbers, and a scale built on this rule is planned.
-- **Glossary.** A **design token** is a named value that the interface takes its look from, written once as a CSS custom property (`--surface`). Always say *design token*, never *token* alone: a *syntax token* is a piece of code that Shiki colours, and a receiver has a secret that is also called a token. `Alert` and `Notice` are the two messages above.
+- **A design token** that is not a colour is named `--<kind>-<name>`, where the kind says what it holds (`--radius-md`, `--space-8`, `--font-size-md`, `--control-height-md`); a colour has no kind word and is named for its role (`--surface`, `--accent`). Five older design tokens keep their names, which do not follow this rule (`--mono`, `--sans`, `--gutter-w`, `--row-h`, `--shadow`).
+- **Glossary.** A **design token** is a named value that the interface takes its look from, written once as a CSS custom property. The kind word in a design token's name says what it holds (`--radius-md` a radius, `--font-size-md` a type size, `--space-8` a space of 8 px); a colour has no kind word (`--accent`, `--text`). Always say *design token*, never *token* alone: a *syntax token* is a piece of code that Shiki colours, and a receiver has a secret that is also called a token. `Alert` and `Notice` are the two messages above.
 
 ## Changing a component
 
@@ -85,9 +118,10 @@ What follows can be checked, and each line says where. It is the least a compone
 
 - **Only Chromium has seen it** (the browser pane). Safari and Firefox have not been tried.
 - **The gallery is for the dev server only.** The production build rewrites `light-dark()` into custom-property toggles that are resolved once, on the root, so two columns could not show two schemes there, and the build does not include the gallery. On the dev server `light-dark()` needs a recent browser.
-- **A toggle that is on looks like any hovered button while the mouse is over it:** the hover rule is more specific than the pressed one. It was so before the library.
-- **The danger button's label in dark is under 4.5:1** (above).
-- **`SubmitDialog` still draws its buttons with the old `btn` rules** in `src/styles.css`, until it moves to the library.
+- **`SubmitDialog` still draws its buttons, its notices and its text area with the old `btn`, `notice` and `field` rules** in `src/styles.css`, until it moves to the library.
+- **No field shows an error yet.** Nothing in the app shows one, so `TextField` and `Select` have no invalid state; the first field that needs one adds it, with its place in the gallery.
+- **Both tones of `Notice` look the same.** `info` and `warn` are both drawn in the warning colours, as the old `notice` rule was, until the design gives `info` a look of its own.
+- **The guard against raw sizes reads one line at a time.** It wants one declaration to a line and the braces of a rule on lines of their own (`.a { height: 32px; }` fails for that reason alone), it does not see a raw fallback inside `var()`, as in `var(--space-6, 8px)`, and it looks only at radius, type size, gap, height, padding and margin: a `width` or a `border` can still be raw.
 
 ## `Button`, and why
 
@@ -96,15 +130,16 @@ What follows can be checked, and each line says where. It is the least a compone
 | Decision | Why |
 |---|---|
 | `variant` is `default`, `primary`, `ghost` or `danger`; `size` is `md` or `sm` | The five looks that the app drew with the `btn` family, as it used them. |
-| `pressed` draws and announces a toggle through `aria-pressed`; the look is `.jared-btn[aria-pressed='true']` | The panel toggle in the header drew a class and an attribute separately. One source cannot drift from itself. |
+| `pressed` draws and announces a toggle through `aria-pressed`; the look is `.jared-btn[aria-pressed='true']` | The panel toggle in the header drew a class and an attribute separately. One source cannot drift from itself. A toggle that is on keeps its look under the pointer, and only its border thickens (`.jared-btn[aria-pressed='true']:hover:not(:disabled)`). |
 | `busy` is `aria-disabled`, ignores the click, and prevents the default | A disabled button drops the focus, and a focusable button is still pressed by the keyboard, which `pointer-events: none` does not stop. The guard is here once, as `run()` had it in the dialog, and it stops a submit button too. |
 | `type` is `button` unless given | A button in a form must not submit by accident. |
 | `iconOnly` needs `aria-label`, and is `default` or `ghost` | No text, so no name unless the type asks. The icon takes the muted colour of its own rule, which would not read on the primary or the danger button. |
 | `icon` comes before the label, and the space between them is `gap`, not text | The old markup put a space character between them, which a flex row does not draw. |
 | `className` is added after the library's, for layout | The suggestion button in a narrow card takes the full width of the card; it says so with its own class and not with the library's. |
 | The component imports no helper from the app, and joins its classes itself | The boundary: nothing here imports `lib`. |
-| 44 px under `(pointer: coarse)`, in `button.css` | A finger needs about 44 px; written once. |
-| Sizes and the white of the danger label are raw | A scale for them is planned. |
+| `--control-height-lg` under `(pointer: coarse)`, in `button.css` | A finger needs about 44 px; written once. |
+| Sizes are steps of the scale; the small button's padding of 9 px is raw, with its reason on the line | 9 px is a layout number that is not a step. It shows the guard on a real component. |
+| The danger label is `--danger-fg` | White on the dark red is 2.52:1, so the label is dark in the dark scheme (7.71:1) and white in the light one (5.36:1). |
 
 ## Logic
 

@@ -61,11 +61,16 @@ const DIFF_START = /^(diff |Index: |--- |From [0-9a-f]{7,} |commit [0-9a-f]{7,})
 
 const isGitPath = (path: string, prefix: string): boolean => path.startsWith(prefix)
 
-/** A path as the diff writes it: without the quotes git puts round a name with unusual characters, and without a trailing time. */
+/**
+ * A path as the diff writes it: without the quotes git puts round a name with unusual characters, and without what follows a tab,
+ * which is a time after `diff -u` and a bare tab after git, for a name with a space in it (a quoted name has no tab of its own: it is
+ * written `\t`).
+ */
 export function unquotePath(raw: string): string {
-  if (!(raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"'))) return raw.split('\t')[0]
+  const named = raw.split('\t')[0]
+  if (!(named.length >= 2 && named.startsWith('"') && named.endsWith('"'))) return named
   const bytes: number[] = []
-  const body = raw.slice(1, -1)
+  const body = named.slice(1, -1)
   for (let i = 0; i < body.length; i++) {
     const c = body[i]
     if (c !== '\\') {

@@ -3,7 +3,8 @@
 # file in the one-file Jared, which is a page opened from a path, with the request in a script beside it; or, with --serve, put the file
 # in a review folder that a small service on this computer serves over http, so that a browser tool can show it.
 # Uses only sh, perl (JSON::PP, MIME::Base64, IO::Socket::INET, IO::Select and POSIX are in perl's core) and the common tools wc, date, basename
-# and tr, and for --file and --serve also dirname, mkdir, mktemp, find, ln, cp, rm, kill and sleep. Run it with --help for the options and the exit statuses.
+# and tr, for --file and --serve also dirname, mkdir, mktemp, find, ln, cp, rm, kill and sleep, and for --rev git, cut, mkdir, mktemp, find, rm and mv.
+# Run it with --help for the options and the exit statuses.
 
 usage() {
   cat <<'USAGE'
@@ -11,6 +12,7 @@ Usage: jared-link <file> [--jared <address>] [--open] [--max <bytes>]
        jared-link <file> --file [--page <path>] [--max <bytes>]
        jared-link <file> --serve [--label <words>] [--closes moment|now|never] [--message <words>] [--banner true|false]
                                [--port <number>] [--page <path>] [--max <bytes>]
+       jared-link --rev <commit> [--max <bytes>]
        jared-link --stop
 
 Prints a link that opens <file> in Jared: Jared's address, then #jared=<base64url JSON of an "open" request>.
@@ -41,9 +43,18 @@ The request also names Claude as the one to tell (submitTarget), which only chan
   --port <number>     the port for a service that has to be started (default: any free port); for --serve only
   --stop              stop the Jared service, if one is running, and say so
 
-Exit status: 0 done; 1 the file cannot be read; 2 a mistake in the command line; 3 too big (for a link, or for Jared);
+  --rev <commit>      write the change of one commit of the git repository that this folder is in to a file, which Jared shows as changes, and
+                      print its path on one line; give that file to this helper or to Jared as any other. <commit> is whatever git takes for
+                      one commit (a hash, an abbreviated hash, a tag, a branch, HEAD~2): a range is not one. The file is in the cache folder,
+                      in diffs/, named for the first 12 characters of the hash. It holds one line, commit <hash>, an empty line, the message,
+                      and the change as git show writes it: against the first parent for a merge, and against the empty tree for the first
+                      commit. It has no author and no date, and none of your own git settings (colour, prefixes, an external diff, lines of
+                      context) reaches it. Files in diffs/ more than an hour old are removed the next time. It takes no file and no option
+                      but --max, and it changes nothing in the repository.
+
+Exit status: 0 done; 1 the file cannot be read, or, with --rev, the commit cannot be taken (the message says why); 2 a mistake in the command line; 3 too big (for a link, or for Jared);
 4 the file is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
-6 --file or --serve, and the one-file page is not there; 7 --file or --serve, and a folder or a file for the review cannot be made;
+6 --file or --serve, and the one-file page is not there; 7 --file, --serve or --rev, and a folder or a file for the review cannot be made;
 8 --serve, and the service could not be started (the port is in use, or sockets cannot be opened).
 USAGE
 }
@@ -59,6 +70,7 @@ open=0
 fileway=0
 serve=0
 stop=0
+rev=
 label=
 closes=
 message=
@@ -74,6 +86,11 @@ while [ $# -gt 0 ]; do
     --file) fileway=1 ;;
     --serve) serve=1 ;;
     --stop) stop=1 ;;
+    --rev)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--rev needs a commit.' 2
+      rev=$2
+      shift
+      ;;
     --label)
       [ $# -ge 2 ] && [ -n "$2" ] || fail '--label needs the words for the button.' 2
       # A plugin setting that was never set reaches the skill unfilled; a label that is still the setting's own name is no words, and the
@@ -132,6 +149,11 @@ if [ "$stop" = 1 ]; then
   { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--stop takes nothing else.' 2
 fi
 { [ "$serve" = 0 ] || [ "$fileway" = 0 ]; } || fail '--serve and --file are two ways: give one.' 2
+if [ -n "$rev" ]; then
+  # What the commit is called goes to git, which would take a word that begins with a hyphen for an option of its own.
+  case $rev in -*) fail "A commit does not begin with a hyphen, and \"$rev\" does." 2 ;; esac
+  { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ -z "$label$closes$message$banner$port" ]; } || fail '--rev takes no file and no option but --max.' 2
+fi
 if [ "$serve" = 0 ] && [ -n "$label$closes$message$banner$port" ]; then
   fail '--label, --closes, --message, --banner and --port are for --serve.' 2
 fi
@@ -309,6 +331,39 @@ if [ "$stop" = 1 ]; then
     rm -f "$base/service"
     echo 'No Jared service is running.'
   fi
+  exit 0
+fi
+
+if [ -n "$rev" ]; then
+  command -v git > /dev/null 2>&1 || fail 'git is not installed here, and a commit needs it.' 1
+  git rev-parse --git-dir > /dev/null 2>&1 || fail 'This folder is not in a git repository, so there is no commit to take.' 1
+  # One commit: a range or a name of something else does not pass, and what passes is the full hash, which is all that goes to git below.
+  hash=$(git rev-parse --verify --quiet "$rev^{commit}" 2> /dev/null) || fail "\"$rev\" is not one commit in this repository." 1
+
+  cache_base
+  umask 077
+  mkdir -p "$base/diffs" 2> /dev/null || fail "The cache folder \"$base\" cannot be made. Set JARED_CACHE to another folder." 7
+  find "$base/diffs" -maxdepth 1 -name '*.diff' -mmin +60 2> /dev/null | while IFS= read -r old; do
+    rm -f "$old"
+  done
+  tmp=$(mktemp "$base/diffs/.rev.XXXXXX" 2> /dev/null) || fail "A file for the commit cannot be made in \"$base/diffs\"." 7
+  # The text as git writes it for anyone, whatever the settings of the user or of the repository: the options say what a setting might change.
+  git show --format='commit %H%n%n%B' -m --first-parent --no-color --no-textconv \
+    --find-renames -U3 --src-prefix=a/ --dst-prefix=b/ "$hash" > "$tmp" 2> /dev/null || {
+    rm -f "$tmp"
+    fail "git could not show \"$rev\"." 1
+  }
+  size=$(wc -c < "$tmp" | tr -d ' ')
+  [ "$size" -le "$max" ] || {
+    rm -f "$tmp"
+    fail "The change of \"$rev\" is $size bytes, and $max is the most that Jared opens." 3
+  }
+  out=$base/diffs/$(printf '%s' "$hash" | cut -c1-12).diff
+  mv -f "$tmp" "$out" 2> /dev/null || {
+    rm -f "$tmp"
+    fail "A file for the commit cannot be made in \"$base/diffs\"." 7
+  }
+  printf '%s\n' "$out"
   exit 0
 fi
 

@@ -29,7 +29,7 @@ import {
 import { commentAtLane, commentLanes, commentsByEnd, hasOverlap, laneAtOffset, laneMasks, maxColumns, pressesBar } from '../lib/viewer'
 import type { Action } from '../state/reducer'
 import type { Draft, LineSelection, ReviewComment, SourceFile } from '../types'
-import { Button } from '../ui'
+import { Button, Kbd } from '../ui'
 import { CodeLine } from './CodeLine'
 import { DiffLine } from './DiffLine'
 import { IconMessage, IconX } from './icons'
@@ -397,7 +397,7 @@ export function CodeViewer({
           <div className="selbar" role="toolbar" aria-label="Selection actions">
             <span className="selbar-label">{labelOfRange(diff, sel.start, sel.end)}</span>
             <Button variant="primary" size="sm" icon={<IconMessage />} onClick={() => dispatch({ type: 'startDraft' })}>
-              Comment <kbd>C</kbd>
+              Comment <Kbd>C</Kbd>
             </Button>
             <button
               type="button"

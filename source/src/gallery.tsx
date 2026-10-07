@@ -1,6 +1,6 @@
 import { StrictMode, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Button } from './ui'
+import { Button, Kbd, LinkButton, LiveStatus, Notice, Select, TextField } from './ui'
 import './styles.css'
 import './gallery.css'
 
@@ -62,7 +62,7 @@ function ButtonStates() {
         <Button iconOnly icon={<Dot />} aria-label="Colour scheme: system" title="Colour scheme: system" />
         <Button iconOnly variant="ghost" icon={<Dot />} aria-label="Add" />
       </Group>
-      <Group title="Pressed (a toggle): off, on, and one that you can press">
+      <Group title="Pressed (a toggle): off, on, and one that you can press (hover over the one that is on: it stays on and its border thickens)">
         <Button pressed={false} icon={<Dot />}>
           Off
         </Button>
@@ -93,12 +93,77 @@ function ButtonStates() {
   )
 }
 
+function PrimitiveStates() {
+  const [said, setSaid] = useState<string | null>(null)
+  return (
+    <>
+      <h3 className="gallery-component">Kbd</h3>
+      <Group title="A key hint, in a line of text and in a button">
+        <span>
+          Press <Kbd>C</Kbd> to comment, <Kbd>Esc</Kbd> to cancel
+        </span>
+        <Button variant="primary" size="sm" icon={<Dot />}>
+          Comment <Kbd>C</Kbd>
+        </Button>
+      </Group>
+
+      <h3 className="gallery-component">LinkButton</h3>
+      <Group title="An action in a line of text, and one that is disabled">
+        <span>
+          No file handy? <LinkButton>Try a sample</LinkButton> or <LinkButton>a sample diff</LinkButton>
+        </span>
+        <LinkButton disabled>Disabled</LinkButton>
+      </Group>
+
+      <h3 className="gallery-component">Notice</h3>
+      <Group title="Info and warn, which look the same today (in a box, not announced by itself)">
+        <Notice tone="info">There are no comments yet, so there is nothing to send.</Notice>
+        <Notice tone="warn">This suggestion overlaps the suggestion of another comment.</Notice>
+      </Group>
+
+      <h3 className="gallery-component">LiveStatus</h3>
+      <Group title="A region that is announced when its text changes (the gallery draws the text, so that you can see it)">
+        <Button size="sm" onClick={() => setSaid(said === null ? 'Saved at 10:42.' : null)}>
+          {said === null ? 'Say something' : 'Clear'}
+        </Button>
+        <LiveStatus>{said}</LiveStatus>
+      </Group>
+
+      <h3 className="gallery-component">TextField</h3>
+      <Group title="With a label and a hint, with its label hidden, in the code variant, and disabled">
+        <TextField className="gallery-wide" label="Suggested implementation" hint="replaces the selected lines" rows={2} defaultValue="const x = 1" />
+        <TextField className="gallery-wide" label="Comment" labelHidden rows={2} placeholder="Leave a comment on these lines…" />
+        <TextField className="gallery-wide" label="Code" variant="code" hint="in the code variant" rows={3} defaultValue={'function add(a, b) {\n  return a + b\n}'} spellCheck={false} />
+        <TextField className="gallery-wide" label="Disabled" rows={2} defaultValue="Not editable" disabled />
+      </Group>
+
+      <h3 className="gallery-component">Select</h3>
+      <Group title="With its label drawn, with its label hidden, and disabled">
+        <Select label="Language" defaultValue="ts">
+          <option value="text">Plain text</option>
+          <option value="ts">TypeScript</option>
+          <option value="py">Python</option>
+        </Select>
+        <Select label="Language" labelHidden defaultValue="ts">
+          <option value="text">Plain text</option>
+          <option value="ts">TypeScript</option>
+          <option value="py">Python</option>
+        </Select>
+        <Select label="Language" labelHidden disabled defaultValue="ts">
+          <option value="ts">TypeScript, disabled</option>
+        </Select>
+      </Group>
+    </>
+  )
+}
+
 function Scheme({ scheme }: { scheme: 'light' | 'dark' }) {
   return (
     <div className="gallery-scheme" data-scheme={scheme}>
       <h2>{scheme === 'light' ? 'Light' : 'Dark'}</h2>
       <h3 className="gallery-component">Button</h3>
       <ButtonStates />
+      <PrimitiveStates />
     </div>
   )
 }
