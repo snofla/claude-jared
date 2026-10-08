@@ -27,7 +27,7 @@ export interface SubmitState {
   sending: boolean
   /** The time of the handover that nobody picked up for `NOBODY_YET_MS`, when there is one. */
   lateFor: number | null
-  /** The reviewer opened the group of the other ways to export. */
+  /** The group of the other ways to export is kept open: the reviewer opened it, or used it (Download, or a Copy that worked) after a failure had opened it. */
   userOpen: boolean
   /**
    * The review was taken and nothing was changed: the dialog closes by itself after a moment. Held as the `updatedAt` it began with, so that an
@@ -74,14 +74,17 @@ export function submitReducer(state: SubmitState, event: SubmitEvent): SubmitSta
     case 'formatChosen':
       return changed(state, { format: event.format })
     case 'downloaded':
-      // `failed` stays as it was: a download after a refused copy leaves the line in the error's style, as it always did.
-      return changed(state, { status: COPY.downloaded(event.name) })
+      // A download is a success whatever came before it, so its line is not drawn as an error. The group of the other ways, which a failure opened, stays open
+      // (`userOpen`): the reviewer is using it, and it must not close while they do. `sendFailed` stays as it was: the send did fail, so the line that points to
+      // copying and downloading stays under the line of the download.
+      return changed(state, { failed: false, userOpen: state.userOpen || state.failed, status: COPY.downloaded(event.name) })
     case 'copied': {
       const link = event.way === 'link'
       const words = event.ok
         ? link ? COPY.copiedForLink(event.linkTarget) : COPY.copied
         : link ? COPY.clipboardRefusedLink(event.linkTarget) : COPY.clipboardRefused
-      return changed(state, { failed: !event.ok, status: words })
+      // A copy that works after a failure keeps open the group that the failure opened, as a download does. A second refusal does not count as the reviewer's use of the group: it stays open for the failure alone.
+      return changed(state, { failed: !event.ok, userOpen: state.userOpen || (event.ok && state.failed), status: words })
     }
     case 'sendStarted':
       return changed(state, {

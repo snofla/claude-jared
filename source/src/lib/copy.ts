@@ -71,8 +71,10 @@ export const COPY = {
     const who = asker ?? 'A program'
     return kept === null ? `${who} asked to close the file. Your review was kept.` : `${who} asked to close ${kept}. Your review was kept.`
   },
-  /** What the page says when it was opened for a review that has expired: the page cannot show that review, and may show another one from its storage. */
+  /** What the page says when it was opened for a review that has expired and shows a review that it restored from its storage: it cannot show the review that was meant, and the one it shows may be another. */
   bootExpired: 'This review has expired, so what the page shows may be another one. Ask Claude to open the file again.',
+  /** The same when the page shows no review: there is no other review to warn about. */
+  bootExpiredEmpty: 'This review has expired. Ask Claude to open the file again.',
   /** The dialog's one line when nothing takes the review, and when a link asked for the review on the clipboard (with who to tell). */
   lineExport: 'This review stays in this browser until you copy or download it.',
   lineLink: (target: string | null): string =>

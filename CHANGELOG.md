@@ -2,6 +2,12 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.13.2 — 2026-10-08
+
+- In the **Export review** or **Submit review** window, after a copy was refused or a send failed, a download is shown as a success, with its check mark, and no longer as an error. The group **Other ways to export**, which the failure opened, now stays open after a download or a copy that works.
+- The banner of an expired review says only that the review has expired and to ask Claude to open the file again, when the page shows no review. It no longer warns that the page may show another one.
+- The drag overlay, which shows when a file is dragged over the page, is a little darker.
+
 ## 0.13.1 — 2026-10-07
 
 - The page of a review that Claude opened for you keeps its file for an hour, where it kept it for ten minutes: you can reload it, or open it again, within that time. After that the page says so in a warning banner, "This review has expired, so what the page shows may be another one. Ask Claude to open the file again.", where it used to show the last session without a word.

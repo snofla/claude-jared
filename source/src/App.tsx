@@ -25,6 +25,7 @@ import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/s
 import { buildSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
 import { cancelReview, closeFile, keepOpen, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openRecent, openText, replaceQuestion, type OpenOutcome } from './state/flows'
+import { expiredNotice } from './state/expired'
 import { emptyState, reducer, type AppState } from './state/reducer'
 import type { ReviewComment } from './types'
 
@@ -264,7 +265,7 @@ export default function App() {
       delete page[BOOT_EXPIRED_KEY]
       const link = fromAddress ?? fromScript
       if (!link) {
-        if (expired) setNotice({ kind: 'warn', text: COPY.bootExpired }) // a page whose file the helper has taken back: the last session is not its answer
+        if (expired) setNotice({ kind: 'warn', text: expiredNotice(stateRef.current.file !== null) }) // a page whose file the helper has taken back: the last session is not its answer
         return
       }
       if (!link.ok) return setNotice({ kind: 'error', text: link.error })

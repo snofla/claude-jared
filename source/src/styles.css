@@ -94,7 +94,7 @@ pre {
 .sr-only {
   position: absolute;
   width: 1px;
-  height: 1px;
+  height: 1px; /* raw: the visually hidden pattern is one pixel by definition */
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
@@ -114,8 +114,8 @@ pre {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 10px 16px;
+  gap: var(--space-8) var(--space-12);
+  padding: var(--space-10) var(--space-16);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   min-width: 0;
@@ -124,14 +124,14 @@ pre {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px 4px 4px;
-  margin-left: -4px;
+  gap: var(--space-8);
+  padding: var(--space-4) var(--space-8) var(--space-4) var(--space-4);
+  margin-left: -4px; /* raw: takes back the 4px of the brand's own left padding, so that its icon lines up with the page's edge */
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 15px; /* raw: the brand's own size, between the 14px and 16px steps */
   color: var(--accent);
 }
 
@@ -140,14 +140,14 @@ pre {
 }
 
 .brand-lg {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   padding: 0;
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-20);
 }
 
 /* The version of Jared, small and in the quiet colour, beside the name. The negative margin takes back part of the gap that the name has after it, so that the number reads as part of the name. */
 .version {
-  margin-left: -4px;
+  margin-left: -4px; /* raw: takes back 4px of the gap beside the name */
   font-size: var(--font-size-xs);
   font-weight: 400;
   color: var(--muted);
@@ -157,7 +157,7 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-20);
 }
 
 .landing-top .brand-lg {
@@ -167,7 +167,7 @@ pre {
 .file {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
   color: var(--muted);
 }
@@ -182,7 +182,7 @@ pre {
 
 .file-lines {
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 /* The width that the header allows the language choice. Its look is the library's Select. */
@@ -230,7 +230,7 @@ pre {
 .inner {
   width: max-content;
   min-width: 100%;
-  padding-bottom: 96px;
+  padding-bottom: 96px; /* raw: empty room under the last line of code, a layout number */
 }
 
 .inner:focus {
@@ -280,7 +280,7 @@ pre {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 12px 0 6px;
+  padding: 0 var(--space-12) 0 var(--space-6);
   border-right: 1px solid var(--border);
   color: var(--gutter-text);
   cursor: pointer;
@@ -371,10 +371,10 @@ pre {
   display: grid;
   place-items: center;
   width: 16px;
-  height: 16px;
+  height: 16px; /* raw: the add button is a 16px square, as its width on the line before */
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--accent);
   color: var(--accent-ink);
   opacity: 0;
@@ -388,7 +388,7 @@ pre {
 
 .code {
   flex: 1 0 auto;
-  padding: 0 16px 0 14px;
+  padding: 0 var(--space-16) 0 var(--space-14);
   white-space: pre;
   color: var(--code-text);
 }
@@ -400,10 +400,10 @@ pre {
   position: sticky;
   left: calc(var(--gutter-w) + 8px);
   display: inline-block;
-  margin-right: 10px;
-  padding: 0 8px;
+  margin-right: var(--space-10);
+  padding: 0 var(--space-8);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--muted);
   font: 12px/18px var(--sans);
@@ -461,7 +461,7 @@ pre {
   position: sticky;
   left: 0;
   width: 100cqw;
-  padding: 10px 20px 12px calc(var(--gutter-w) + 14px);
+  padding: var(--space-10) var(--space-20) var(--space-12) calc(var(--gutter-w) + var(--space-14));
   background: var(--surface-2);
   border-block: 1px solid var(--border);
   font: 14px/1.5 var(--sans);
@@ -488,17 +488,17 @@ pre {
 }
 
 .composer-head {
-  padding-bottom: 6px;
+  padding-bottom: var(--space-6);
 }
 
 .suggest {
-  margin: 12px 12px 4px;
+  margin: var(--space-12) var(--space-12) var(--space-4);
 }
 
 .suggest-label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
+  margin-bottom: var(--space-6);
+  font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -512,25 +512,25 @@ pre {
 }
 
 .panel-card > .suggest {
-  margin: 0 12px 12px;
+  margin: 0 var(--space-12) var(--space-12);
 }
 
 .composer-field {
-  margin: 0 12px;
+  margin: 0 var(--space-12);
 }
 
 .composer-notice {
-  margin: 0 12px 12px;
+  margin: 0 var(--space-12) var(--space-12);
 }
 
 .hint-keys {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 /* diff of original vs suggested lines */
 .diff {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   font: 13px/20px var(--mono);
 }
@@ -570,7 +570,7 @@ pre {
 }
 
 .diff-code {
-  padding-right: 12px;
+  padding-right: var(--space-12);
 }
 
 /* ---------- floating selection bar ---------- */
@@ -614,7 +614,7 @@ pre {
   right: 2px;
   padding: 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: 2px; /* raw: a 2px corner radius, finer than the smallest step */
   background: var(--review-bar);
 }
 
@@ -639,15 +639,15 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--space-12) var(--space-16);
   border-bottom: 1px solid var(--border);
 }
 
 .side-head h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: var(--space-8);
+  font-size: var(--font-size-md);
 }
 
 .side-close {
@@ -656,27 +656,27 @@ pre {
 
 .side-empty {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
   justify-items: start;
-  padding: 24px 16px;
+  padding: 24px 16px; /* raw: a layout number of the empty drawer */
   color: var(--muted);
 }
 
 .side-list {
   flex: 1;
   margin: 0;
-  padding: 8px;
+  padding: var(--space-8);
   list-style: none;
   overflow: auto;
 }
 
 .side-item {
   display: grid;
-  gap: 6px;
+  gap: var(--space-6);
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   text-align: left;
 }
@@ -690,7 +690,7 @@ pre {
 .side-item-top {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .side-item-text {
@@ -707,7 +707,7 @@ pre {
   flex: 1;
   display: grid;
   place-items: center;
-  padding: 32px 16px;
+  padding: 32px 16px; /* raw: a layout number of the start page */
   overflow: auto;
 }
 
@@ -716,26 +716,26 @@ pre {
 }
 
 .landing h1 {
-  font-size: clamp(28px, 5vw, 40px);
+  font-size: clamp(28px, 5vw, 40px); /* raw: a fluid size between 28px and 40px for the heading of the start page */
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
 
 .lede {
-  margin: 14px 0 28px;
+  margin: 14px 0 28px; /* raw: a layout number of the start page */
   color: var(--muted);
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   max-width: 54ch;
 }
 
 .dropzone {
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   width: 100%;
-  padding: 36px 20px;
+  padding: 36px 20px; /* raw: a layout number of the start page */
   border: 2px dashed var(--border-strong);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
   color: var(--muted);
   transition: border-color 0.15s, background 0.15s;
@@ -750,22 +750,22 @@ pre {
 .dropzone-title {
   color: var(--text);
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
 .landing-alt {
-  margin-top: 14px;
+  margin-top: var(--space-14);
   color: var(--muted);
   text-align: center;
 }
 
 .recent {
-  margin-top: 36px;
+  margin-top: 36px; /* raw: a layout number of the start page */
 }
 
 .recent h2 {
-  margin-bottom: 8px;
-  font-size: 12px;
+  margin-bottom: var(--space-8);
+  font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -777,7 +777,7 @@ pre {
   padding: 0;
   list-style: none;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   overflow: hidden;
 }
@@ -785,7 +785,7 @@ pre {
 .recent li {
   display: flex;
   align-items: center;
-  padding-right: 6px;
+  padding-right: var(--space-6);
 }
 
 .recent li + li {
@@ -796,9 +796,9 @@ pre {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   min-width: 0;
-  padding: 10px 14px;
+  padding: var(--space-10) var(--space-14);
   border: 0;
   background: none;
   text-align: left;
@@ -825,20 +825,20 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
+  margin-top: var(--space-6);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .preview {
   margin: 0;
   max-height: 280px;
-  padding: 12px 14px;
+  padding: var(--space-12) var(--space-14);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--code-bg);
-  font-size: 12.5px;
+  font-size: 12.5px; /* raw: the preview's own size, between the 12px and 13px steps */
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -846,7 +846,7 @@ pre {
 
 /* The field for the overall summary: a little more room above it than the dialog's rows have. */
 .summary-field {
-  margin-top: 6px;
+  margin-top: var(--space-6);
 }
 
 /* Words that a sender gave have no break in them when they are all wide, so they may break anywhere rather than widen the dialog. */
@@ -860,7 +860,7 @@ pre {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-8);
   margin-left: auto;
 }
 
@@ -876,7 +876,7 @@ pre {
 
 .dialog-dest {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
 }
 
@@ -896,8 +896,8 @@ pre {
 .status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: var(--space-6);
+  font-size: var(--font-size-sm);
 }
 
 /* ---------- drag overlay ---------- */
@@ -908,16 +908,16 @@ pre {
   z-index: 50;
   display: grid;
   place-items: center;
-  background: rgba(8, 10, 14, 0.5);
+  background: var(--backdrop);
   backdrop-filter: blur(2px);
 }
 
 .drop-card {
-  padding: 28px 40px;
+  padding: 28px 40px; /* raw: a layout number of the drop card */
   border: 2px dashed var(--accent);
-  border-radius: 16px;
+  border-radius: 16px; /* raw: a layout number of the drop card */
   background: var(--surface);
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
 }
 
@@ -929,7 +929,7 @@ pre {
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 }
 
@@ -962,8 +962,8 @@ pre {
 
   .header {
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: var(--space-8);
+    padding: var(--space-8) var(--space-12);
   }
 
   /* file name gets its own row so it isn't squeezed to "use…" */
@@ -977,8 +977,8 @@ pre {
   }
 
   .panel {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding-left: var(--space-12);
+    padding-right: var(--space-12);
   }
 }
 
@@ -1007,7 +1007,7 @@ pre {
 }
 
 .is-diff .num + .num {
-  margin-left: 6px;
+  margin-left: var(--space-6);
 }
 
 /* A row of a diff is tinted by what it is. The tint is a layer of the same background as the selection and the reviewed
@@ -1034,7 +1034,7 @@ pre {
 
 .sign {
   flex: 0 0 22px;
-  padding-left: 4px;
+  padding-left: var(--space-4);
   text-align: center;
   user-select: none;
   color: var(--code-text);
@@ -1054,7 +1054,7 @@ pre {
 }
 
 .sign + .code {
-  padding-left: 4px;
+  padding-left: var(--space-4);
 }
 
 .row.is-hunk .code {
@@ -1064,7 +1064,7 @@ pre {
 .row.is-meta .code,
 .row.is-note .code {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .row.is-file .code {
@@ -1077,5 +1077,5 @@ pre {
 }
 
 .row.is-file .file-badge {
-  margin-left: 10px;
+  margin-left: var(--space-10);
 }

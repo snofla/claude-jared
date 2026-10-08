@@ -107,7 +107,7 @@ The sizes that a component draws with are design tokens too, in `tokens.css`. Us
 
 - **Arithmetic is written out:** `calc(var(--space-2) * 2)`. There is no step for a multiple.
 - **A name with a kind word is a length** and has no light and dark value; every other name is a colour and has both, but for the five older names below. `scripts/theme.test.ts` checks both, and that `--space-8` is 8 px.
-- **The guard.** In the CSS files of this folder, `scripts/theme.test.ts` fails a radius, type size, gap, height, padding or margin that is a number with a unit (`px`, `rem`, `em`, `vw`, `vh`, `ch` or `pt`) and is not inside `var(...)`. A raw size is allowed when a comment on its line begins `raw:` and gives the reason, as in `padding: 0 9px; /* raw: a layout number, not a step */`; a `raw:` comment with no reason fails too. What the guard cannot see is under *Known not to work*.
+- **The guard.** In the CSS files of this folder, `scripts/theme.test.ts` fails a radius, type size, gap, height, padding or margin that is a number with a unit (`px`, `rem`, `em`, `vw`, `vh`, `ch` or `pt`) and is not inside `var(...)`. A raw size is allowed when a comment on its line begins `raw:` and gives the reason, as in `padding: 0 9px; /* raw: a layout number, not a step */`; a `raw:` comment with no reason fails too. The same guard reads the app's stylesheet, `src/styles.css`, where a raw size is a layout number or an optical offset with its reason on the line. What the guard cannot see is under *Known not to work*.
 - **Not on the scale:** the families (`--mono`, `--sans`), the shadow (`--shadow`) and the two sizes of the code viewer (`--gutter-w`, `--row-h`) keep their older names.
 
 ## Names
