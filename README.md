@@ -57,7 +57,7 @@ Jared opens with your file, in your session's browser if it has one (the browser
 
 ### In your session's browser
 
-Press **Submit review**. The review goes to the session. If it has not answered in a minute, tell it that you pressed the button.
+Press **Submit review**. The review goes to the session. If the session has not answered in a minute, tell it that you pressed the button.
 
 Your session's browser gets Jared from a small service on your computer. It stops by itself after half an hour without use. To see whether it is running, and when it ends, run `/jared:status`. To stop it sooner, run `/jared:stop`.
 
@@ -76,31 +76,38 @@ Press **Export review**, then choose one of two ways:
 
 ### Options
 
-You can add these after the file, the diff or the commit. None is needed.
+All of these are optional. Add them after the file, the diff or the commit.
 
-- `--rev <commit>` says that the word you gave is a commit, even if a file has that name.
-- `--jared <address>` says where Jared runs, for this review only; the plugin setting `jared_url` sets it for all. Use it only for a Jared that you run yourself or trust, as for the setting.
-- `--via <way>` says how the file gets to Jared and the review comes back. The default, `auto`, takes the first of these that fits:
-  - `background`: Jared opens in your session's browser (the browser pane of the Claude app, or Claude in Chrome), and when you press **Submit review** the review comes to the session by itself, if a background command wakes your session.
-  - `serve`: the same browser, but you tell the session that you pressed the button.
-  - `file`: Jared opens in your own browser, and you copy or download the review.
-  - `browser` and `clipboard`: for a Jared that runs somewhere else; they need the plugin setting `jared_url`.
+| Option | What it does |
+|---|---|
+| `--rev <commit>` | Reads the word you gave as a commit, even if a file has that name. |
+| `--jared <address>` | Uses the Jared that runs at that address, for this review. The plugin setting `jared_url` does the same for every review. Use it only for a Jared that you run yourself or trust. |
+| `--via <way>` | Chooses how the file gets to Jared and how the review comes back. The default, `auto`, takes the first way in the next table that fits. Name a way, and only that way is tried. |
+| `--block` | For a run that cannot end its turn, such as `claude -p`: it waits in place. It is not available in this plugin; if you give it, Claude says so and stops. |
+| `--closes moment\|now\|never` | When Jared's window closes by itself after the review is received: after a moment (`moment`, the default), at once (`now`), or not at all (`never`). |
+| `--message <words>` | The words that tell you the review was sent, 1 to 80 characters. The default is "Review sent to Claude." |
+| `--banner true\|false` | Whether that message is shown under the header. A screen reader hears it either way. The default is `true`. |
 
-  Name one of them to use that way and no other.
-- `--block` waits in place, for a run that cannot end its turn, such as `claude -p`. This plugin does not support it, and says so.
-- `--closes moment|now|never` says when Jared's window closes by itself once the review is received: after a moment (the default), at once, or never.
-- `--message <words>` sets the words that tell you the review was sent, 1 to 80 characters. The default is "Review sent to Claude."
-- `--banner true|false` says whether that message is drawn under the header; a screen reader hears it either way. The default is true.
+The last three work only in your session's browser. If you give one of them, `auto` does not open Jared in your own browser.
 
-The last three cannot be used when Jared opens in your own browser, so `auto` does not choose that way when you give one of them.
+The ways of `--via`, in the order that `auto` tries them:
+
+| Way | What happens |
+|---|---|
+| `background` | Jared opens in your session's browser (the browser pane of the Claude app, or Claude in Chrome), and when you press **Submit review** the review comes to the session by itself. This needs a session that is woken when a background command ends; if yours is not, Claude says so and uses `serve`. |
+| `serve` | The same browser, but you tell the session that you pressed the button. |
+| `file` | Jared opens in your own browser, and you copy or download the review. |
+| `browser`, `clipboard` | For a Jared that runs somewhere else. They need an address: the plugin setting `jared_url`, or `--jared`. |
 
 ## Where Jared runs
 
 The plugin carries a copy of Jared, so nothing else needs to run.
 
-To use a Jared that runs somewhere else, set the plugin setting `jared_url` ("Where Jared runs") to its address. The plugin then opens your file there, for a file of up to about 75 KB. Set it only for a Jared that you run yourself or trust, because the page at that address receives the file that you review.
+To use a Jared that runs somewhere else, set the plugin setting `jared_url` ("Where Jared runs") to its address. The plugin then opens your file there, if it is up to about 75 KB. Set it only for a Jared that you run yourself or trust, because the page at that address receives the file that you review.
 
 ## Update
+
+To see which version you have, run `/jared:version` in a session, or `claude plugin list` in a terminal.
 
 In a terminal, update the marketplace and then the plugin, and restart Claude Code:
 
@@ -110,6 +117,8 @@ claude plugin update jared@claude-jared
 ```
 
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+
+An update takes effect only after the restart. Then run `/jared:version` to check the version.
 
 ## Remove
 

@@ -39,7 +39,7 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       service is one process that every review uses: it listens on 127.0.0.1 only, answers GET and HEAD for the
                       page and the script of a review folder, takes one POST for each review folder, at
                       /<secret>/<review folder>/message, which writes the review in that folder as the file review.json, and
-                      nothing else, and ends by itself after $JARED_SERVICE_IDLE seconds (default 1800) without a request. Its port, secret, pid and the time of its start are in the file "service" in the cache folder.
+                      nothing else, and ends by itself after $JARED_SERVICE_IDLE seconds (default 1800) without a request. Its port, secret, pid, the time of its start and the version of the plugin that started it are in the file "service" in the cache folder. A service that an earlier version of the plugin started, which an update leaves running, is stopped and replaced by one of this helper's version; a service of the same or a newer version is used as it is.
   --label <words>     the words on the button that hands the review to the caller (1 to 40 characters), so that the page has a
                       button and the caller can wait for the review with window.jared.waitForSubmit; for --serve only
   --closes, --message, --banner
@@ -60,7 +60,7 @@ The request also names Claude as the one to tell (submitTarget), which only chan
   --after <revision>  for --wait: only a revision above this one counts (default 0): after taking revision 2, wait again with --after 2
   --timeout <seconds> for --wait: how long to wait (default 600; 1 to 3600)
   --stop              stop the Jared service, if one is running, and say so and how long it had run
-  --status            say whether the Jared service is running, on which port, since when, and when it ends by itself; asking is a
+  --status            say whether the Jared service is running, on which port, since when, which version of the plugin started it, and when it ends by itself; asking is a
                       request like any other, which puts the end off
   --version           say the version of the plugin that this helper belongs to
 
@@ -223,6 +223,15 @@ case $closes in '' | moment | now | never) ;; *) fail '--closes must be moment, 
 case $banner in '' | true | false) ;; *) fail '--banner must be true or false.' 2 ;; esac
 case $port in '' | *[!0-9]*) [ -z "$port" ] || fail '--port must be a whole number.' 2 ;; *) [ "$port" -le 65535 ] || fail '--port must be at most 65535.' 2 ;; esac
 
+# The manifest of the plugin that this helper belongs to, and its version, which is what a service that this helper starts is told, or nothing when it
+# cannot be read or has characters that no version has.
+manifest=$(cd "$(dirname "$0")" && pwd)/../.claude-plugin/plugin.json
+own_version() {
+  number=$(perl -ne 'if (/"version"\s*:\s*"([^"]+)"/) { print $1; exit }' "$manifest" 2> /dev/null)
+  case $number in *[!0-9A-Za-z._+-]*) number= ;; esac
+  printf '%s' "$number"
+}
+
 # The folder for the reviews: $JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared. Sets base.
 cache_base() {
   if [ -n "${JARED_CACHE:-}" ]; then
@@ -251,13 +260,43 @@ service_alive() {
   ' "$1" "$2" "$3" > /dev/null 2>&1
 }
 
-# Whether the file "service" tells of a service that answers: sets svc_port, svc_token, svc_pid and svc_started (the time of its start in
-# seconds, or nothing for a file that an older helper wrote).
+# Whether the file "service" tells of a service that answers: sets svc_port, svc_token, svc_pid, svc_started (the time of its start in
+# seconds, or nothing for a file that an older helper wrote) and svc_version (the version of the plugin that started it, or nothing for a service
+# of a version before this was written down).
 service_running() {
-  svc_port= svc_token= svc_pid= svc_started=
+  svc_port= svc_token= svc_pid= svc_started= svc_version=
   [ -f "$base/service" ] || return 1
-  read -r svc_port svc_token svc_pid svc_started < "$base/service" 2> /dev/null
+  read -r svc_port svc_token svc_pid svc_started svc_version < "$base/service" 2> /dev/null
   service_alive "$svc_port" "$svc_token" "$svc_pid"
+}
+
+# Whether version $1 is older than version $2, which must be numbers with dots, as 1.2.3 is (a suffix such as -rc.1 is not looked at): 1.9.0 is older than
+# 1.10.0. A service with no version written down ($1 empty) is older than any version. When $2 is nothing, or $1 is something that cannot be compared,
+# nothing is older, so that a service is never replaced because of a version that this helper cannot read.
+version_older() {
+  [ -n "$2" ] || return 1
+  [ -n "$1" ] || return 0
+  perl -e 'my @a = $ARGV[0] =~ /^(\d+)\.(\d+)\.(\d+)/ or exit 1; my @b = $ARGV[1] =~ /^(\d+)\.(\d+)\.(\d+)/ or exit 1; for my $i (0 .. 2) { exit 0 if $a[$i] < $b[$i]; exit 1 if $a[$i] > $b[$i] } exit 1' "$1" "$2"
+}
+
+# Whether the service that answers is to be used as it is. It is not when an earlier version of the plugin started it: one with no version written
+# down, or with a version older than this helper's own. One of the same version, of a newer one (a helper never goes back), or of a version that cannot
+# be compared is used, and so is any when this helper cannot read its own version, as before the version was written down. So services are only ever
+# replaced by newer ones: two sessions with two versions of the plugin do not take turns at ending each other's service.
+service_current() {
+  service_running || return 1
+  version_older "$svc_version" "$ownver" && return 1
+  return 0
+}
+
+# Ends the service that service_running found, and waits up to two seconds for its process to go.
+end_service() {
+  kill "$svc_pid" 2> /dev/null
+  waited=0
+  while kill -0 "$svc_pid" 2> /dev/null && [ "$waited" -lt 20 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
 }
 
 # Makes sure that the Jared service is running, and sets svc_port and svc_token: the one that the file "service" tells of when it
@@ -266,7 +305,8 @@ service_running() {
 # (it is atomic) in the cache folder. A lock more than a minute old was left by a helper that was killed, and is taken over. After ten
 # seconds without it a helper looks once more and, when there is still no service, goes on without the lock, so that a review is never held up by it.
 service_started() {
-  service_running && return 0
+  ownver=$(own_version)
+  service_current && return 0
   locked=0
   tries=0
   while [ "$tries" -lt 100 ]; do
@@ -281,13 +321,15 @@ service_started() {
     tries=$((tries + 1))
     perl -e 'select(undef, undef, undef, 0.1)'
   done
-  if service_running; then
+  if service_current; then
     if [ "$locked" = 1 ]; then rmdir "$base/service.lock" 2> /dev/null; fi
     return 0
   fi
+  # What answers now was started by an earlier version of the plugin, so it is ended and replaced, under the lock that makes one helper at a time do it.
+  if service_running; then end_service; fi
   idle=${JARED_SERVICE_IDLE:-1800}
   case $idle in '' | *[!0-9]*) idle=1800 ;; esac
-  started=$(perl - "$base" "$idle" "${port:-0}" <<'PERL'
+  started=$(perl - "$base" "$idle" "${port:-0}" "$ownver" <<'PERL'
     use strict;
     use warnings;
     use IO::Socket::INET;
@@ -296,7 +338,7 @@ service_started() {
     use JSON::PP;
     use Fcntl qw(:flock);
     use B ();
-    my ($base, $idle, $want) = @ARGV;
+    my ($base, $idle, $want, $version) = @ARGV;
     open(my $rnd, "<:raw", "/dev/urandom") or exit 8;
     (read($rnd, my $bytes, 16) // 0) == 16 or exit 8;
     close $rnd;
@@ -306,6 +348,9 @@ service_started() {
     my $state = "$base/service";
     my $daemon = 0;
     my $started = time;
+    $version = "" unless defined $version;
+    # What the file "service" holds, and what the service knows it by: its port, secret and pid, the time of its start, and the version of the plugin that started it.
+    sub state_line { return "$port $token $daemon $started" . (length $version ? " $version" : "") . "\n" }
     my ($previous, $latest) = ($started, $started);
     pipe(my $ready_r, my $ready_w) or exit 8;
     my $pid = fork;
@@ -326,7 +371,7 @@ service_started() {
     sub mine {
       open(my $f, "<", $state) or return 0;
       my $line = <$f>;
-      return defined $line && $line eq "$port $token $daemon $started\n";
+      return defined $line && $line eq state_line();
     }
     sub finish {
       unlink $state if mine();
@@ -465,7 +510,7 @@ service_started() {
       return take($c, $sel, $target, \@headers, $rest) if $method eq "POST";
       my $head = $method eq "HEAD";
       return reply($c, 200, "OK", "text/plain; charset=utf-8", "jared-service $daemon\n", $head) if $target eq "/$token/health";
-      return reply($c, 200, "OK", "application/json; charset=utf-8", "{\"pid\":$daemon,\"started\":$started,\"now\":" . time . ",\"previous\":$previous,\"idle\":$idle}\n", $head) if $target eq "/$token/status";
+      return reply($c, 200, "OK", "application/json; charset=utf-8", "{\"pid\":$daemon,\"started\":$started,\"now\":" . time . ",\"previous\":$previous,\"idle\":$idle" . (length $version ? ",\"version\":\"$version\"" : "") . "}\n", $head) if $target eq "/$token/status";
       if ($target =~ m{^/$token/(review\.[A-Za-z0-9]{6})/(jared\.html|jared-boot\.js)$}) {
         my ($folder, $name) = ($1, $2);
         my $path = "$base/$folder/$name";
@@ -482,7 +527,7 @@ service_started() {
     {
       my $tmp = "$state.$$";
       open(my $o, ">", $tmp) or exit 8;
-      print $o "$port $token $daemon $started\n";
+      print $o state_line();
       close($o) or exit 8;
       rename($tmp, $state) or exit 8;
     }
@@ -539,12 +584,7 @@ if [ "$stop" = 1 ]; then
       '' | *[!0-9]*) ;;
       *) ran=$(perl -e "$SPAN_PERL"' print span(time - $ARGV[0]);' "$svc_started" 2> /dev/null) ;;
     esac
-    kill "$svc_pid" 2> /dev/null
-    waited=0
-    while kill -0 "$svc_pid" 2> /dev/null && [ "$waited" -lt 20 ]; do
-      sleep 0.1
-      waited=$((waited + 1))
-    done
+    end_service
     if [ -n "$ran" ]; then echo "Stopped the Jared service, which had run for $ran."; else echo 'Stopped the Jared service.'; fi
   else
     rm -f "$base/service"
@@ -555,8 +595,8 @@ fi
 
 if [ "$status" = 1 ]; then
   cache_base
-  svc_port= svc_token= svc_pid= svc_started=
-  [ -f "$base/service" ] && read -r svc_port svc_token svc_pid svc_started < "$base/service" 2> /dev/null
+  svc_port= svc_token= svc_pid= svc_started= svc_version=
+  [ -f "$base/service" ] && read -r svc_port svc_token svc_pid svc_started svc_version < "$base/service" 2> /dev/null
   # The service is asked for its status and for nothing before it, so that the request before this one that it reports is not the helper's own.
   { printf '%s\n' "$SPAN_PERL"; cat <<'PERL'
       use strict;
@@ -583,6 +623,7 @@ if [ "$status" = 1 ]; then
           print "The Jared service is running, on port $port (process $pid).\n";
           print "It started at " . strftime("%H:%M", localtime($data->{started})) . ", " . span($data->{now} - $data->{started}) . " ago.\n";
           print "The request before this one came " . span($data->{now} - $data->{previous}) . " ago. This one puts the end off: it ends by itself in " . span($data->{idle}) . " if no other request comes.\n";
+          print "It is of version $data->{version}.\n" if defined $data->{version} && $data->{version} =~ /^[0-9A-Za-z._+-]+\z/;
           exit 0;
         }
         my $health = ask("health");
@@ -598,8 +639,7 @@ PERL
 fi
 
 if [ "$version" = 1 ]; then
-  manifest=$(cd "$(dirname "$0")" && pwd)/../.claude-plugin/plugin.json
-  number=$(perl -ne 'if (/"version"\s*:\s*"([^"]+)"/) { print $1; exit }' "$manifest" 2> /dev/null)
+  number=$(own_version)
   [ -n "$number" ] || fail "The version of this plugin cannot be read: $manifest is missing, or has no version." 1
   echo "Jared plugin $number"
   exit 0

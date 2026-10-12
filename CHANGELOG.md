@@ -2,6 +2,11 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.14.1 — 2026-10-12
+
+- After an update of the plugin, the next review replaces a Jared service that an earlier version started with one of the new version, so you need not run `/jared:stop` yourself; this holds for the update to 0.14.1 from any earlier version. A service of a newer version is never replaced by an older one. `/jared:status` also says which version of the plugin started the service.
+- The README of the plugin is easier to read. The options of `/jared:review` are in a table, with a second table of the ways of `--via` in the order that `auto` tries them. Sentences that read awkwardly now say plainly that only the way you name is tried and that `--block` is not available in the plugin. The *Update* section says how to see which version you have and that an update takes effect only after the restart.
+
 ## 0.14.0 — 2026-10-12
 
 - **In the Claude app, your review now comes back to the session by itself.** You press **Submit review** in Jared, and Claude picks the review up without being told.
