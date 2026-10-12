@@ -224,12 +224,27 @@ export type Reply = SessionReply | SourceReply | ExportedReply | ErrorReply
 
 /**
  * A message from the engine's side that answers no request: something happened that its peer may want to know. `submitted` is sent when
- * the reviewer hands the review over on a page that a script drives. `seq` counts the events of a page, of both kinds, from 1.
+ * the reviewer hands the review over on a page that a script drives. `seq` counts the events of a page, of every kind, from 1.
  */
 export interface SubmittedEvent extends Envelope {
   type: 'submitted'
   seq: number
+  /**
+   * The number of the press that sent this review: 1 for the first press since the file was opened. A press that took the place of one that
+   * no call had taken still has its number, so that a gap tells the program that one was replaced.
+   */
+  revision: number
   review: Review
+  /** What differs from the last review that a program took. A help and never the truth, which is `review`; absent when the page does not say. */
+  changes?: ReviewChanges
+}
+
+/** The ids of the comments that are new, edited or deleted since the revision `since` (0 when no review was taken before). */
+export interface ReviewChanges {
+  since: number
+  new: string[]
+  edited: string[]
+  deleted: string[]
 }
 
 /**
@@ -241,9 +256,22 @@ export interface CancelledEvent extends Envelope {
   seq: number
 }
 
-export type Event = SubmittedEvent | CancelledEvent
+/**
+ * `skipped`, sent when the reviewer skips the review, that is, chooses not to review this file now, on a page that a caller started the review in: to the script that
+ * drives the page, or to the receiver that gave the page its file. It carries no review, because none will come; unlike `cancelled`, the
+ * review that the reviewer has, if there is one, is kept in Jared.
+ */
+export interface SkippedEvent extends Envelope {
+  type: 'skipped'
+  seq: number
+}
 
-export const EVENT_TYPES = ['submitted', 'cancelled'] as const
+export type Event = SubmittedEvent | CancelledEvent | SkippedEvent
+
+export const EVENT_TYPES = ['submitted', 'cancelled', 'skipped'] as const
+
+/** Whether an event says that no review will come from the page: the reviewer gave the review up, or chose not to review the file now. */
+export const endsReview = (event: Event): event is CancelledEvent | SkippedEvent => event.type === 'cancelled' || event.type === 'skipped'
 
 /** Whether a value that arrived from a peer has the shape of an event. */
 export function isEvent(value: unknown): value is Event {

@@ -1,5 +1,5 @@
 /*
-  Notice: a message in the page, in a box. Both tones are drawn in the warning colours today.
+  Notice: a message in the page, in a box. `info` says something to know, calmly, on the accent's tint; `warn` says something to look at, in the warning colours.
 */
 
 .jared-notice {
@@ -8,7 +8,11 @@
   font-size: var(--font-size-sm);
 }
 
-.jared-notice-info,
+.jared-notice-info {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
 .jared-notice-warn {
   background: var(--warn-bg);
   color: var(--warn-fg);

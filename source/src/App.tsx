@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent } from 'react'
 import { CodeViewer } from './components/CodeViewer'
 import { CancelDialog } from './components/CancelDialog'
+import { SkipDialog } from './components/SkipDialog'
+import { DeliveryStrip } from './components/DeliveryStrip'
 import { Header } from './components/Header'
 import { Alert, IconCheck } from './ui'
 import { Landing } from './components/Landing'
 import { ReviewPanel } from './components/ReviewPanel'
 import { SubmitDialog } from './components/SubmitDialog'
 import { createOutbox } from './engine/outbox'
-import { PROTOCOL_VERSION, type Event, type SubmittedEvent } from './engine/protocol'
-import { fetchSource, sendCancelled, sendReview } from './engine/receiver-client'
+import { eventRules } from './engine/page-host'
+import { endsReview, PROTOCOL_VERSION, type Event, type SubmittedEvent } from './engine/protocol'
+import { fetchSource, sendCancelled, sendReview, sendSkipped, sendToService } from './engine/receiver-client'
 import { useMediaQuery } from './hooks/useMediaQuery'
 import { usePlatform } from './hooks/usePlatform'
+import { useLate } from './hooks/useLate'
 import { usePageApi } from './hooks/usePageApi'
 import { useDiffTokens, useLatest, useTokens } from './hooks/useTokens'
 import { COPY } from './lib/copy'
-import { afterSent, afterSentSettings, canTryAgain, closeDelayMs, deliveryOf, sentMessage, sentUnchanged, toldOfCancel } from './lib/delivery'
+import { changeCount, deltaSince, marksOf, noteOf, snapshotOf, type Mark, type Snapshot } from './lib/changes'
+import { afterSent, afterSentSettings, canTryAgain, closeDelayMs, closesAtPress, deliveryOf, failureIsTold, mustTellProgram, programWaits, sentMessage, sentUnchanged, takenAsItIs, toldOfCancel, waitingWords } from './lib/delivery'
 import { diffOf } from './lib/diff'
 import { BOOT_EXPIRED_KEY, BOOT_KEY, bootExpired, readBoot, readFragment } from './lib/fragment-link'
-import { hostFromSearch } from './lib/host-link'
+import { SERVICE_KEY, hostFromSearch, serviceAddress } from './lib/host-link'
 import type { Platform, Picked } from './lib/platform'
 import { PLAIN_TEXT } from './lib/language'
 import { draftHasText } from './lib/review'
@@ -37,6 +42,7 @@ interface Notice {
 /** The width at which the comments panel stops being an overlay: the breakpoint of `.side` in styles.css. */
 const WIDE_QUERY = '(min-width: 900px)'
 const NO_LINES: string[] = [] // the same array each time, so that a hook that depends on it does not run again
+const NO_MARKS: ReadonlyMap<string, Mark> = new Map()
 
 const STORAGE_WARNING: Notice = {
   kind: 'warn',
@@ -48,9 +54,6 @@ function init(platform: Platform): AppState {
   // The file that was open at the last visit comes back through the engine, as any file is opened.
   return last ? reducer(emptyState, { type: 'open', name: last.file.name, text: last.file.content, review: last.review, now: platform.environment.now() }) : emptyState
 }
-
-/** Whether an event of the page is the reviewer's cancel, which the outbox keeps when the page is left with no file open. */
-const isCancelled = (event: Event): boolean => event.type === 'cancelled'
 
 export default function App() {
   const services = usePlatform()
@@ -64,12 +67,20 @@ export default function App() {
   const [submitOpen, setSubmitOpen] = useState(false)
   // The question before a review is given up.
   const [cancelOpen, setCancelOpen] = useState(false)
+  // The question of Back to start while a program waits for the review.
+  const [skipOpen, setSkipOpen] = useState(false)
   // Reviews that the reviewer has handed over to a script that drives the page, and that it has not taken yet.
-  const outbox = useMemo(() => createOutbox<Event>(), [])
-  // What the page has told its peer, of both kinds, counted from 1.
+  const outbox = useMemo(() => createOutbox<Event>(eventRules), [])
+  // What the page has told its peer, of every kind, counted from 1.
   const events = useRef(0)
+  // The presses of the review button for the file that is open, counted from 1; a file that is opened starts again.
+  const revisions = useRef(0)
   // When, and for which file (by its hash), the reviewer handed a review over to a script that has not taken it yet.
   const [handed, setHandedAt] = useState<{ at: number; hash: string } | null>(null)
+  // What the last press of a delivery that takes changes carried, and what a call took last (a press that was replaced was never taken): the page tells
+  // the reviewer what the next press will send, and the note that goes with a review is against what was taken.
+  const [pressed, setPressed] = useState<{ hash: string; revision: number; snapshot: Snapshot } | null>(null)
+  const [taken, setTaken] = useState<{ revision: number; snapshot: Snapshot } | null>(null)
   // The colour scheme: the choice is kept, and applied to the page as an attribute that the CSS selects on (`index.html` has
   // already applied the kept one before the first paint).
   const [theme, setTheme] = useState<Theme>(services.theme.load)
@@ -81,13 +92,22 @@ export default function App() {
   // Opened from a link that a Claude session printed: the file comes from the receiver at this address, and the
   // review can be sent back to it. Only an address on this computer is ever used (see `receiverAddress`).
   const [host] = useState(() => hostFromSearch(window.location.search))
+  // Served by the Jared service for a review that comes back as a file: the script of the review gave the address of the review's folder
+  // (`window.__JARED_SERVICE`). Only a folder at the service that served this page is ever used (see `serviceAddress`).
+  const [service] = useState(() => serviceAddress((window as unknown as Record<string, unknown>)[SERVICE_KEY], window.location.origin))
+  // Where a review goes besides a script on the page: the receiver of the link, or the service that served the page. Either answers.
+  const sendTo = host ?? service
+  // The review goes to the service, which keeps it as a file: "sent" is all that is known, so the message says what to do if the program has not answered.
+  const viaService = host === null && service !== null
   const [notice, setNotice] = useState<Notice | null>(null)
   // The message that says a review was sent, for when the dialog was not there to say it, and whether it is to be told once the dialog has closed.
   const [sentText, setSentText] = useState<string | null>(null)
   const tellOnClose = useRef(false)
   // The red banner of a send that failed after its dialog was closed: the next send takes it away, so that it is never beside the message that says it was sent.
   const failedSend = useRef<Notice | null>(null)
-  // The warning that a script's request was declined. Cancel review takes it away with the review that it says was kept.
+  // The reviewer gave the review up (Discard review) or skipped it (Skip review): the send that was waiting is dropped with it, and that is not told as a failure.
+  const givenUp = useRef(false)
+  // The warning that a script's request was declined. Discard review takes it away with the review that it says was kept.
   const declinedNote = useRef<Notice | null>(null)
   const sentTimer = useRef(0)
   const [dragActive, setDragActive] = useState(false)
@@ -100,6 +120,7 @@ export default function App() {
   const flashTimer = useRef<number>(0)
   const draftRef = useLatest(draft)
   const stateRef = useLatest(state)
+  const takenRef = useLatest(taken)
   const submitOpenRef = useLatest(submitOpen)
 
   // A text whose language is diff, and that has a hunk, is shown as a diff: then its colours come row by row, from the file each row is in.
@@ -107,13 +128,24 @@ export default function App() {
   const fileTokens = useTokens(diff || !file ? null : file.content, file?.language ?? PLAIN_TEXT)
   const diffTokens = useDiffTokens(diff, file?.lines ?? NO_LINES)
   const tokens = diff ? diffTokens : fileTokens
-  const delivery = deliveryOf(host, state.submitLabel, state.submitTarget)
-  // The message is emptied before it is set, so that a second one with the same words is read again; and it goes when another file is
-  // opened or the file is closed, and when the next send begins.
-  const tellSent = useCallback((text: string) => {
-    window.clearTimeout(sentTimer.current)
-    setSentText(null)
-    sentTimer.current = window.setTimeout(() => setSentText(text), 100)
+  const delivery = deliveryOf(sendTo, state.submitLabel, state.submitTarget)
+  const sentTextRef = useLatest(sentText)
+  // A message that replaces one is emptied before it is set, so that a second one with the same words is read again. One that comes when there
+  // is none is set at once: the strip under the header gives way to it in the same render, and the code under them does not move twice. The
+  // message goes when another file is opened or the file is closed, and when the next send begins.
+  const tellSent = useCallback(
+    (text: string) => {
+      window.clearTimeout(sentTimer.current)
+      if (sentTextRef.current === null) return setSentText(text)
+      setSentText(null)
+      sentTimer.current = window.setTimeout(() => setSentText(text), 100)
+    },
+    [sentTextRef],
+  )
+  // The page forgets what was pressed and taken when the file that it was for is closed or another is opened.
+  const forgetPresses = useCallback(() => {
+    setPressed(null)
+    setTaken(null)
   }, [])
   const clearSent = useCallback(() => {
     window.clearTimeout(sentTimer.current)
@@ -124,8 +156,8 @@ export default function App() {
     // The dialog closed by itself: what is outside a modal dialog is not heard while it is open, so the message waits until it has gone.
     if (submitOpen || !tellOnClose.current) return
     tellOnClose.current = false
-    tellSent(sentMessage(state.submitTarget, afterSentSettings(state.submitOptions)))
-  }, [submitOpen, tellSent, state.submitTarget, state.submitOptions])
+    tellSent(sentMessage(state.submitTarget, afterSentSettings(state.submitOptions), viaService))
+  }, [submitOpen, tellSent, state.submitTarget, state.submitOptions, viaService])
 
   // Hand the review over: to the receiver, which answers, or to the script that drives the page, which asks for it. Either marks the
   // review sent once it has happened, so the status never says more than the page has seen. What follows depends on whether the dialog is
@@ -134,6 +166,7 @@ export default function App() {
     const current = stateRef.current.review
     if (!current) return { ok: false, error: COPY.nothingToSend }
     clearSent()
+    givenUp.current = false
     const stale = failedSend.current
     failedSend.current = null
     if (stale) setNotice((shown) => (shown === stale ? null : shown))
@@ -142,15 +175,38 @@ export default function App() {
     let outcome: { ok: true } | { ok: false; error: string }
     if (host) {
       outcome = await sendReview(host, current, now, { target: stateRef.current.submitTarget })
+    } else if (service) {
+      // Each press is a later state of the review, whole, with what differs from the last one that the service answered for. The service numbers
+      // it and says so in its reply (the page counts from 1 on every load, and the service refuses a number below the file's), and a press that it
+      // answered for is the one that counts as taken: the next note is against that number.
+      const sent = snapshotOf(current)
+      const lastTaken = takenRef.current
+      const changes = noteOf(lastTaken?.revision ?? 0, deltaSince(lastTaken?.snapshot ?? null, current))
+      const answer = await sendToService(service, current, now, { changes, target: stateRef.current.submitTarget })
+      outcome = answer
+      if (answer.ok) {
+        setPressed({ hash, revision: answer.revision, snapshot: sent })
+        setTaken({ revision: answer.revision, snapshot: sent })
+      }
     } else {
-      const event: SubmittedEvent = { protocol: PROTOCOL_VERSION, type: 'submitted', seq: ++events.current, review: { ...current, submittedAt: now } }
+      const revision = ++revisions.current
+      const sent = snapshotOf(current)
+      const lastTaken = takenRef.current
+      const changes = noteOf(lastTaken?.revision ?? 0, deltaSince(lastTaken?.snapshot ?? null, current))
+      const event: SubmittedEvent = { protocol: PROTOCOL_VERSION, type: 'submitted', seq: ++events.current, revision, review: { ...current, submittedAt: now }, changes }
+      setPressed({ hash, revision, snapshot: sent })
       setHandedAt({ at: Date.now(), hash })
-      const taken = await outbox.post(event)
+      const result = await outbox.post(event)
+      // A later press took this one's place before any call took it: that press carries the review, and it has the state of the hand-over.
+      if (result === 'replaced') return { ok: true, closeAfterMs: null }
       setHandedAt(null)
-      outcome = taken ? { ok: true } : { ok: false, error: COPY.fileChanged }
+      if (result === 'taken') setTaken({ revision, snapshot: sent })
+      outcome = result === 'taken' ? { ok: true } : { ok: false, error: COPY.fileChanged }
     }
     if (!outcome.ok) {
-      if (!submitOpenRef.current) {
+      const told = failureIsTold(submitOpenRef.current, givenUp.current)
+      givenUp.current = false
+      if (told) {
         failedSend.current = { kind: 'error', text: COPY.notSent(outcome.error, canTryAgain(outcome.error)) }
         setNotice(failedSend.current)
       }
@@ -162,17 +218,35 @@ export default function App() {
     const unchanged = !!latest && latest.file.hash === hash && sentUnchanged(latest, now)
     const settings = afterSentSettings(stateRef.current.submitOptions)
     const next = afterSent({ dialogOpen: submitOpenRef.current, unchanged, closes: settings.closes })
-    if (next === 'tells') tellSent(sentMessage(stateRef.current.submitTarget, settings))
+    if (next === 'tells') tellSent(sentMessage(stateRef.current.submitTarget, settings, viaService))
     return { ok: true, closeAfterMs: next === 'closes' ? closeDelayMs(settings.closes) : null }
-  }, [host, outbox, stateRef, services, submitOpenRef, clearSent, tellSent])
+  }, [host, service, viaService, outbox, stateRef, services, submitOpenRef, clearSent, tellSent, takenRef])
   // A review handed over for a file that is no longer open is of no use to whoever asks next, and is not waited for: whichever way the
-  // file was replaced (the reviewer's, a script's, a link's). A cancel is the one thing that stays when the page is left with no file open: it
-  // is about the file that was just given up, and it is for the script that is waiting or asks next. Opening a file drops it.
+  // file was replaced (the reviewer's, a script's, a link's). A cancel or a skip is the one thing that stays when the page is left with no file open:
+  // it is about the file that was just left, and it is for the script that is waiting or asks next. Opening a file drops it.
   const fileHash = file?.hash
   useEffect(() => {
-    outbox.clear(fileHash === undefined ? isCancelled : undefined)
+    outbox.clear(fileHash === undefined ? endsReview : undefined)
+    revisions.current = 0
   }, [fileHash, outbox])
   const waitingSince = handed !== null && handed.hash === fileHash ? handed.at : null
+  const late = useLate(waitingSince)
+  // After a first press of a delivery that takes changes, the button sends the later state: how many changes it will send, which comments they are, and what
+  // a script that took a review before is to be told. What a script takes is the review as it was at the press; what the reviewer changed since is not in it.
+  // A page that has the service's address and a receiver's too sends to the receiver, which records no press: `pressed` stays null and this is false.
+  const updates = (delivery?.kind === 'caller' || service !== null) && pressed !== null && pressed.hash === fileHash && review !== null
+  const delta = updates && review ? deltaSince(pressed.snapshot, review) : null
+  const changes = delta ? changeCount(delta) : null
+  const marks = delta ? marksOf(delta) : NO_MARKS
+  const changedSincePress = waitingSince !== null && changes !== null && changes > 0
+  const update = taken !== null
+  const nothingNew = () => tellSent(COPY.nothingNew(delivery?.target ?? null))
+  // The button: the dialog for a first press, and the changes at once after it, or a word that there is nothing new.
+  const press = () => {
+    if (changes === null) return setSubmitOpen(true)
+    if (changes === 0) return nothingNew()
+    void deliver()
+  }
   const unsaved = useSyncExternalStore(services.reviews.subscribe, services.reviews.failed)
   const banner = notice ?? (unsaved ? STORAGE_WARNING : null)
   const recent = file ? [] : services.reviews.recent()
@@ -191,10 +265,12 @@ export default function App() {
         closeFile(services)
         setSubmitOpen(false)
         clearSent()
+        forgetPresses()
       } else if (another) {
         keepOpen(services, adoptedFile) // as opening a file does
         setNotice(null)
         clearSent()
+        forgetPresses()
         setHoveredId(null)
       }
     },
@@ -215,10 +291,11 @@ export default function App() {
     else if (outcome.kind === 'opened') {
       setNotice(null)
       clearSent()
+      forgetPresses()
       setHoveredId(null)
       dispatch(outcome.action)
     } else if (outcome.kind === 'gone') refreshRecent()
-  }, [clearSent])
+  }, [clearSent, forgetPresses])
 
   const openPickedFile = useCallback(
     async (picked: Picked) => applyOutcome(await openPicked(services, stateRef.current, picked)),
@@ -332,10 +409,14 @@ export default function App() {
   }, [openFileRef, submitOpenRef])
 
   const goHome = () => {
+    // A program that waits for the review is not left waiting in silence: the question comes first, and Skip review is its way out.
+    const { review: current, sentAt } = stateRef.current
+    if (current && programWaits(delivery, sentAt)) return setSkipOpen(true)
     if (!mayDiscard(services, draftRef.current)) return
     closeFile(services)
     setSubmitOpen(false)
     clearSent()
+    forgetPresses()
     dispatch({ type: 'close' })
   }
 
@@ -343,15 +424,42 @@ export default function App() {
   // page was given, or the script that drives the page, through the outbox. The page does not wait for an answer, and tries once.
   const tellOfCancel = () => {
     const seq = ++events.current
-    if (host) void sendCancelled(host, seq, { target: state.submitTarget })
+    if (sendTo) void sendCancelled(sendTo, seq, { target: state.submitTarget })
     else void outbox.post({ protocol: PROTOCOL_VERSION, type: 'cancelled', seq })
+  }
+
+  // Tell the program that started the review that the reviewer chose not to review the file now, as tellOfCancel tells it that the review was given up.
+  const tellOfSkip = () => {
+    const seq = ++events.current
+    if (sendTo) void sendSkipped(sendTo, seq, { target: state.submitTarget })
+    else void outbox.post({ protocol: PROTOCOL_VERSION, type: 'skipped', seq })
+  }
+
+  // Skip the review of the open file: the program that waits for it is told, the review is kept as Back to start keeps it, and the page goes back to the start. A script that
+  // drives the page does not look at the page until it is asked, so the start page tells the reviewer to tell it; a receiver is told at once.
+  const skipCurrent = () => {
+    if (!file || !mayDiscard(services, draftRef.current)) return
+    const { review: current, sentAt } = stateRef.current
+    const told = current !== null && programWaits(delivery, sentAt)
+    if (told) tellOfSkip()
+    givenUp.current = true
+    closeFile(services)
+    setSkipOpen(false)
+    setSubmitOpen(false)
+    clearSent()
+    forgetPresses()
+    dispatch({ type: 'close' })
+    refreshRecent()
+    if (told && mustTellProgram(delivery)) setNotice({ kind: 'warn', text: COPY.skipTellProgram(delivery?.target ?? null) })
   }
 
   // Give the review of the open file up: the program that started it is told, it is forgotten as Forget does on the start page, and the page goes back to the start.
   const cancelCurrent = () => {
     if (!file) return
     const { review: current, sentAt } = stateRef.current
-    if (current && toldOfCancel(delivery, current, sentAt) !== undefined) tellOfCancel()
+    const told = current !== null && toldOfCancel(delivery, current, sentAt) !== undefined
+    if (told) tellOfCancel()
+    givenUp.current = true
     cancelReview(services, file.hash)
     const stale = declinedNote.current
     declinedNote.current = null
@@ -359,12 +467,16 @@ export default function App() {
     setCancelOpen(false)
     setSubmitOpen(false)
     clearSent()
+    forgetPresses()
     dispatch({ type: 'close' })
     refreshRecent()
+    if (told && mustTellProgram(delivery)) setNotice({ kind: 'warn', text: COPY.discardTellProgram(delivery?.target ?? null) })
   }
 
   // Asked for from the header and from the submit dialog: a question first when there is something to lose, and nothing to ask otherwise.
   const askToCancel = () => (mustAskBeforeCancel(stateRef.current) ? setCancelOpen(true) : cancelCurrent())
+  // Skip review is offered while a program waits for the review: in the header's menu and the foot of the window.
+  const onSkip = review && programWaits(delivery, state.sentAt) ? skipCurrent : null
 
   const openKept = (hash: string) => applyOutcome(openRecent(services, hash))
   const openSample = (name: string, text: string) => applyOutcome(openFile(services, stateRef.current, buildSource(name, text)))
@@ -389,8 +501,11 @@ export default function App() {
             onHome={goHome}
             onOpen={() => inputRef.current?.click()}
             onLanguage={(language) => dispatch({ type: 'setLanguage', language })}
-            onSubmit={() => setSubmitOpen(true)}
+            onSubmit={press}
+            changes={changes}
+            onReviewWindow={changes === null ? null : () => setSubmitOpen(true)}
             onCancel={askToCancel}
+            onSkip={onSkip}
             delivery={delivery}
             handedOver={waitingSince !== null}
             sentAt={state.sentAt}
@@ -398,6 +513,12 @@ export default function App() {
             onTheme={setTheme}
           />
           {banner && <Banner notice={banner} onDismiss={() => setNotice(null)} />}
+          <DeliveryStrip
+            words={waitingWords(waitingSince !== null, late, delivery?.target ?? null, changedSincePress, update)}
+            late={late}
+            onCancel={takenAsItIs(review, state.sentAt) ? null : askToCancel}
+            onOtherWays={() => setSubmitOpen(true)}
+          />
           <SentBanner message={sentText} drawn={afterSentSettings(state.submitOptions).banner} onDismiss={clearSent} />
           <div className="main">
             <CodeViewer
@@ -420,6 +541,7 @@ export default function App() {
             {panelOpen && (
               <ReviewPanel
                 comments={review.comments}
+                marks={marks}
                 hoveredId={hoveredId}
                 onHover={setHoveredId}
                 onJump={jumpTo}
@@ -436,14 +558,22 @@ export default function App() {
               to={host ? new URL(host).host : undefined}
               deliver={deliver}
               waitingSince={waitingSince}
+              late={late}
+              changedSincePress={changedSincePress}
+              changes={changes}
+              update={update}
+              onNothingNew={nothingNew}
+              closesAtPress={closesAtPress(delivery, afterSentSettings(state.submitOptions).closes)}
               sentAt={state.sentAt}
               forClaude={linked}
               linkTarget={state.submitTarget}
               onClose={() => setSubmitOpen(false)}
               onSentClosed={() => (tellOnClose.current = true)}
               onCancel={askToCancel}
+              onSkip={onSkip}
             />
           )}
+          {skipOpen && <SkipDialog target={delivery?.target ?? null} onKeep={() => setSkipOpen(false)} onSkip={skipCurrent} />}
           {cancelOpen && (
             <CancelDialog
               comments={review.comments.length}

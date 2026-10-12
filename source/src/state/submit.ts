@@ -1,5 +1,5 @@
 import { COPY } from '../lib/copy'
-import { NOBODY_YET_MS, type Delivery } from '../lib/delivery'
+import type { Delivery } from '../lib/delivery'
 
 /**
  * What the submit dialog remembers, and the rules it follows: what an event does to it, and what is drawn from it. The dialog's markup, its
@@ -25,8 +25,6 @@ export interface SubmitState {
   /** The last send failed (a failed copy is not that): the line that points to copying and downloading goes under it. */
   sendFailed: boolean
   sending: boolean
-  /** The time of the handover that nobody picked up for `NOBODY_YET_MS`, when there is one. */
-  lateFor: number | null
   /** The group of the other ways to export is kept open: the reviewer opened it, or used it (Download, or a Copy that worked) after a failure had opened it. */
   userOpen: boolean
   /**
@@ -42,7 +40,6 @@ export const initialSubmitState: SubmitState = {
   failed: false,
   sendFailed: false,
   sending: false,
-  lateFor: null,
   userOpen: false,
   closingFor: null,
 }
@@ -57,8 +54,6 @@ export type SubmitEvent =
   | { type: 'sendStarted'; delivery: Delivery | null }
   /** The delivery answered. `updatedAt` is the review's, now: what the automatic close is held against. */
   | { type: 'sendFinished'; result: SendResult; updatedAt: string }
-  /** The review has been with a caller, not taken, for too long. */
-  | { type: 'lateFired'; waitingSince: number }
   | { type: 'toggled'; open: boolean }
   /** A key or a press inside the dialog: the reviewer is doing something, so it does not close under them. */
   | { type: 'closingCancelled' }
@@ -91,7 +86,7 @@ export function submitReducer(state: SubmitState, event: SubmitEvent): SubmitSta
         sending: true,
         failed: false,
         sendFailed: false,
-        status: event.delivery?.kind === 'caller' ? COPY.waiting(event.delivery.target) : COPY.sending,
+        status: event.delivery?.kind === 'caller' ? COPY.waiting : COPY.sending,
       })
     case 'sendFinished': {
       const { result, updatedAt } = event
@@ -100,8 +95,6 @@ export function submitReducer(state: SubmitState, event: SubmitEvent): SubmitSta
       const closingFor = result.closeAfterMs === null ? null : { updatedAt, afterMs: result.closeAfterMs }
       return changed(state, { sending: false, status: null, closingFor })
     }
-    case 'lateFired':
-      return changed(state, { lateFor: event.waitingSince })
     case 'toggled':
       return changed(state, { userOpen: event.open })
     case 'closingCancelled':
@@ -122,15 +115,9 @@ export const busy = (state: SubmitState, waiting: boolean): boolean => state.sen
 /** The check mark before the status line: only for what worked, and not while something is going on. */
 export const showsCheck = (state: SubmitState, waiting: boolean): boolean => !state.failed && !busy(state, waiting)
 
-/** Whether the handover that began at `waitingSince` was not taken in time. */
-export const isLate = (state: SubmitState, waitingSince: number | null): boolean => waitingSince !== null && state.lateFor === waitingSince
-
-/** How long to wait, from `now`, before saying that nobody has taken a review handed over at `waitingSince`: what is left of `NOBODY_YET_MS`, none if it is spent. */
-export const lateDelayMs = (waitingSince: number, now: number): number => Math.max(0, NOBODY_YET_MS - (now - waitingSince))
-
 /** What the status line says: the last thing that happened here, else that the review waits, else when it was last sent (`last`). */
-export const statusLine = (state: SubmitState, waiting: boolean, delivery: Delivery | null, last: string | null): string | null =>
-  state.status ?? (waiting ? COPY.waiting(delivery?.target ?? null) : last)
+export const statusLine = (state: SubmitState, waiting: boolean, last: string | null): string | null =>
+  state.status ?? (waiting ? COPY.waiting : last)
 
 /**
  * Whether the dialog offers to give the review up. It does not while a send to a receiver is in flight, and not once a program has `taken` the

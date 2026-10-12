@@ -255,6 +255,25 @@ function ComponentStates() {
         </div>
       </Group>
 
+      <Group title="With buttons that answer it: beside the words, and under them when the alert is too narrow (resize the window)">
+        <div className="gallery-alerts">
+          <Alert
+            tone="warn"
+            role="status"
+            actions={
+              <>
+                <Button size="sm" variant="ghost">
+                  Discard review
+                </Button>
+                <Button size="sm">Copy or download</Button>
+              </>
+            }
+          >
+            Tell Claude that you have submitted the review. If Claude does not take it, copy or download the review.
+          </Alert>
+        </div>
+      </Group>
+
       <h3 className="gallery-component">Card</h3>
       <Group title="An article with a head, words and a foot, and one with only a head and words (the words keep their line breaks)">
         <div className="gallery-cards">
@@ -342,8 +361,8 @@ function ComponentStates() {
               ))}
             </MenuGroup>
             <MenuSeparator />
-            <MenuItem icon={<IconX />} onSelect={() => setChosen('Cancel review')}>
-              Cancel review
+            <MenuItem icon={<IconX />} onSelect={() => setChosen('Discard review')}>
+              Discard review
             </MenuItem>
           </Menu>
         </div>
@@ -368,7 +387,7 @@ function ComponentStates() {
             </MenuGroup>
             <MenuSeparator />
             <MenuItem icon={<IconX />} onSelect={() => {}}>
-              Cancel review
+              Discard review
             </MenuItem>
           </Menu>
         </div>

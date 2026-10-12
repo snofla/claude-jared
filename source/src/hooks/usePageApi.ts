@@ -14,11 +14,12 @@ export interface PageApi {
   /** Send a request as plain JSON and get its replies, as `Engine.handleMessage` does. */
   handleMessage(value: unknown): Reply[]
   /**
-   * Take what the page has for the script, waiting up to `timeoutMs` (default 40 s, at most 10 minutes): the `submitted` message when the
-   * reviewer hands the review over, the `cancelled` message when the reviewer gives it up, or `{ type: "timeout" }`. An event that came
-   * before the call is kept for it.
+   * Take what the page has for the script that the script has not seen, waiting up to `timeoutMs` (default 40 s, at most 10 minutes): the
+   * `submitted` message when the reviewer hands the review over, with a `revision` above `afterRevision` (default 0), the `cancelled` message when the
+   * reviewer gives it up, the `skipped` message when the reviewer chooses not to review the file now, or `{ type: "timeout" }`. An event that came
+   * before the call is kept for it, and the newest review stays for a call that has not seen it.
    */
-  waitForSubmit(timeoutMs?: number): Promise<Event | { type: 'timeout' }>
+  waitForSubmit(timeoutMs?: number, afterRevision?: number): Promise<Event | { type: 'timeout' }>
 }
 
 declare global {
@@ -77,7 +78,7 @@ export function usePageApi(
       if (text !== null) declined.current(text)
       return replies
     }
-    const api: PageApi = { protocol: PROTOCOL_VERSION, handleMessage, waitForSubmit: (timeoutMs) => waitForSubmit(outbox, timeoutMs) }
+    const api: PageApi = { protocol: PROTOCOL_VERSION, handleMessage, waitForSubmit: (timeoutMs, afterRevision) => waitForSubmit(outbox, timeoutMs, afterRevision) }
     window.jared = api
     return () => {
       if (window.jared === api) delete window.jared

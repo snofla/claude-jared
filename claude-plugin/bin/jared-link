@@ -11,8 +11,9 @@ usage() {
 Usage: jared-link <file> [--jared <address>] [--open] [--max <bytes>]
        jared-link <file> --file [--page <path>] [--max <bytes>]
        jared-link <file> --serve [--label <words>] [--closes moment|now|never] [--message <words>] [--banner true|false]
-                               [--port <number>] [--page <path>] [--max <bytes>]
+                               [--review-file] [--port <number>] [--page <path>] [--max <bytes>]
        jared-link --rev <commit> [--max <bytes>]
+       jared-link --wait <review> [--after <revision>] [--timeout <seconds>]
        jared-link --stop
        jared-link --status
        jared-link --version
@@ -36,13 +37,28 @@ The request also names Claude as the one to tell (submitTarget), which only chan
   --serve             make the review folder as --file does, make sure that the Jared service is running, and print the address
                       http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. The
                       service is one process that every review uses: it listens on 127.0.0.1 only, answers GET and HEAD for the
-                      page and the script of a review folder and nothing else, and ends by itself after $JARED_SERVICE_IDLE
-                      seconds (default 1800) without a request. Its port, secret, pid and the time of its start are in the file "service" in the cache folder.
+                      page and the script of a review folder, takes one POST for each review folder, at
+                      /<secret>/<review folder>/message, which writes the review in that folder as the file review.json, and
+                      nothing else, and ends by itself after $JARED_SERVICE_IDLE seconds (default 1800) without a request. Its port, secret, pid and the time of its start are in the file "service" in the cache folder.
   --label <words>     the words on the button that hands the review to the caller (1 to 40 characters), so that the page has a
                       button and the caller can wait for the review with window.jared.waitForSubmit; for --serve only
   --closes, --message, --banner
                       what happens once the review is taken, as in the receiver; for --serve only
+  --review-file       for --serve: the page sends the review to the service, which writes it as the file review.json of the review's folder
+                      (see --wait), instead of keeping it for a script that drives the page: the page is given the address of its folder
+                      in jared-boot.js, as window.__JARED_SERVICE, after the request
   --port <number>     the port for a service that has to be started (default: any free port); for --serve only
+  --wait <review>     wait for the review that the page of a review made with --serve sends to the service, and print one line of JSON
+                      and end with a status, as the receiver's wait does. <review> is the address that --serve printed, or the name of the
+                      review's folder, or its path. The service writes each review that the page sends as the file review.json of the folder, whole,
+                      with its revision (a whole number from 1) inside, or {"revision":<n>,"status":"cancelled"} or "skipped" when the reviewer
+                      gave the review up or skipped it. The line is {"status":"received","revision":<n>,"reviewFile":<path>,"message":<words>}
+                      (status 0), {"status":"cancelled",...} (4), {"status":"skipped",...} (5), {"status":"timeout",...} (3) or
+                      {"status":"error","message":<words>} (1: the review's folder is not there or is gone, the service is not running or ended
+                      while it waited, and the file holds nothing newer). A review that is in the file already is given at once. While it waits it
+                      asks the service for its status now and then, which is a request that puts off the service's end.
+  --after <revision>  for --wait: only a revision above this one counts (default 0): after taking revision 2, wait again with --after 2
+  --timeout <seconds> for --wait: how long to wait (default 600; 1 to 3600)
   --stop              stop the Jared service, if one is running, and say so and how long it had run
   --status            say whether the Jared service is running, on which port, since when, and when it ends by itself; asking is a
                       request like any other, which puts the end off
@@ -57,7 +73,8 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       context) reaches it. Files in diffs/ more than an hour old are removed the next time. It takes no file and no option
                       but --max, and it changes nothing in the repository.
 
-Exit status: 0 done; 1 the file cannot be read, or, with --rev, the commit cannot be taken (the message says why); 2 a mistake in the command line; 3 too big (for a link, or for Jared);
+Exit status of --wait: 0 a review is in the file, 3 none came in time, 4 the reviewer gave the review up, 5 the reviewer skipped it, 1 an error, 2 a mistake in the command line.
+Exit status of the others: 0 done; 1 the file cannot be read, or, with --rev, the commit cannot be taken (the message says why); 2 a mistake in the command line; 3 too big (for a link, or for Jared);
 4 the file is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
 6 --file or --serve, and the one-file page is not there; 7 --file, --serve or --rev, and a folder or a file for the review cannot be made;
 8 --serve, and the service could not be started (the port is in use, or sockets cannot be opened).
@@ -78,10 +95,14 @@ stop=0
 status=0
 version=0
 rev=
+waitfor=
+after=
+timeout=
 label=
 closes=
 message=
 banner=
+reviewfile=0
 port=
 page=${JARED_PAGE:-}
 max=524288
@@ -92,12 +113,28 @@ while [ $# -gt 0 ]; do
     --open) open=1 ;;
     --file) fileway=1 ;;
     --serve) serve=1 ;;
+    --review-file) reviewfile=1 ;;
     --stop) stop=1 ;;
     --status) status=1 ;;
     --version) version=1 ;;
     --rev)
       [ $# -ge 2 ] && [ -n "$2" ] || fail '--rev needs a commit.' 2
       rev=$2
+      shift
+      ;;
+    --wait)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--wait needs a review: the address that --serve printed, or the name of its folder.' 2
+      waitfor=$2
+      shift
+      ;;
+    --after)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--after needs a revision, a whole number.' 2
+      after=$2
+      shift
+      ;;
+    --timeout)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--timeout needs a number of seconds.' 2
+      timeout=$2
       shift
       ;;
     --label)
@@ -165,13 +202,22 @@ if [ "$version" = 1 ]; then
   { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--version takes no file and no option.' 2
 fi
 { [ "$serve" = 0 ] || [ "$fileway" = 0 ]; } || fail '--serve and --file are two ways: give one.' 2
+if [ -n "$waitfor" ]; then
+  { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ -z "$rev$label$closes$message$banner$port" ]; } \
+    || fail '--wait takes a review, --after and --timeout, and nothing else.' 2
+  case $after in '' | *[!0-9]*) [ -z "$after" ] || fail '--after must be a whole number.' 2 ;; esac
+  case $timeout in '' | *[!0-9]*) [ -z "$timeout" ] || fail '--timeout must be a whole number of seconds.' 2 ;; esac
+  [ -z "$timeout" ] || { [ "$timeout" -ge 1 ] && [ "$timeout" -le 3600 ]; } || fail '--timeout must be from 1 to 3600 seconds.' 2
+elif [ -n "$after$timeout" ]; then
+  fail '--after and --timeout are for --wait.' 2
+fi
 if [ -n "$rev" ]; then
   # What the commit is called goes to git, which would take a word that begins with a hyphen for an option of its own.
   case $rev in -*) fail "A commit does not begin with a hyphen, and \"$rev\" does." 2 ;; esac
   { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ -z "$label$closes$message$banner$port" ]; } || fail '--rev takes no file and no option but --max.' 2
 fi
-if [ "$serve" = 0 ] && [ -n "$label$closes$message$banner$port" ]; then
-  fail '--label, --closes, --message, --banner and --port are for --serve.' 2
+if [ "$serve" = 0 ] && { [ -n "$label$closes$message$banner$port" ] || [ "$reviewfile" = 1 ]; }; then
+  fail '--label, --closes, --message, --banner, --review-file and --port are for --serve.' 2
 fi
 case $closes in '' | moment | now | never) ;; *) fail '--closes must be moment, now or never.' 2 ;; esac
 case $banner in '' | true | false) ;; *) fail '--banner must be true or false.' 2 ;; esac
@@ -247,6 +293,9 @@ service_started() {
     use IO::Socket::INET;
     use IO::Select;
     use POSIX qw(setsid);
+    use JSON::PP;
+    use Fcntl qw(:flock);
+    use B ();
     my ($base, $idle, $want) = @ARGV;
     open(my $rnd, "<:raw", "/dev/urandom") or exit 8;
     (read($rnd, my $bytes, 16) // 0) == 16 or exit 8;
@@ -294,6 +343,108 @@ service_started() {
         $off += $n;
       }
     }
+    sub say_json {
+      my ($c, $code, $text, $data) = @_;
+      reply($c, $code, $text, "application/json; charset=utf-8", JSON::PP->new->utf8->canonical->encode($data) . "\n");
+    }
+    # What a review folder takes from its page: one POST, at /<secret>/<review folder>/message, of the receiver's own submit, cancelled or skipped.
+    # It is written as the file review.json of that folder, whole, by a temporary file and a rename, with its revision inside; the answer says the revision that the file holds.
+    sub take {
+      my ($c, $sel, $target, $headers, $rest) = @_;
+      my @h = @$headers;
+      my ($origin) = map { /^origin:\s*(.*?)\s*$/i ? lc($1) : () } @h;
+      if (defined $origin) {
+        $origin eq "http://127.0.0.1:$port" || $origin eq "http://localhost:$port" or return reply($c, 403, "Forbidden", "text/plain", "Forbidden\n");
+      }
+      $target =~ m{^/$token/(review\.[A-Za-z0-9]{6})/message$} or return reply($c, 404, "Not Found", "text/plain", "Not found\n");
+      my $folder = $1;
+      my ($type) = map { /^content-type:\s*(.*?)\s*$/i ? lc($1) : () } @h;
+      defined $type && $type =~ m{^application/json(?:\s*;\s*charset=utf-8)?$}
+        or return say_json($c, 415, "Unsupported Media Type", { ok => JSON::PP::false, code => "type", message => "Send application/json." });
+      my @lengths = map { /^content-length:\s*(.*?)\s*$/i ? $1 : () } @h;
+      @lengths <= 1 or return say_json($c, 400, "Bad Request", { ok => JSON::PP::false, code => "invalid", message => "More than one Content-Length." });
+      @lengths == 1 && $lengths[0] =~ /^[0-9]+$/ or return say_json($c, 411, "Length Required", { ok => JSON::PP::false, code => "length", message => "Send a Content-Length." });
+      my $length = $lengths[0] + 0;
+      $length <= 4194304 or return say_json($c, 413, "Payload Too Large", { ok => JSON::PP::false, code => "large", message => "Over 4 MB." });
+      my $body = defined $rest ? $rest : "";
+      while (length($body) < $length) {
+        $sel->can_read(5) or return;
+        sysread($c, my $chunk, 65536) or return;
+        $body .= $chunk;
+      }
+      $body = substr($body, 0, $length);
+      my $bad = sub { say_json($c, 400, "Bad Request", { ok => JSON::PP::false, code => "invalid", message => $_[0] }) };
+      my $data = eval { JSON::PP->new->utf8->decode($body) };
+      ref $data eq "HASH" or return $bad->("The message is not a JSON object.");
+      defined $data->{protocol} && !ref $data->{protocol} && $data->{protocol} eq "1" or return $bad->("The protocol is not 1.");
+      my $kind = $data->{type};
+      defined $kind && !ref $kind && $kind =~ /^(?:submit|cancelled|skipped)$/ or return $bad->("The type is not submit, cancelled or skipped.");
+      my ($revision, $review, $changes);
+      if ($kind eq "submit") {
+        $review = $data->{review};
+        ref $review eq "HASH" && defined $review->{version} && !ref $review->{version} && $review->{version} eq "1" && ref $review->{comments} eq "ARRAY"
+          && ref $review->{file} eq "HASH" && defined $review->{file}{name} && !ref $review->{file}{name} or return $bad->("The review is not a review of version 1.");
+        # The file says that a review has ended by a top-level status, so a review that has one of its own would end the review.
+        exists $review->{status} and return $bad->("The review has a status.");
+        # What the page says differs from the review that was taken before it: the ids of comments, a help and never the truth. It is kept beside the revision.
+        if (exists $data->{changes}) {
+          my $n = $data->{changes};
+          # An id is a string: a number that JSON::PP read is flagged as one, and a string of the same digits is not.
+          my $ids = sub { ref $_[0] eq "ARRAY" && !grep { my $f = defined $_ && !ref $_ ? B::svref_2object(\$_)->FLAGS : 0; !($f & B::SVp_POK) || ($f & (B::SVp_IOK | B::SVp_NOK)) || length($_) > 200 } @{$_[0]} };
+          ref $n eq "HASH" && defined $n->{since} && !ref $n->{since} && $n->{since} =~ /^[0-9]{1,9}$/ && $ids->($n->{new}) && $ids->($n->{edited}) && $ids->($n->{deleted})
+            or return $bad->("The changes are not a revision and lists of the ids of comments.");
+          $changes = { since => $n->{since} + 0, new => [map { "$_" } @{$n->{new}}], edited => [map { "$_" } @{$n->{edited}}], deleted => [map { "$_" } @{$n->{deleted}}] };
+        }
+        if (exists $data->{revision}) {
+          my $r = $data->{revision};
+          defined $r && !ref $r && $r =~ /^[1-9][0-9]{0,8}$/ or return $bad->("The revision is not a whole number from 1.");
+          $revision = $r + 0;
+        }
+      }
+      my $dir = "$base/$folder";
+      -d $dir && !-l $dir && -f "$dir/jared.html" && !-l "$dir/jared.html" or return reply($c, 404, "Not Found", "text/plain", "Not found\n");
+      umask 077;
+      my $failed = sub { say_json($c, 500, "Internal Server Error", { ok => JSON::PP::false, code => "write", message => "The review could not be written." }) };
+      open(my $lock, ">>", "$dir/review.lock") or return $failed->();
+      flock($lock, LOCK_EX) or return $failed->();
+      my $file = "$dir/review.json";
+      my ($have, $state, $text) = (0, undef, undef);
+      if (-f $file && !-l $file && open(my $in, "<:raw", $file)) {
+        local $/;
+        $text = <$in>;
+        close $in;
+        my $old = eval { JSON::PP->new->utf8->decode($text) };
+        if (ref $old eq "HASH") {
+          $have = $old->{revision} // 0;
+          $state = $old->{status};
+        }
+      }
+      defined $state and return say_json($c, 409, "Conflict", { ok => JSON::PP::false, code => "closed", message => "The review has ended.", revision => $have + 0 });
+      my $json = JSON::PP->new->utf8->canonical;
+      my ($new, $out);
+      if ($kind eq "submit") {
+        $new = defined $revision ? $revision : $have + 1;
+        my %file = %$review;
+        delete $file{changes}; # a field of the review's own with that name is not the note
+        $file{changes} = $changes if defined $changes;
+        $file{revision} = $new + 0;
+        $out = $json->encode(\%file) . "\n";
+        my $same = defined $text && $text eq $out;
+        $new < $have || ($new == $have && !$same)
+          and return say_json($c, 409, "Conflict", { ok => JSON::PP::false, code => "stale", message => "The file holds a later revision.", revision => $have + 0 });
+        return say_json($c, 200, "OK", { ok => JSON::PP::true, revision => $new + 0 }) if $same;
+      } else {
+        $new = $have + 1;
+        $out = $json->encode({ revision => $new + 0, status => $kind }) . "\n";
+      }
+      my $tmp = "$dir/.review.json.$$";
+      open(my $o, ">", $tmp) or return $failed->();
+      binmode $o;
+      print $o $out;
+      close($o) or do { unlink $tmp; return $failed->() };
+      rename($tmp, $file) or do { unlink $tmp; return $failed->() };
+      say_json($c, 200, "OK", { ok => JSON::PP::true, revision => $new + 0 });
+    }
     sub answer {
       my $c = shift;
       my $sel = IO::Select->new($c);
@@ -304,12 +455,14 @@ service_started() {
         sysread($c, my $chunk, 4096) or return;
         $buf .= $chunk;
       }
-      my ($line, @headers) = split /\r\n/, $buf;
+      my ($top, $rest) = split /\r\n\r\n/, $buf, 2;
+      my ($line, @headers) = split /\r\n/, $top;
       defined $line && $line =~ m{^([A-Z]+) (\S+) HTTP/1\.[01]$} or return reply($c, 400, "Bad Request", "text/plain", "Bad request\n");
       my ($method, $target) = ($1, $2);
-      $method eq "GET" || $method eq "HEAD" or return reply($c, 405, "Method Not Allowed", "text/plain", "Method not allowed\n", 0, "Allow: GET, HEAD\r\n");
+      $method eq "GET" || $method eq "HEAD" || $method eq "POST" or return reply($c, 405, "Method Not Allowed", "text/plain", "Method not allowed\n", 0, "Allow: GET, HEAD, POST\r\n");
       my ($host) = map { /^host:\s*(.*?)\s*$/i ? lc($1) : () } @headers;
       defined $host && ($host eq "127.0.0.1:$port" || $host eq "localhost:$port") or return reply($c, 403, "Forbidden", "text/plain", "Forbidden\n");
+      return take($c, $sel, $target, \@headers, $rest) if $method eq "POST";
       my $head = $method eq "HEAD";
       return reply($c, 200, "OK", "text/plain; charset=utf-8", "jared-service $daemon\n", $head) if $target eq "/$token/health";
       return reply($c, 200, "OK", "application/json; charset=utf-8", "{\"pid\":$daemon,\"started\":$started,\"now\":" . time . ",\"previous\":$previous,\"idle\":$idle}\n", $head) if $target eq "/$token/status";
@@ -452,6 +605,78 @@ if [ "$version" = 1 ]; then
   exit 0
 fi
 
+# --wait: the file review.json of a review folder, which the service writes, until it holds a revision above --after.
+if [ -n "$waitfor" ]; then
+  cache_base
+  name=$(perl -e 'print $1 if $ARGV[0] =~ m{(?:^|/)(review\.[A-Za-z0-9]{6})(?:/|$)}' "$waitfor")
+  perl - "$base" "$name" "${after:-0}" "${timeout:-600}" <<'PERL'
+    use strict;
+    use warnings;
+    use JSON::PP;
+    use IO::Socket::INET;
+    use Time::HiRes qw(time);
+    my ($base, $name, $after, $timeout) = @ARGV;
+    my $json = JSON::PP->new->utf8->canonical;
+    sub finish {
+      my ($status, $code, %more) = @_;
+      print $json->encode({ status => $status, %more }), "\n";
+      exit $code;
+    }
+    $name ne "" or finish("error", 1, message => "That is not a review: give the address that --serve printed, or the name of its folder.");
+    my $dir = "$base/$name";
+    -d $dir && !-l $dir or finish("error", 1, message => "There is no folder for that review.");
+    my $file = "$dir/review.json";
+    my $deadline = time + $timeout;
+    # What the service says of itself, and so a request that puts off its end: its idle time in seconds, or undef when it does not answer.
+    sub ask_service {
+      open(my $f, "<", "$base/service") or return undef;
+      my ($port, $token) = split " ", (scalar <$f> // "");
+      close $f;
+      defined $port && defined $token && $port =~ /^[0-9]+$/ && $token =~ /^[0-9a-f]{32}$/ or return undef;
+      # A service that takes the connection and does not answer is no service: after 4 seconds the alarm ends the asking, with an answer of none, and not the helper.
+      my $answer = eval {
+        local $SIG{ALRM} = sub { die "alarm\n" };
+        alarm 4;
+        my $s = IO::Socket::INET->new(PeerAddr => "127.0.0.1", PeerPort => $port, Timeout => 3) or die "no service\n";
+        print $s "GET /$token/status HTTP/1.1\r\nHost: 127.0.0.1:$port\r\nConnection: close\r\n\r\n";
+        local $/;
+        scalar <$s>;
+      };
+      alarm 0;
+      defined $answer && $answer =~ m{^HTTP/1\.1 200 .*?\r\n\r\n(\{.*\})}s or return undef;
+      my $state = eval { JSON::PP->new->decode($1) };
+      return ref $state eq "HASH" && defined $state->{idle} && $state->{idle} =~ /^[0-9]+$/ ? $state->{idle} + 0 : undef;
+    }
+    my $every = 5;
+    my $next = 0;
+    while (1) {
+      if (-f $file && !-l $file && open(my $in, "<:raw", $file)) {
+        local $/;
+        my $text = <$in>;
+        close $in;
+        my $data = eval { JSON::PP->new->utf8->decode($text) };
+        if (ref $data eq "HASH" && defined $data->{revision} && !ref $data->{revision} && $data->{revision} =~ /^[0-9]+$/ && $data->{revision} > $after) {
+          my $n = $data->{revision} + 0;
+          my $state = $data->{status} // "";
+          finish("cancelled", 4, revision => $n, message => "The reviewer gave the review up.") if $state eq "cancelled";
+          finish("skipped", 5, revision => $n, message => "The reviewer skipped the review.") if $state eq "skipped";
+          finish("received", 0, revision => $n, reviewFile => $file, message => "Revision $n of this review is in the file. Read it; to take a later one, wait again with --after $n.");
+        }
+      }
+      -d $dir or finish("error", 1, message => "The folder of the review is gone.");
+      if (time >= $next) {
+        my $idle = ask_service();
+        defined $idle or finish("error", 1, message => "The Jared service is not running, so no review can come.");
+        $every = $idle / 3 < 1 ? 1 : $idle / 3 > 30 ? 30 : int($idle / 3);
+        $next = time + $every;
+      }
+      time >= $deadline and finish("timeout", 3, message => "No review came in $timeout seconds.");
+      select(undef, undef, undef, 0.25);
+    }
+PERL
+  exit $?
+fi
+
 if [ -n "$rev" ]; then
   command -v git > /dev/null 2>&1 || fail 'git is not installed here, and a commit needs it.' 1
   git rev-parse --git-dir > /dev/null 2>&1 || fail 'This folder is not in a git repository, so there is no commit to take.' 1
@@ -585,6 +810,11 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
       rm -rf "$dir"
       fail 'The Jared service could not be started (the port is in use, or sockets cannot be opened).' 8
     }
+    # The address of the folder, for the page to send the review to: only characters of a port, a secret and the name of a folder that this helper made.
+    if [ "$reviewfile" = 1 ]; then
+      printf 'window.__JARED_SERVICE = "http://127.0.0.1:%s/%s/%s"\n' "$svc_port" "$svc_token" "$(basename "$dir")" >> "$dir/jared-boot.js" \
+        || { rm -rf "$dir"; fail "The script for the review cannot be written in \"$dir\"." 7; }
+    fi
     (
       sleep "$keep"
       printf '%s\n' 'window.__JARED_BOOT_EXPIRED = true' > "$dir/jared-boot.js"

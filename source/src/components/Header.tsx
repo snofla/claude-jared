@@ -1,9 +1,9 @@
 import { COPY } from '../lib/copy'
-import { buttonLabel, statusOf, type Delivery } from '../lib/delivery'
+import { sendLabel, statusOf, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
 import type { Review, SourceFile } from '../types'
 import { THEMES, type Theme } from '../lib/theme'
-import { Badge, Button, IconBrand, IconDownload, IconFile, IconMore, IconPanel, IconSend, IconUpload, IconX, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
+import { Badge, Button, IconBrand, IconDownload, IconFile, IconMessage, IconMore, IconPanel, IconSend, IconUpload, IconX, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
 import { Version } from './Version'
 
 /** The tone of a status, as `statusOf` names it, in the words of `Badge`. */
@@ -17,10 +17,16 @@ interface Props {
   onHome: () => void
   onOpen: () => void
   onLanguage: (language: string) => void
-  /** Opens the dialog. What the button is called, and its icon, follow what takes the review (`delivery`); the default is Export. */
+  /** Presses the button: opens the dialog, or, after a first press, sends the changes at once. What the button is called, and its icon, follow what takes the review (`delivery`); the default is Export. */
   onSubmit: () => void
-  /** Called when the reviewer presses Cancel review; the page asks first when there is something to lose. */
+  /** How many changes the next press will send, once there was a press of a delivery that takes changes; `null` before that and for a delivery that cannot. */
+  changes: number | null
+  /** Opens the dialog of the summary and the preview, once the button sends at once; `null` when the button opens it itself. */
+  onReviewWindow: (() => void) | null
+  /** Called when the reviewer presses Discard review; the page asks first when there is something to lose. */
   onCancel: () => void
+  /** Called when the reviewer presses Skip review, which is offered only while a program waits for the review: the review is kept. `null` when it is not offered. */
+  onSkip: (() => void) | null
   delivery: Delivery | null
   /** The review is with a script that drives the page, which has not taken it yet. */
   handedOver: boolean
@@ -31,9 +37,9 @@ interface Props {
   onTheme: (theme: Theme) => void
 }
 
-export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen, onLanguage, onSubmit, onCancel, delivery, handedOver, sentAt, theme, onTheme }: Props) {
-  const state = statusOf(review, delivery, handedOver, sentAt)
-  const label = buttonLabel(delivery)
+export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, onCancel, onSkip, delivery, handedOver, sentAt, theme, onTheme }: Props) {
+  const state = statusOf(review, handedOver, sentAt)
+  const label = sendLabel(delivery, changes)
   const count = review.comments.length
 
   return (
@@ -68,6 +74,11 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
         <Badge variant="count">{count}</Badge>
       </Button>
       <Menu label={COPY.moreActions} icon={<IconMore />}>
+        {onReviewWindow && (
+          <MenuItem icon={<IconMessage />} onSelect={onReviewWindow}>
+            {COPY.reviewWindow}
+          </MenuItem>
+        )}
         <MenuItem icon={<IconUpload />} onSelect={onOpen}>
           Open…
         </MenuItem>
@@ -80,11 +91,16 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
           ))}
         </MenuGroup>
         <MenuSeparator />
+        {onSkip && (
+          <MenuItem icon={<IconFile />} onSelect={onSkip}>
+            {COPY.skipReview}
+          </MenuItem>
+        )}
         <MenuItem icon={<IconX />} onSelect={onCancel}>
-          {COPY.cancelReview}
+          {COPY.discardReview}
         </MenuItem>
       </Menu>
-      <Button variant="primary" icon={delivery ? <IconSend /> : <IconDownload />} onClick={onSubmit} title={label} aria-label={label}>
+      <Button variant={changes === 0 ? 'default' : 'primary'} icon={delivery ? <IconSend /> : <IconDownload />} onClick={onSubmit} title={label} aria-label={label}>
         <span className="submit-label">{label}</span>
       </Button>
     </header>

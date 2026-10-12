@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef } from 'react'
 import { usePlatform } from '../hooks/usePlatform'
 import { useLatest } from '../hooks/useTokens'
 import { COPY } from '../lib/copy'
-import { buttonLabel, destinationLine, lastDelivery, takenAsItIs, type Delivery } from '../lib/delivery'
+import { buttonLabel, destinationLine, emptyReviewNotice, lastDelivery, sendLabel, takenAsItIs, waitingWords, type Delivery } from '../lib/delivery'
 import { reviewFileName, toJson, toMarkdown } from '../lib/export'
 import {
   busy,
@@ -10,8 +10,6 @@ import {
   closeAfterMs,
   groupOpen,
   initialSubmitState,
-  isLate,
-  lateDelayMs,
   mimeOf,
   shownFormat,
   showsCheck,
@@ -22,7 +20,7 @@ import {
   type SendResult,
 } from '../state/submit'
 import type { Review } from '../types'
-import { Button, Dialog, DialogFoot, Disclosure, IconCheck, IconCopy, IconDownload, IconSend, Notice, SegmentedControl, TextField, type SegmentedOption } from '../ui'
+import { Button, Dialog, DialogFoot, Disclosure, IconCheck, IconCopy, IconDownload, IconSend, LiveStatus, Notice, SegmentedControl, TextField, type SegmentedOption } from '../ui'
 
 interface Props {
   review: Review
@@ -43,6 +41,21 @@ interface Props {
   deliver?: () => Promise<SendResult>
   /** When the review was given to a script that has not taken it yet, as a time; else `null`. */
   waitingSince: number | null
+  /** That review has been with the script, not taken, for too long (`useLate`, which the strip under the header reads too). */
+  late: boolean
+  /** The reviewer has changed the review since the press: what the script will take is the review as it was then. */
+  changedSincePress: boolean
+  /** How many changes the next press will send, once there was a press of a delivery that takes changes: then the button sends the later state, even while the earlier one waits. `null` before that. */
+  changes: number | null
+  /** A call has taken a review of this file before: what the reviewer is to tell the program is that changes were sent. */
+  update: boolean
+  /** The reviewer pressed the button with nothing new to send: the page says so. */
+  onNothingNew: () => void
+  /**
+   * The dialog closes at the press, and the page tells the rest: a script can take long to take the review, and the reviewer goes on working
+   * meanwhile (`closesAtPress`). Then the dialog does not wait for `deliver`.
+   */
+  closesAtPress: boolean
   /** When the review was last sent to its delivery, or `null`. */
   sentAt: string | null
   /** Set when Jared was opened by a link that carries requests: the review goes to the clipboard, as JSON, for Claude to read. A delivery wins over it. */
@@ -53,8 +66,10 @@ interface Props {
   onClose: () => void
   /** The dialog closed by itself, because the review was taken and nothing was changed: the page tells the reviewer, once the dialog is gone. */
   onSentClosed: () => void
-  /** Called when the reviewer presses Cancel review in the foot. The question comes over the dialog, and the dialog is still there when the reviewer keeps the review. */
+  /** Called when the reviewer presses Discard review in the foot. The question comes over the dialog, and the dialog is still there when the reviewer keeps the review. */
   onCancel: () => void
+  /** Called when the reviewer presses Skip review in the foot, which is offered only while a program waits for the review: the review is kept. `null` when it is not offered. */
+  onSkip: (() => void) | null
 }
 
 const FORMATS: readonly SegmentedOption<Format>[] = [
@@ -62,7 +77,7 @@ const FORMATS: readonly SegmentedOption<Format>[] = [
   { value: 'json', label: 'JSON' },
 ]
 
-export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, sentAt, forClaude, linkTarget, onClose, onSentClosed, onCancel }: Props) {
+export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, late, changedSincePress, changes, update, onNothingNew, closesAtPress, sentAt, forClaude, linkTarget, onClose, onSentClosed, onCancel, onSkip }: Props) {
   const { submit } = usePlatform()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [state, dispatch] = useReducer(submitReducer, initialSubmitState)
@@ -79,24 +94,19 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
     return () => clearTimeout(timer)
   }, [closeAfter, onSentClosedRef])
 
-  // A review that a script has not taken after a while may be one that nobody is asking for: say so, so that the reviewer is never stuck.
-  useEffect(() => {
-    if (waitingSince === null) return
-    const timer = setTimeout(() => dispatch({ type: 'lateFired', waitingSince }), lateDelayMs(waitingSince, Date.now()))
-    return () => clearTimeout(timer)
-  }, [waitingSince])
-  const late = isLate(state, waitingSince)
-
   const way = wayOf(delivery, forClaude)
   const shown = shownFormat(way, state.format)
   const text = shown === 'md' ? toMarkdown(review) : toJson(review)
   const count = review.comments.length
+  const empty = emptyReviewNotice(count, review.summary, delivery)
   const label = buttonLabel(delivery)
   const waiting = waitingSince !== null
   const taken = takenAsItIs(review, sentAt)
   const last = lastDelivery(review, delivery, sentAt)
-  const line = statusLine(state, waiting, delivery, last)
-  const unavailable = busy(state, waiting)
+  const line = statusLine(state, waiting, last)
+  // A later press replaces a review that waits, so the button is not unavailable for that: only a send that is on its way (to a receiver) holds it.
+  const unavailable = busy(state, waiting && changes === null)
+  const sendWords = sendLabel(delivery, changes)
   // Download, in a link's dialog, is in the group of the other ways to export too, so a clipboard that is refused opens it.
   const groupIsOpen = groupOpen(state, late)
 
@@ -115,6 +125,17 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
 
   const run = async () => {
     if (!deliver || unavailable) return // the button is only marked unavailable, so that the focus stays on it
+    if (changes === 0) {
+      dialogRef.current?.close()
+      onNothingNew()
+      return
+    }
+    if (closesAtPress) {
+      // The page takes it from here: the strip under the header says what to do, and the message or the banner of a failure comes as it does for a dialog that was closed.
+      void deliver()
+      dialogRef.current?.close() // through the dialog's own close(), as every way out goes: its `close` event runs `onClose` once
+      return
+    }
     dispatch({ type: 'sendStarted', delivery })
     const result = await deliver()
     dispatch({ type: 'sendFinished', result, updatedAt: reviewRef.current.updatedAt })
@@ -149,7 +170,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
       onKeyDownCapture={() => dispatch({ type: 'closingCancelled' })}
       onPointerDownCapture={() => dispatch({ type: 'closingCancelled' })}
     >
-      {count === 0 && <Notice tone="info">{delivery ? COPY.noCommentsSending : COPY.noCommentsExporting}</Notice>}
+      {empty && <Notice tone="info">{empty}</Notice>}
 
       <TextField
         className="summary-field"
@@ -170,20 +191,27 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
         {text}
       </pre>
 
-      <p className="muted dialog-dest">
-        {way === 'delivered' ? destinationLine(delivery!, to ?? null, review, sentAt) : way === 'link' ? COPY.lineLink(linkTarget) : COPY.lineExport}
-      </p>
-      {late && (
-        <Notice tone="warn" role="status">
-          {COPY.nobodyYet}
-        </Notice>
-      )}
+      <div className="dialog-notes">
+        <p className="muted dialog-dest">
+          {way === 'delivered' ? destinationLine(delivery!, to ?? null, review, sentAt) : way === 'link' ? COPY.lineLink(linkTarget) : COPY.lineExport}
+        </p>
+        <LiveStatus>
+          {waiting && <Notice tone="warn">{waitingWords(waiting, late, delivery?.target ?? null, changedSincePress, update)}</Notice>}
+        </LiveStatus>
+      </div>
 
       <DialogFoot>
         {canCancel(state, waiting, taken) && (
-          <Button variant="ghost" onClick={onCancel}>
-            {COPY.cancelReview}
-          </Button>
+          <>
+            {onSkip && (
+              <Button variant="ghost" onClick={onSkip}>
+                {COPY.skipReview}
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onCancel}>
+              {COPY.discardReview}
+            </Button>
+          </>
         )}
         <span className={state.failed ? 'status status-error dialog-status' : 'status muted dialog-status'} role="status" aria-live="polite">
           {line && (
@@ -194,8 +222,8 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
         </span>
         <span className="dialog-actions">
           {way === 'delivered' ? (
-            <Button variant="primary" icon={<IconSend />} busy={unavailable} onClick={() => void run()} title={label} aria-label={label}>
-              <span className="submit-label">{label}</span>
+            <Button variant={changes === 0 ? 'default' : 'primary'} icon={<IconSend />} busy={unavailable} onClick={() => void run()} title={sendWords} aria-label={sendWords}>
+              <span className="submit-label">{sendWords}</span>
             </Button>
           ) : way === 'link' ? (
             copyButton(true)

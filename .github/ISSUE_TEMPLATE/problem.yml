@@ -20,9 +20,9 @@ body:
     id: opened
     attributes:
       label: Where did Jared open your file?
-      description: The browser pane is the browser inside the Claude app. Your own browser is one such as Safari, Chrome or Firefox.
+      description: Your session's browser is the one that Claude drives, the browser pane of the Claude app or Claude in Chrome. Your own browser is one that you opened yourself, such as Safari, Chrome or Firefox.
       options:
-        - In the browser pane of the Claude app
+        - In your session's browser
         - In my own browser
         - Another way, or I am not sure
     validations:
@@ -31,7 +31,7 @@ body:
     id: system
     attributes:
       label: Your computer, and your browser
-      description: For example macOS and Safari, or Linux and Firefox. Leave the browser out if you used the pane of the Claude app.
+      description: For example macOS and Safari, or Linux and Firefox. Leave the browser out if you used your session's browser.
   - type: textarea
     id: happened
     attributes:

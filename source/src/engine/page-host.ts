@@ -2,7 +2,7 @@ import type { Draft, Review, SourceFile } from '../types.ts'
 import { draftHasText } from '../lib/review.ts'
 import { prepareSource } from '../lib/source.ts'
 import { emptyEngineState, handle, type EngineState } from './engine.ts'
-import type { Outbox } from './outbox.ts'
+import type { Outbox, OutboxRules } from './outbox.ts'
 import { errorReply, parseRequest, PROTOCOL_VERSION, sameSubmitOptions, type Event, type Reply, type SubmitOptions } from './protocol.ts'
 
 /**
@@ -112,11 +112,23 @@ export const DEFAULT_SUBMIT_WAIT_MS = 40_000
 export const MAX_SUBMIT_WAIT_MS = 600_000
 
 /**
- * What `window.jared.waitForSubmit(timeoutMs)` does: take the oldest event that the page has for the script, a review that the reviewer has
- * handed over or the reviewer's cancel, waiting for one up to `timeoutMs`, and say `{ type: "timeout" }` if none came. An event that came
- * before the call is kept for it.
+ * What the page's outbox does with its events: a review takes the place of a review that no call has taken, and the newest stays, whoever has
+ * taken it, until a file is opened or closed, so that a review that a call took and whose caller is gone is not lost; a cancel and a skip are
+ * emptied by the call that takes them.
  */
-export async function waitForSubmit(outbox: Outbox<Event>, timeoutMs?: number): Promise<Event | { type: 'timeout' }> {
+export const eventRules: OutboxRules<Event> = {
+  replaces: (incoming, kept) => incoming.type === 'submitted' && kept.type === 'submitted',
+  retained: (event) => event.type === 'submitted',
+}
+
+/**
+ * What `window.jared.waitForSubmit(timeoutMs, afterRevision)` does: take the oldest event that the page has for the script and that the
+ * script has not seen, waiting for one up to `timeoutMs`, and say `{ type: "timeout" }` if none came. A review that the reviewer has handed over
+ * is new when its `revision` is above `afterRevision` (default 0, so any review is); the reviewer's cancel and skip are always new. An event
+ * that came before the call is kept for it.
+ */
+export async function waitForSubmit(outbox: Outbox<Event>, timeoutMs?: number, afterRevision?: number): Promise<Event | { type: 'timeout' }> {
   const wanted = Number.isFinite(timeoutMs) ? (timeoutMs as number) : DEFAULT_SUBMIT_WAIT_MS // not a number, whatever a script passes in, is not finite
-  return (await outbox.next(Math.min(Math.max(wanted, 0), MAX_SUBMIT_WAIT_MS))) ?? { type: 'timeout' }
+  const seen = Number.isFinite(afterRevision) ? (afterRevision as number) : 0
+  return (await outbox.next(Math.min(Math.max(wanted, 0), MAX_SUBMIT_WAIT_MS), (event) => event.type !== 'submitted' || event.revision > seen)) ?? { type: 'timeout' }
 }

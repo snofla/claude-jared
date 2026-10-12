@@ -30,7 +30,7 @@ export function CancelDialog({ comments, summary, writing, fileName, tells, onKe
         <span className="dialog-actions">
           <Button onClick={onKeep}>{COPY.keepReviewing}</Button>
           <Button variant="danger" onClick={onCancel}>
-            {COPY.cancelReview}
+            {COPY.discardReview}
           </Button>
         </span>
       </DialogFoot>

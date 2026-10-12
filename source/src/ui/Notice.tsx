@@ -4,7 +4,7 @@ import './notice.css'
 export type NoticeTone = 'info' | 'warn'
 
 type NoticeProps = Omit<ComponentPropsWithoutRef<'p'>, 'className'> & {
-  /** What kind of message it is: `info` for something to know, `warn` for something to look at. Both are drawn in the warning colours. */
+  /** What kind of message it is: `info` for something to know, drawn calmly, `warn` for something to look at, drawn in the warning colours. */
   tone: NoticeTone
   /** Layout only, such as a margin in a card. */
   className?: string

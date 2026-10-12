@@ -20,6 +20,11 @@ export type AlertProps = Dismissal & {
   children?: ReactNode
   /** A decorative icon before the words. */
   icon?: ReactNode
+  /**
+   * Buttons that answer the message, after the words and before the cross. They are outside the live region, so that they are not read with the message,
+   * and they go under the words when the alert is too narrow for both. Drawn only while there are words.
+   */
+  actions?: ReactNode
   /** The live region's role. By default `status` (polite) for `ok` and `alert` (assertive) for the other tones. */
   role?: 'status' | 'alert'
   /** Layout only, such as a margin. Never the look. */
@@ -31,14 +36,16 @@ export type AlertProps = Dismissal & {
  * anything to say, because a region that arrives already holding its text is not always announced: keep rendering the `Alert`, and put the words
  * in its children when there are some. The words are the caller's.
  */
-export function Alert({ tone, children, icon, role = tone === 'ok' ? 'status' : 'alert', onDismiss, dismissLabel, className }: AlertProps) {
+export function Alert({ tone, children, icon, actions, role = tone === 'ok' ? 'status' : 'alert', onDismiss, dismissLabel, className }: AlertProps) {
   const drawn = children !== undefined && children !== null && children !== false
+  const withActions = drawn && actions !== undefined && actions !== null && actions !== false
   return (
-    <div className={drawn ? ['jared-alert', `jared-alert-${tone}`, className].filter(Boolean).join(' ') : undefined}>
+    <div className={drawn ? ['jared-alert', `jared-alert-${tone}`, withActions && 'jared-alert-with-actions', className].filter(Boolean).join(' ') : undefined}>
       <span className="jared-alert-text" role={role}>
         {drawn && icon}
         {drawn && <span>{children}</span>}
       </span>
+      {withActions && <span className="jared-alert-actions">{actions}</span>}
       {drawn && onDismiss && <IconButton label={dismissLabel} icon={<IconX />} onClick={onDismiss} />}
     </div>
   )

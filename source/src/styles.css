@@ -880,6 +880,11 @@ pre {
   overflow-wrap: anywhere;
 }
 
+/* The line about where the review goes and the notice that may follow it are one row of the dialog's grid. The notice's live region has to be in the page before it has words, so that a screen reader announces them; empty, it must not take a row of its own. */
+.dialog-notes > [role='status']:not(:empty) {
+  margin-top: var(--space-10);
+}
+
 /* The caller's own words are put on the page, so a long label is cut here (the whole label is in the button's title and name) and
    never reaches the layout; the dialog's title wraps. */
 .submit-label {

@@ -1,16 +1,20 @@
+import { COPY } from '../lib/copy'
+import type { Mark } from '../lib/changes'
 import { commentLabel } from '../lib/review'
 import type { ReviewComment } from '../types'
 import { Badge, IconButton, IconMessage, IconX, Kbd } from '../ui'
 
 interface Props {
   comments: ReviewComment[]
+  /** The comments that the next press will send: new, or edited since the last press. A comment already sent has none. */
+  marks: ReadonlyMap<string, Mark>
   hoveredId: string | null
   onHover: (id: string | null) => void
   onJump: (comment: ReviewComment) => void
   onClose: () => void
 }
 
-export function ReviewPanel({ comments, hoveredId, onHover, onJump, onClose }: Props) {
+export function ReviewPanel({ comments, marks, hoveredId, onHover, onJump, onClose }: Props) {
   return (
     <aside className="side" aria-label="Review comments">
       <header className="side-head">
@@ -46,6 +50,7 @@ export function ReviewPanel({ comments, hoveredId, onHover, onJump, onClose }: P
                 <span className="side-item-top">
                   <Badge>{commentLabel(c)}</Badge>
                   {c.suggestion !== null && <Badge tone="ok">± suggestion</Badge>}
+                  {marks.has(c.id) && <Badge tone="accent">{marks.get(c.id) === 'new' ? COPY.markNew : COPY.markEdited}</Badge>}
                 </span>
                 <span className="side-item-text">{c.comment || 'Suggested change'}</span>
               </button>

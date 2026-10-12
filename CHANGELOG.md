@@ -2,6 +2,30 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.14.0 — 2026-10-12
+
+- **In the Claude app, your review now comes back to the session by itself.** You press **Submit review** in Jared, and Claude picks the review up without being told.
+  - Claude says that it will pick the review up. If it has not answered in a minute, tell it that you pressed the button; Jared's message under the header says so too.
+  - The plugin tries this way first when your session has a browser and a background command wakes it; `--via background` asks for it. When a session has both the browser pane of the app and Claude in Chrome, Claude uses the pane, so that the whole review stays inside the app.
+  - A session that is not woken by background commands says so once and uses the earlier way, in which you tell Claude that you pressed the button.
+  - After Claude has worked through your review, it watches for up to ten minutes for the changes that you send. It starts watching as soon as it has read your review, so a round that you stop does not end the watch. When nothing comes in time, it says so in one line and does not ask whether to wait again.
+  - Claude no longer repeats an exit code or the name of a status when it tells you what happened. When Jared cannot hand the review over, it says why in its own words, for example "This review is more than 4 MB, which is too much to hand over."
+- **After you press the button, you can go on reviewing and send further changes.**
+  - The button reads **Send changes (3)**, where the number is how many comments you added, edited or deleted since (a changed summary counts as one), and a press sends the review as it is now, at once. With nothing new it reads **Up to date with Claude**.
+  - The list of comments marks the ones that the next press will send, **new** or **edited**. The **⋯** menu has **Summary, preview and export…**, which opens the window of the summary, the preview and the export.
+  - Claude works only on what is new or edited since the last time, and says what the update held in one line, for example "Update 2: 2 new, 1 edited, 1 deleted".
+  - When you have to tell Claude that you pressed the button (the earlier way), the window closes at the press, the header says "Not taken yet", and a notice under it tells you what to tell Claude and, if you change the review after pressing, that the changes are not in what you sent and that **Send changes** sends them.
+  - After a while that notice adds a button that opens the window again, where you can copy or download the review. Giving up a review that waits no longer shows a message that a different file was opened.
+- **Skip review**, in the **⋯** menu and in the window that sends the review, leaves the file without reviewing it now, tells Claude that you skipped it, and keeps your review under **Continue reviewing**.
+  - Claude tells you that you skipped it and that Jared keeps your comments. In the earlier way, the start page also tells you to tell Claude that you skipped or discarded the review.
+  - **Back to start** now asks first while Claude waits for the review. **Cancel review** is now called **Discard review**.
+- In the earlier way, Claude no longer checks again and again, for up to ten minutes, whether you have sent your review. It tells you that the file is open and waits for you to say that you have submitted the review, and then takes it. If nothing has been submitted yet, it says so and asks you to press the button and tell it again.
+- In the **Export review** or **Submit review** window, a review with no comment and no summary says "No comments." and what will happen: that Claude will be told that you found nothing to say, or that the export has none. The message is no longer drawn as a warning, and a review that has only a summary no longer gets the warning that sending gives an empty review.
+  - Given a review with no comments and no summary, Claude says in one line that you found nothing to say, and stops.
+- In the **Export review** or **Submit review** window, when a review cannot be sent, the line under the reason now says that the review was not sent, and that you can copy or download it instead.
+- The README of the plugin has a new section, *Options*, that lists the options of `/jared:review`: `--rev`, `--jared`, `--via` with the ways that `auto` takes in order, `--block`, `--closes`, `--message` and `--banner`. It says what each does and that `--block` is not available in the plugin.
+- The README of the plugin and the form for reporting a problem now say that Jared opens in your session's browser, the browser pane of the Claude app or Claude in Chrome, and not only in the pane.
+
 ## 0.13.2 — 2026-10-08
 
 - In the **Export review** or **Submit review** window, after a copy was refused or a send failed, a download is shown as a success, with its check mark, and no longer as an error. The group **Other ways to export**, which the failure opened, now stays open after a download or a copy that works.

@@ -18,8 +18,13 @@ export const COPY = {
   /** Sent to the receiver, or taken by the program that opened Jared. Said of nothing else. */
   sent: (time: string): string => `Sent ${time}`,
   editedSinceSent: 'Edited since sending',
-  /** The review is with the page's API and nobody has taken it: not sent yet. */
-  waiting: (target: string | null): string => (target === null ? 'Waiting to be received' : `Waiting for ${target}`),
+  /**
+   * The review is with the page's API and nobody has taken it: not sent yet. For the header's chip and the dialog's line, so it is short and names nobody: a
+   * program that waits to be told that the review is submitted does not take it until it is told, so the words do not say that anything is working.
+   */
+  waiting: 'Not taken yet',
+  /** What the dialog tells the reviewer at once, in a notice, while a script has not taken the review: to tell the program that the review is submitted. */
+  waitingNotice: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you have submitted the review.' : `Tell ${target} that you have submitted the review.`),
 
   sending: 'Sending…',
   /**
@@ -27,14 +32,46 @@ export const COPY = {
    * well, and the same message for both. With the name that the sender gave, and without one. It has no time: the header and the dialog's line keep it.
    */
   reviewSent: (target: string | null): string => (target === null ? 'Review sent to the program that opened Jared.' : `Review sent to ${target}.`),
+  /**
+   * The same for a review that the Jared service kept as a file, where "sent" is all that the page knows: the program may not have it yet, and what to do about that.
+   * The second sentence goes when a real session has shown that a finished background command wakes the session that waits for the file.
+   */
+  reviewSentToService: (target: string | null): string =>
+    target === null
+      ? 'Review sent to the program that opened Jared. If it has not answered in a minute, tell it that you pressed the button.'
+      : `Review sent to ${target}. If ${target} has not answered in a minute, tell it that you pressed the button.`,
   /** The name of the × that takes that message away. */
   dismiss: 'Dismiss',
   /** The dialog, after a delivery: when, as a sentence, and with what has not gone. */
   sentAt: (time: string): string => `Sent at ${time}.`,
   sentAtChanged: (time: string): string => `Sent at ${time}. Changes made since then have not been sent.`,
-  nobodyYet: 'Not received yet. You can keep waiting, or copy or download the review.',
+  /** Added to the notice while a program has not taken the review, once the reviewer has changed it: what was handed over is the review as it was at the press. */
+  changedAfterPress: 'Changes you made after pressing the button are not in what you sent. Press Send changes to send them.',
+  /** The button after a first press: how many changes it will send, or that there is nothing new (the words of the program that takes the review, when it gave a name). */
+  sendChanges: (count: number): string => `Send changes (${count})`,
+  inStep: (target: string | null): string => (target === null ? 'Nothing new to send' : `Up to date with ${target}`),
+  /** What a press says when there is nothing new to send. */
+  nothingNew: (target: string | null): string => (target === null ? 'Nothing new to send: the program has the review as it is.' : `Nothing new to send: ${target} has the review as it is.`),
+  /** The notice of a press that sent changes to a program that took the review before: what to tell it, and, after a while, the way out. */
+  updateNotice: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you have sent changes.' : `Tell ${target} that you have sent changes.`),
+  updateNobodyYet: (target: string | null): string =>
+    target === null
+      ? 'Tell the program that opened Jared that you have sent changes. If the program does not take them, copy or download the review.'
+      : `Tell ${target} that you have sent changes. If ${target} does not take them, copy or download the review.`,
+  /** The item of the menu that opens the window of the summary and the preview, once the button sends at once. */
+  reviewWindow: 'Summary, preview and export…',
+  /** The marks beside a comment in the list: what the next press will send. */
+  markNew: 'new',
+  markEdited: 'edited',
+  /** The same notice after a while, with the way out added: its first sentence is the one of `waitingNotice`, so that it reads as one thought. */
+  nobodyYet: (target: string | null): string =>
+    target === null
+      ? 'Tell the program that opened Jared that you have submitted the review. If the program does not take it, copy or download the review.'
+      : `Tell ${target} that you have submitted the review. If ${target} does not take it, copy or download the review.`,
   /** The heading of the group that holds the other ways to get the review out. */
   otherWaysToExport: 'Other ways to export',
+  /** The button of the strip under the header, after the late time: it opens the dialog, where the review can be copied or downloaded. */
+  copyOrDownload: 'Copy or download',
   /** The × in the dialog's heading: its name, and its title with the key that does the same. */
   close: 'Close',
   closeTitle: (key: string): string => `Close (${key})`,
@@ -46,18 +83,28 @@ export const COPY = {
   /** The names of its three choices. */
   themeChoice: { system: 'System', light: 'Light', dark: 'Dark' },
   /** The button that gives a review up, and the danger button of its question. */
-  cancelReview: 'Cancel review',
+  discardReview: 'Discard review',
   /** The safe button of that question: nothing is discarded and nobody is told. */
   keepReviewing: 'Keep reviewing',
-  cancelTitle: 'Cancel this review?',
+  cancelTitle: 'Discard this review?',
   /** What giving a review up discards: the comments saved on the open file. */
   cancelDiscards: (count: number, name: string): string => `${COPY.commentCount(count)} on ${name} will be discarded.`,
   /** What giving a review up discards when a comment is being written. */
   cancelDiscardsDraft: 'The comment you are writing will be discarded.',
   /** What giving a review up discards when it has an overall summary, whether or not it has comments. */
   cancelDiscardsSummary: 'The overall summary will be discarded.',
+  /** The button that skips a review: it leaves the file without reviewing it now, keeps the review and tells the program that waits. */
+  skipReview: 'Skip review',
+  /** The question of Back to start when a program waits for the review: who waits, by the caller's name for them or as the program that opened Jared. */
+  skipTitle: (target: string | null): string => (target === null ? 'The program that opened Jared is waiting for this review.' : `${target} is waiting for this review.`),
+  /** What skipping does, under that question: the review is kept for later. */
+  skipKept: 'Skipping leaves this file for now. Your review is kept, and you can go on with it from the start page.',
+  /** The banner on the start page after a skip of a review that a script started: the script does not hear of it until the reviewer says so. */
+  skipTellProgram: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you skipped the review.' : `Tell ${target} that you skipped the review.`),
+  /** The banner on the start page after a discard of a review that a script started, for the same reason as the one after a skip. */
+  discardTellProgram: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you discarded the review.' : `Tell ${target} that you discarded the review.`),
   /** What giving a review up tells whoever waits for it: the caller's name for them, or the program that opened Jared when there is none. */
-  cancelTells: (target: string | null): string => (target === null ? 'The program that opened Jared will be told that you cancelled.' : `${target} will be told that you cancelled.`),
+  cancelTells: (target: string | null): string => (target === null ? 'The program that opened Jared will be told that you discarded the review.' : `${target} will be told that you discarded the review.`),
   /**
    * What the banner says when a program asked, through the page's own interface, to open another file and the page kept the open review
    * (`kept` is the name of that file): who asked (the caller's name for itself, or a program when it gave none) and the file it asked for.
@@ -93,8 +140,10 @@ export const COPY = {
     target === null
       ? 'Could not access the clipboard. Download the review, then give the file to the program that opened Jared.'
       : `Could not access the clipboard. Download the review, then give the file to ${target}.`,
-  noCommentsExporting: 'There are no comments yet. Exporting now gives an empty review.',
-  noCommentsSending: 'There are no comments yet. Sending now gives an empty review.',
+  /** The window of a review with no comment and no summary: what is in it, as a statement and not as a caution. The words of a program that takes the review name it. */
+  noCommentsExporting: 'No comments. The review that you export has none.',
+  noCommentsSending: (target: string | null): string =>
+    target === null ? 'No comments. The program that opened Jared will be told that you found nothing to say.' : `No comments. ${target} will be told that you found nothing to say.`,
   /** How many comments the review has, under the dialog's title. English-only plural: localisation replaces it with `Intl.PluralRules`, so do not copy the pattern. */
   commentCount: (count: number): string => (count === 0 ? 'no comments' : count === 1 ? '1 comment' : `${count} comments`),
   /** The line that says where a delivery goes; it does not name the button, which wears the sender's words. Each case is one whole message. */
@@ -140,13 +189,20 @@ export const COPY = {
   },
   unexpectedAnswer: (target: string | null): string =>
     target === null ? 'The program that opened Jared sent an answer that Jared did not expect.' : `${target} sent an answer that Jared did not expect.`,
+  /** What the Jared service refuses with, in the page's own words and with no name of a program, because no program was told: a review that is over what it takes, a file that it could not write, and any other refusal in its own sentence. */
+  serviceTooBig: 'This review is more than 4 MB, which is too much to hand over.',
+  serviceNotSaved: 'The review could not be saved on this computer.',
+  serviceRefused: (message: string): string => `The service refused the review: ${/[.!?]$/.test(message) ? message : `${message}.`}`,
   /**
    * The composer, when the suggestion being written overlaps the suggestion of another comment: `range` is the other's lines, or
    * a list of them built with `Intl.ListFormat`, in lower case after "on" ("lines 5–10 and line 9"). It does not say what a reader will do.
    */
   suggestionOverlapsOne: (range: string): string => `This suggestion overlaps the one on ${range}, so they cannot both be applied.`,
   suggestionOverlapsSeveral: (ranges: string): string => `This suggestion overlaps the ones on ${ranges}, so they cannot all be applied.`,
-  /** Under the error, when sending failed, as a line of its own. */
-  copyInstead: 'You can copy or download the review instead.',
+  /**
+   * Under the error, when sending failed, as a line of its own: the one place that says that the review was not sent, for every cause (a receiver, a
+   * script that drives the page, a file that was replaced), so that each cause says only why. The banner of a closed dialog says it in `notSent`.
+   */
+  copyInstead: 'The review was not sent. You can copy or download it instead.',
   fileChanged: 'A different file was opened before the review was received.',
 } as const

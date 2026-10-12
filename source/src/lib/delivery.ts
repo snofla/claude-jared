@@ -19,6 +19,24 @@ export const SUBMIT_LABEL = COPY.submitLabel
 /** How long a review may stay with the page, not taken by a caller, before the dialog says that nobody has picked it up: a guess, to be measured. */
 export const NOBODY_YET_MS = 90_000
 
+/** How long to wait, from `now`, before saying that nobody has taken a review handed over at `waitingSince`: what is left of `NOBODY_YET_MS`, none if it is spent. */
+export const lateDelayMs = (waitingSince: number, now: number): number => Math.max(0, NOBODY_YET_MS - (now - waitingSince))
+
+/** Whether the handover that began at `waitingSince` was not taken in time: `lateFor` is the handover that the timer fired for. */
+export const isLateFor = (lateFor: number | null, waitingSince: number | null): boolean => waitingSince !== null && lateFor === waitingSince
+
+/**
+ * What the page tells the reviewer to do while a program has been handed the review and has not taken it: the notice of the strip under the
+ * header, and of the dialog if it is opened meanwhile. After the late time it adds the way out, and once the reviewer has changed the review since the
+ * press (`changedSincePress`) it says that the changes are not in what was handed over, which is the review as it was then, and how to send them. After a
+ * review that a call took (`update`), what the reviewer is to tell the program is that changes were sent. `null` when no review waits.
+ */
+export const waitingWords = (waiting: boolean, late: boolean, target: string | null, changedSincePress = false, update = false): string | null => {
+  if (!waiting) return null
+  const first = update ? (late ? COPY.updateNobodyYet(target) : COPY.updateNotice(target)) : late ? COPY.nobodyYet(target) : COPY.waitingNotice(target)
+  return [first, changedSincePress && COPY.changedAfterPress].filter(Boolean).join(' ')
+}
+
 /**
  * How long the dialog says "Sent at ..." after a review was taken, with nothing changed since, before it closes by itself: a
  * guess, to be tried with readers as `NOBODY_YET_MS` is.
@@ -44,14 +62,28 @@ export function deliveryOf(host: string | null, submitLabel: string | null, subm
 
 export const buttonLabel = (delivery: Delivery | null): string => delivery?.label ?? EXPORT_LABEL
 
+/**
+ * The words of the button that sends the review. Before the first press, and for a delivery that cannot take changes, they are the program's own;
+ * after a press (`changes`, the number of changes since it) they say how many changes the next press will send, or that there are none.
+ */
+export const sendLabel = (delivery: Delivery | null, changes: number | null): string =>
+  changes === null ? buttonLabel(delivery) : changes > 0 ? COPY.sendChanges(changes) : COPY.inStep(delivery?.target ?? null)
+
+/**
+ * What the window says of a review that has nothing in it, no comment and no summary: what the program will get, or what the export will hold. A review with
+ * only a summary is not empty, and the window says nothing of it. `null` when there is nothing to say.
+ */
+export const emptyReviewNotice = (comments: number, summary: string, delivery: Delivery | null): string | null =>
+  comments > 0 || summary.trim() !== '' ? null : delivery ? COPY.noCommentsSending(delivery.target) : COPY.noCommentsExporting
+
 export type Tone = 'muted' | 'ok' | 'warn'
 
 /**
  * What the header says about the review. `handedOver` is a review that the page has given to a caller that has not taken it:
  * that is not sent yet, and the header does not say it is.
  */
-export function statusOf(review: Review, delivery: Delivery | null, handedOver: boolean, sentAt: string | null): { text: string; tone: Tone } {
-  if (handedOver) return { text: COPY.waiting(delivery?.target ?? null), tone: 'warn' }
+export function statusOf(review: Review, handedOver: boolean, sentAt: string | null): { text: string; tone: Tone } {
+  if (handedOver) return { text: COPY.waiting, tone: 'warn' }
   // Sent is said only of a review that reached its delivery; one that was copied or downloaded was exported, even on a page that has a delivery.
   if (sentAt !== null) return review.updatedAt > sentAt ? { text: COPY.editedSinceSent, tone: 'warn' } : { text: COPY.sent(formatTime(sentAt)), tone: 'ok' }
   if (!review.submittedAt) return { text: COPY.draft, tone: 'muted' }
@@ -81,6 +113,21 @@ export const toldOfCancel = (delivery: Delivery | null, review: Review, sentAt: 
   delivery === null || takenAsItIs(review, sentAt) ? undefined : delivery.target
 
 /**
+ * Whether a program waits for the review: it started the review and has taken nothing yet (`sentAt` is `null`). Skip review is offered then, and Back
+ * to start asks first, because the program would otherwise go on waiting for a review that the reviewer has left. After a take, edited since or not, the
+ * program's turn has ended and it looks again only when the reviewer says that they sent changes, so it is not waiting: nothing is offered and Back to
+ * start goes back at once (the review is kept in any case).
+ */
+export const programWaits = (delivery: Delivery | null, sentAt: string | null): boolean => delivery !== null && sentAt === null
+
+/**
+ * Whether the reviewer has to tell the program that they left the review, by skipping it or by discarding it: a script that drives the page looks at the
+ * page only when it is asked, so the start page says what to tell it; a receiver is told at once. It is one rule for both exits, so that when the page can
+ * wake the program by itself (a file that a waiting command watches), it is changed here and both banners go.
+ */
+export const mustTellProgram = (delivery: Delivery | null): boolean => delivery?.kind === 'caller'
+
+/**
  * What a caller said about what happens once its delivery has taken the review, with the defaults filled in: when the dialog closes
  * by itself, the words of the message that tells the reviewer (`null`: Jared's own), and whether the message is drawn as a banner. This is the one
  * place where the defaults are.
@@ -100,8 +147,17 @@ export function closeDelayMs(closes: Closes): number | null {
   return closes === 'never' ? null : closes === 'now' ? 0 : CLOSE_AFTER_SENT_MS
 }
 
+/**
+ * Whether the dialog closes at the press and leaves the rest to the page. A review that a program has to take (a caller that drives the page)
+ * can wait a long time, and the reviewer goes on working meanwhile, so the dialog does not wait with it: the strip under the header says what
+ * to do, and the message or the banner of a failure comes as they do for a dialog that the reviewer closed. A receiver answers within a moment,
+ * so the dialog waits for it and says "Sent at ..." as before. A caller that set `closes` to `never` wants the dialog kept, and has it.
+ */
+export const closesAtPress = (delivery: Delivery | null, closes: Closes): boolean => delivery?.kind === 'caller' && closes !== 'never'
+
 /** The message that tells the reviewer that a review was sent: the caller's words, as given, or Jared's own for whoever receives it. */
-export const sentMessage = (target: string | null, settings: AfterSentSettings): string => settings.message ?? COPY.reviewSent(target)
+export const sentMessage = (target: string | null, settings: AfterSentSettings, viaService = false): string =>
+  settings.message ?? (viaService ? COPY.reviewSentToService(target) : COPY.reviewSent(target))
 
 /**
  * What happens when a delivery has been taken (a receiver answered, or a script took the review). `closes`: the dialog is open and nothing
@@ -124,6 +180,12 @@ export function afterSent({ dialogOpen, unchanged, closes = 'moment' }: { dialog
 export function destinationLine(delivery: Delivery, address: string | null, review: Review, sentAt: string | null): string {
   return sentAt !== null && review.updatedAt <= sentAt ? COPY.wasSentTo(delivery.target) : COPY.willBeSentTo(delivery.target, address)
 }
+
+/**
+ * Whether a send that failed is told in the red banner: when nobody is looking at the dialog that would say it, and not when the reviewer gave the
+ * review up, because they know that it was not sent, and the banner would say that a different file was opened.
+ */
+export const failureIsTold = (dialogOpen: boolean, givenUp: boolean): boolean => !dialogOpen && !givenUp
 
 /** Whether pressing the button again can mend a failed send: not when a different file was opened, or when there is no review. */
 export const canTryAgain = (error: string): boolean => error !== COPY.fileChanged && error !== COPY.nothingToSend

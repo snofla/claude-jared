@@ -43,3 +43,19 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* With buttons beside the words: when the alert is too narrow for both, the buttons go under the words and not over them. */
+.jared-alert-with-actions {
+  flex-wrap: wrap;
+}
+
+.jared-alert-with-actions > .jared-alert-text {
+  flex: 1 1 14rem;
+}
+
+.jared-alert-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
