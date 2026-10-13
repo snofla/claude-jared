@@ -2,6 +2,15 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.15.1 — 2026-10-13
+
+- **Your saved reviews stay after the service stops.** Jared now opens at the same place in your session's browser each time the small service starts, so your saved reviews, the sets of files you kept and your **Viewed** marks are still under **Continue reviewing** after the service has been stopped, has ended by itself after half an hour, or has been replaced by an update of the plugin.
+  - If another program is using that place, Jared takes another one once, and the earlier reviews are not shown there.
+- **Several files open in one order, whichever way you name them.** When you pick or drop several files, they open in order of their whole paths, with capital and small letters together, so that `badge.css` stands beside `Badge.tsx` and not after every capitalised name. Claude sorts the files of a wildcard in the same way.
+  - A review that you saved keeps the order it had when you open the same files again.
+- **A dropped folder that the browser will not read is said to be unread.** When a browser will not read a dropped folder (Chrome does not, on a page opened from a file), Jared says that this browser did not let it read the folder and what to do instead, and not that there is no file to open.
+  - A folder that did not open among files that did is named in the line of what was left out, as a folder that could not be read.
+
 ## 0.15.0 — 2026-10-13
 
 - **You can review several files together.** Name them after `/jared:review` by wildcard or by a list, for example `/jared:review src/lib/*.ts` or `/jared:review a.ts, b.ts`, and they open as one review.

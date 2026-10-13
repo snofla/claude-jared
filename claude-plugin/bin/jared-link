@@ -34,7 +34,8 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       prints one sentence. The script is replaced after $JARED_BOOT_KEEP seconds (default 3600) by one that says that the review has expired, so that a page opened later can tell, and review folders
                       more than an hour old are removed the next time. The file may be as big as Jared opens.
   --page <path>       the one-file page (default: $JARED_PAGE; else app/jared.html in the plugin, which a published copy has;
-                      else dist-single/jared.html of the repository that this plugin is in, which npm run build:single makes)
+                      else dist-single/jared.html of the repository that this plugin is in, which npm run build:single makes; a copy that the app makes
+                      from the Jared repository's marketplace is not in the repository, and needs the page at app/jared.html or in $JARED_PAGE)
 
   --serve             make the review folder as --file does, make sure that the Jared service is running, and print the address
                       http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. Give it 2 to 100 files, one after another, to review them together: each is read as UTF-8 text, no name may be given twice, and several files go with --serve only, not with --file, a link or --rev. The
@@ -49,7 +50,9 @@ The request also names Claude as the one to tell (submitTarget), which only chan
   --review-file       for --serve: the page sends the review to the service, which writes it as the file review.json of the review's folder
                       (see --wait), instead of keeping it for a script that drives the page: the page is given the address of its folder
                       in jared-boot.js, as window.__JARED_SERVICE, after the request
-  --port <number>     the port for a service that has to be started (default: any free port); for --serve only
+  --port <number>     the port for a service that has to be started. Default: the port that the last service had (the helper keeps it in the file "port" in the cache folder, so that
+                      the page has the same origin, and so the same saved reviews, after a restart), or any free port when that one is taken or there is none. A port given here
+                      is used as it is and is not kept. For --serve only
   --wait <review>     wait for the review that the page of a review made with --serve sends to the service, and print one line of JSON
                       and end with a status, as the receiver's wait does. <review> is the address that --serve printed, or the name of the
                       review's folder, or its path. The service writes each review that the page sends as the file review.json of the folder, whole,
@@ -349,7 +352,21 @@ service_started() {
   if service_running; then end_service; fi
   idle=${JARED_SERVICE_IDLE:-1800}
   case $idle in '' | *[!0-9]*) idle=1800 ;; esac
-  started=$(perl - "$base" "$idle" "${port:-0}" "$ownver" <<'PERL'
+  # The port: the one that --port asks for, which is not kept; else the one the last start was given, from the file "port", when that is a port (a whole
+  # number from 1024 to 65535), so that the page has the same origin, and so the same saved reviews, after the service has been stopped or has ended by
+  # itself; else any free port. A kept port that cannot be had is given up for any free port, and that one is kept.
+  want=${port:-0}
+  fallback=0
+  if [ -z "$port" ]; then
+    kept=
+    if [ -f "$base/port" ]; then { read -r kept < "$base/port"; } 2> /dev/null || :; fi
+    case $kept in '' | *[!0-9]*) ;; *)
+      if [ "${#kept}" -le 5 ] && [ "$kept" -ge 1024 ] && [ "$kept" -le 65535 ]; then want=$kept; fi
+      ;;
+    esac
+    fallback=1
+  fi
+  started=$(perl - "$base" "$idle" "$want" "$ownver" "$fallback" <<'PERL'
     use strict;
     use warnings;
     use IO::Socket::INET;
@@ -358,12 +375,23 @@ service_started() {
     use JSON::PP;
     use Fcntl qw(:flock);
     use B ();
-    my ($base, $idle, $want, $version) = @ARGV;
+    my ($base, $idle, $want, $version, $fallback) = @ARGV;
     open(my $rnd, "<:raw", "/dev/urandom") or exit 8;
     (read($rnd, my $bytes, 16) // 0) == 16 or exit 8;
     close $rnd;
     my $token = unpack("H*", $bytes);
-    my $srv = IO::Socket::INET->new(Listen => 20, LocalAddr => "127.0.0.1", LocalPort => $want, ReuseAddr => 1) or exit 8;
+    # A kept port that anything answers on is taken, whatever it is bound to: on macOS a program that listens on all addresses does not stop a bind to
+    # 127.0.0.1, and the service would take its loopback traffic from it. The service of an earlier version that is still going down answers too.
+    if ($fallback && $want) {
+      my $busy = IO::Socket::INET->new(PeerAddr => "127.0.0.1", PeerPort => $want, Timeout => 1);
+      if ($busy) {
+        close $busy;
+        $want = 0;
+      }
+    }
+    my $srv = IO::Socket::INET->new(Listen => 20, LocalAddr => "127.0.0.1", LocalPort => $want, ReuseAddr => 1)
+      || ($fallback && $want && IO::Socket::INET->new(Listen => 20, LocalAddr => "127.0.0.1", LocalPort => 0, ReuseAddr => 1))
+      or exit 8;
     my $port = $srv->sockport;
     my $state = "$base/service";
     my $daemon = 0;
@@ -579,6 +607,11 @@ service_started() {
 PERL
   )
   code=$?
+  # The port that this start was given is kept for the next one, unless it was asked for with --port. It is written under the lock, to a file of its own
+  # that is then renamed, so that a helper never reads half of it.
+  if [ "$code" = 0 ] && [ -z "$port" ]; then
+    printf '%s\n' "${started%% *}" > "$base/port.$$" 2> /dev/null && { mv -f "$base/port.$$" "$base/port" 2> /dev/null || rm -f "$base/port.$$"; }
+  fi
   if [ "$locked" = 1 ]; then rmdir "$base/service.lock" 2> /dev/null; fi
   [ "$code" = 0 ] || return 1
   read -r svc_port svc_token <<EOF
@@ -872,11 +905,12 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
 
   if [ -z "$page" ]; then
     here=$(cd "$(dirname "$0")" 2> /dev/null && pwd)
-    # A published copy of the plugin carries the page, at app/jared.html; in the repository it is the one that npm run build:single made.
+    # A published copy of the plugin carries the page, at app/jared.html; in the repository it is the one that npm run build:single made; a copy that the app
+    # makes from the repository's marketplace has neither.
     page=$here/../app/jared.html
     [ -f "$page" ] || page=$here/../../dist-single/jared.html
   fi
-  { [ -f "$page" ] && [ -r "$page" ]; } || fail "The one-file page is not at \"$page\". Reinstall the plugin, or, in the Jared source, build it with npm run build:single, or give --page <path>." 6
+  { [ -f "$page" ] && [ -r "$page" ]; } || fail "The one-file page is not at \"$page\". A published copy of the plugin has it: reinstall the plugin. A copy that the app made from the Jared repository's own marketplace does not: build the page in the Jared source (npm run build:single), then put it at app/jared.html in the plugin's folder, or give its path in \$JARED_PAGE or with --page <path>." 6
 
   cache_base
   umask 077

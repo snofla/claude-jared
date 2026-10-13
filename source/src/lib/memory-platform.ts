@@ -15,6 +15,8 @@ export interface MemoryPicked {
 export interface MemoryPickedMany {
   files: MemoryPicked[]
   unread?: number
+  /** The folders of the pick that the browser would not read, as `ReadMany` has them. */
+  unreadFolders?: string[]
 }
 
 export interface MemoryPlatformOptions {
@@ -164,8 +166,8 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
       },
       capture: (drop) => drop,
       readMany: async (picked) => {
-        const { files, unread } = picked as MemoryPickedMany
-        return { unread: unread ?? 0, files: files.map(({ name, text }) => ({ name, text, size: new TextEncoder().encode(text).length })) }
+        const { files, unread, unreadFolders } = picked as MemoryPickedMany
+        return { unread: unread ?? 0, files: files.map(({ name, text }) => ({ name, text, size: new TextEncoder().encode(text).length })), ...(unreadFolders?.length ? { unreadFolders } : {}) }
       },
     },
     submit: {

@@ -103,11 +103,13 @@ function refusal(plan: Extract<SetPlan, { kind: 'refused' }>): string {
   const reason =
     plan.reason === 'nothing'
       ? COPY.setNothing
-      : plan.reason === 'too-many'
-        ? COPY.setTooMany(plan.count, MAX_SET_FILES)
-        : plan.reason === 'too-many-found'
-          ? COPY.setTooManyFound(MAX_SCANNED, MAX_SET_FILES)
-          : COPY.setTooBigTogether(formatBytes(MAX_SET_BYTES))
+      : plan.reason === 'folder'
+        ? COPY.setFolderNotRead
+        : plan.reason === 'too-many'
+          ? COPY.setTooMany(plan.count, MAX_SET_FILES)
+          : plan.reason === 'too-many-found'
+            ? COPY.setTooManyFound(MAX_SCANNED, MAX_SET_FILES)
+            : COPY.setTooBigTogether(formatBytes(MAX_SET_BYTES))
   return plan.leftOut.length > 0 ? `${reason} ${COPY.setLeftOut(plan.leftOut, formatBytes(MAX_BYTES))}` : reason
 }
 
@@ -118,7 +120,7 @@ function refusal(plan: Extract<SetPlan, { kind: 'refused' }>): string {
  */
 export async function openPickedMany(platform: Platform, session: OpenSession, picked: Picked): Promise<OpenOutcome> {
   const read = await platform.input.readMany(picked)
-  if (read.files.length === 1 && read.unread === 0) {
+  if (read.files.length === 1 && read.unread === 0 && !read.unreadFolders?.length) {
     const only = read.files[0]
     if (only.text === null) return { kind: 'refused', error: only.size > MAX_BYTES ? tooBig(only.name, only.size) : COPY.couldNotRead(only.name) }
     return openText(platform, session, only.name, only.text)

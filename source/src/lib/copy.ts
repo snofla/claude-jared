@@ -101,16 +101,18 @@ export const COPY = {
   forgetSet: 'Forget these files and their review',
   /**
    * What the page leaves out of a pick of several files, in one line: each name with the reason, and, after five, how many more. The reasons are
-   * five separate messages; `limit` is the size of the largest file, as the page writes sizes. English-only list, like the plurals around it.
+   * six separate messages; `limit` is the size of the largest file, as the page writes sizes. English-only list, like the plurals around it.
    */
-  setLeftOut: (items: ReadonlyArray<{ name: string; why: 'not-text' | 'too-big' | 'empty' | 'unreadable' | 'same-name' }>, limit: string): string => {
-    const reason = { 'not-text': 'not text', 'too-big': `more than ${limit}`, empty: 'empty', unreadable: 'could not be read', 'same-name': 'same name as another file' } as const
+  setLeftOut: (items: ReadonlyArray<{ name: string; why: 'not-text' | 'too-big' | 'empty' | 'unreadable' | 'unreadable-folder' | 'same-name' }>, limit: string): string => {
+    const reason = { 'not-text': 'not text', 'too-big': `more than ${limit}`, empty: 'empty', unreadable: 'could not be read', 'unreadable-folder': 'folder could not be read', 'same-name': 'same name as another file' } as const
     const shown = items.slice(0, 5).map((item) => `${item.name} (${reason[item.why]})`)
     const rest = items.length - shown.length
     return `Left out: ${listed(rest > 0 ? [...shown, `${rest} more`] : shown)}.`
   },
   /** Why a pick of several files opens none: no file that is text, more files than a review holds, or more text than a review holds. `limit` and `most` are sizes, as the page writes them. */
   setNothing: 'There is no file here that Jared can open.',
+  /** A dropped folder that the browser would not read, when no file could be opened: what happened to Jared, and what to do. It names no cause, since only the failure of the read is known. */
+  setFolderNotRead: 'This browser did not let Jared read that folder. Choose the files in it instead, or open Jared from Claude: a review that Claude starts may read a folder where this page could not.',
   /** A picked file that the browser would not read. */
   couldNotRead: (name: string): string => `Could not read ${name}.`,
   setTooMany: (count: number, most: number): string => `${count} files are more than the ${most} that Jared opens in one review. Choose fewer files.`,

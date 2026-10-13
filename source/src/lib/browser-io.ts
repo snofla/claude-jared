@@ -39,7 +39,7 @@ const BATCH = 25
 type Found = { name: string; file: File | null }
 
 /** The files below a dropped folder, or the file itself: named by their path from the dropped folder, and without what starts with a dot or is node_modules. */
-async function collect(entry: FileSystemEntry, found: Found[]): Promise<void> {
+async function collect(entry: FileSystemEntry, found: Found[], unreadFolders: string[]): Promise<void> {
   if (found.length > MAX_SCANNED) return
   if (entry.isFile) {
     const file = await new Promise<File | null>((resolve) => (entry as FileSystemFileEntry).file(resolve, () => resolve(null)))
@@ -47,11 +47,16 @@ async function collect(entry: FileSystemEntry, found: Found[]): Promise<void> {
     return
   }
   const reader = (entry as FileSystemDirectoryEntry).createReader()
-  // A directory is read in batches, and an empty batch is the end of it.
+  // A directory is read in batches, and an empty batch is the end of it. A batch that cannot be read is not the end: the folder is said to be unread (Chrome
+  // does that on a page opened from a file), what its earlier batches gave is kept, and the rest of the drop is read.
   for (;;) {
-    const batch = await new Promise<FileSystemEntry[]>((resolve) => reader.readEntries(resolve, () => resolve([])))
+    const batch = await new Promise<FileSystemEntry[] | null>((resolve) => reader.readEntries(resolve, () => resolve(null)))
+    if (batch === null) {
+      unreadFolders.push(pathOfEntry(entry.fullPath))
+      return
+    }
     if (batch.length === 0) return
-    for (const child of batch) if (!skippedInFolder(child.name)) await collect(child, found)
+    for (const child of batch) if (!skippedInFolder(child.name)) await collect(child, found, unreadFolders)
   }
 }
 
@@ -69,8 +74,9 @@ async function readFound({ name, file }: Found): Promise<ReadFile> {
 /** Read what was picked (a list of files) or dropped (files, or folders and files): every file with its name, size and text; at most `MAX_SCANNED` are looked at. */
 export async function readMany(picked: File[] | Capture): Promise<ReadMany> {
   const found: Found[] = []
+  const unreadFolders: string[] = []
   if (Array.isArray(picked)) for (const file of picked) found.push({ name: file.name, file })
-  else if (picked.entries.some((entry) => entry.isDirectory)) for (const entry of picked.entries) await collect(entry, found)
+  else if (picked.entries.some((entry) => entry.isDirectory)) for (const entry of picked.entries) await collect(entry, found, unreadFolders)
   else for (const file of picked.files) found.push({ name: file.name, file })
   // Read a few at a time, and stop when the text that can be opened is more than a review holds: the plan is then too much whatever the rest is, and the
   // rest is not read into memory (a folder of a thousand files of 300 KB is 300 MB).
@@ -85,7 +91,7 @@ export async function readMany(picked: File[] | Capture): Promise<ReadMany> {
       counted.add(file.name)
     }
   }
-  return { files, unread: found.length - files.length }
+  return { files, unread: found.length - files.length, ...(unreadFolders.length > 0 ? { unreadFolders } : {}) }
 }
 
 export function downloadText(filename: string, text: string, mime: string): void {

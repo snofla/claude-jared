@@ -67,7 +67,7 @@ Press **Submit review**. The review goes to the session. If the session has not 
 
 Claude waits for the review for up to ten minutes. If the time runs out, Claude Code may show the wait as a command that "failed with exit code 3". That is the end of the wait and not a failure: press the button when you are ready, and tell the session.
 
-Your session's browser gets Jared from a small service on your computer. It stops by itself after half an hour without use. To see whether it is running, and when it ends, run `/jared:status`. To stop it sooner, run `/jared:stop`.
+Your session's browser gets Jared from a small service on your computer. It stops by itself after half an hour without use. Jared opens at the same place in your browser each time, so your saved reviews are normally still under **Continue reviewing** after it has stopped. To see whether it is running, and when it ends, run `/jared:status`. To stop it sooner, run `/jared:stop`.
 
 ### In your own browser
 
