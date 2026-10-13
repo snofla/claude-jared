@@ -10,10 +10,11 @@ usage() {
   cat <<'USAGE'
 Usage: jared-link <file> [--jared <address>] [--open] [--max <bytes>]
        jared-link <file> --file [--page <path>] [--max <bytes>]
-       jared-link <file> --serve [--label <words>] [--closes moment|now|never] [--message <words>] [--banner true|false]
-                               [--review-file] [--port <number>] [--page <path>] [--max <bytes>]
+       jared-link <file>... --serve [--label <words>] [--closes moment|now|never] [--message <words>] [--banner true|false]
+                                    [--review-file] [--port <number>] [--page <path>] [--max <bytes>]
        jared-link --rev <commit> [--max <bytes>]
        jared-link --wait <review> [--after <revision>] [--timeout <seconds>]
+       jared-link --check <file>... [--max <bytes>]
        jared-link --stop
        jared-link --status
        jared-link --version
@@ -24,7 +25,8 @@ The request also names Claude as the one to tell (submitTarget), which only chan
 
   --jared <address>   where Jared runs (default: $JARED_URL, or http://localhost:5173/)
   --open              open the link in the system's browser (open, or xdg-open) instead of printing it; prints one sentence
-  --max <bytes>       the largest file to take (default 524288, which is what Jared opens)
+  --max <bytes>       the largest file to take (default 524288, which is what Jared opens); with --serve and several files, also
+                      the most that all of them are together
 
   --file              open <file> in the one-file Jared (a page that opens from a path) instead of making a link. The helper makes
                       a folder for this review in the cache ($JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared), puts the page
@@ -35,7 +37,7 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       else dist-single/jared.html of the repository that this plugin is in, which npm run build:single makes)
 
   --serve             make the review folder as --file does, make sure that the Jared service is running, and print the address
-                      http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. The
+                      http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. Give it 2 to 100 files, one after another, to review them together: each is read as UTF-8 text, no name may be given twice, and several files go with --serve only, not with --file, a link or --rev. The
                       service is one process that every review uses: it listens on 127.0.0.1 only, answers GET and HEAD for the
                       page and the script of a review folder, takes one POST for each review folder, at
                       /<secret>/<review folder>/message, which writes the review in that folder as the file review.json, and
@@ -59,6 +61,11 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       asks the service for its status now and then, which is a request that puts off the service's end.
   --after <revision>  for --wait: only a revision above this one counts (default 0): after taking revision 2, wait again with --after 2
   --timeout <seconds> for --wait: how long to wait (default 600; 1 to 3600)
+  --check             open nothing, and say what Jared would take of the files given (their paths one after another), as one line of JSON. For each file, in the order given: its
+                      name, its size in bytes and its status: ok; too-big (over --max; it is not read); empty (nothing, only spaces, or only a byte order mark); not-text (not UTF-8, or a NUL
+                      byte in the first 8,000 characters); unreadable; or same-name (a path given twice: the later one). Then use, the names that can be opened, in order; fit, how many of the
+                      first of them Jared takes in one review (at most 100 files, and --max bytes in all; it stops at the first that does not fit); bytes, their size; all, the size of every name in use;
+                      stoppedBy, the limit that stopped the count (bytes, files, or null when all fit); and limit. Exit status 0 whenever the line is printed, 1 when the files could not be checked (nothing is printed), 2 for a mistake in the command line
   --stop              stop the Jared service, if one is running, and say so and how long it had run
   --status            say whether the Jared service is running, on which port, since when, which version of the plugin started it, and when it ends by itself; asking is a
                       request like any other, which puts the end off
@@ -74,8 +81,8 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       but --max, and it changes nothing in the repository.
 
 Exit status of --wait: 0 a review is in the file, 3 none came in time, 4 the reviewer gave the review up, 5 the reviewer skipped it, 1 an error, 2 a mistake in the command line.
-Exit status of the others: 0 done; 1 the file cannot be read, or, with --rev, the commit cannot be taken (the message says why); 2 a mistake in the command line; 3 too big (for a link, or for Jared);
-4 the file is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
+Exit status of the others (--check: 0 whenever the line is printed, 1 when the files could not be checked, 2 a mistake in the command line): 0 done; 1 a file cannot be read, or, with --rev, the commit cannot be taken (the message says why); 2 a mistake in the command line (also a name given twice, and several files without --serve or with --rev); 3 too big (for a link, or for Jared: one file, or several together, or more than 100 files);
+4 a file is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
 6 --file or --serve, and the one-file page is not there; 7 --file, --serve or --rev, and a folder or a file for the review cannot be made;
 8 --serve, and the service could not be started (the port is in use, or sockets cannot be opened).
 USAGE
@@ -87,6 +94,9 @@ fail() {
 }
 
 file=
+filelist=
+nl='
+'
 jared=${JARED_URL:-http://localhost:5173/}
 open=0
 fileway=0
@@ -94,6 +104,7 @@ serve=0
 stop=0
 status=0
 version=0
+check=0
 rev=
 waitfor=
 after=
@@ -117,6 +128,7 @@ while [ $# -gt 0 ]; do
     --stop) stop=1 ;;
     --status) status=1 ;;
     --version) version=1 ;;
+    --check) check=1 ;;
     --rev)
       [ $# -ge 2 ] && [ -n "$2" ] || fail '--rev needs a commit.' 2
       rev=$2
@@ -182,16 +194,23 @@ while [ $# -gt 0 ]; do
       ;;
     --*) fail "Unknown option \"$1\"." 2 ;;
     *)
-      [ -z "$file" ] || fail 'Give one file, not several.' 2
-      file=$1
+      case $1 in *[[:cntrl:]]*) fail 'A file name has a control character in it.' 2 ;; esac
+      [ -n "$file" ] || file=$1
+      filelist=$filelist$1$nl
       ;;
   esac
   shift
 done
+nfiles=$(printf '%s' "$filelist" | wc -l | tr -d ' ')
 
 case $max in '' | *[!0-9]*) fail '--max must be a whole number of bytes.' 2 ;; esac
 case $jared in http://* | https://*) ;; *) fail 'The address of Jared must be an http or https address.' 2 ;; esac
 [ $((stop + status + version)) -le 1 ] || fail 'Give one of --stop, --status and --version, and not more.' 2
+if [ "$check" = 1 ]; then
+  { [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$reviewfile" = 0 ] && [ -z "$waitfor$rev$label$closes$message$banner$port$page$after$timeout" ]; } \
+    || fail '--check takes files and --max, and nothing else.' 2
+  [ -n "$file" ] || fail '--check needs one or more files.' 2
+fi
 if [ "$stop" = 1 ]; then
   { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--stop takes nothing else.' 2
 fi
@@ -202,6 +221,7 @@ if [ "$version" = 1 ]; then
   { [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ -z "$file" ]; } || fail '--version takes no file and no option.' 2
 fi
 { [ "$serve" = 0 ] || [ "$fileway" = 0 ]; } || fail '--serve and --file are two ways: give one.' 2
+{ [ "$nfiles" -le 1 ] || [ "$serve" = 1 ] || [ "$check" = 1 ]; } || fail 'Several files go with --serve only.' 2
 if [ -n "$waitfor" ]; then
   { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ -z "$rev$label$closes$message$banner$port" ]; } \
     || fail '--wait takes a review, --after and --timeout, and nothing else.' 2
@@ -427,8 +447,12 @@ service_started() {
       my ($revision, $review, $changes);
       if ($kind eq "submit") {
         $review = $data->{review};
-        ref $review eq "HASH" && defined $review->{version} && !ref $review->{version} && $review->{version} eq "1" && ref $review->{comments} eq "ARRAY"
-          && ref $review->{file} eq "HASH" && defined $review->{file}{name} && !ref $review->{file}{name} or return $bad->("The review is not a review of version 1.");
+        # Version 1 is a review of one file (a "file" with a name), version 2 of a set of 2 to 100 files (a "files" list of entries that each have a name).
+        my $named = sub { ref $_[0] eq "HASH" && defined $_[0]{name} && !ref $_[0]{name} };
+        ref $review eq "HASH" && defined $review->{version} && !ref $review->{version} && ref $review->{comments} eq "ARRAY"
+          && (($review->{version} eq "1" && $named->($review->{file}))
+            || ($review->{version} eq "2" && ref $review->{files} eq "ARRAY" && @{$review->{files}} >= 2 && @{$review->{files}} <= 100 && !grep { !$named->($_) } @{$review->{files}}))
+          or return $bad->("The review is not a review of version 1 or 2.");
         # The file says that a review has ended by a top-level status, so a review that has one of its own would end the review.
         exists $review->{status} and return $bad->("The review has a status.");
         # What the page says differs from the review that was taken before it: the ids of comments, a help and never the truth. It is kept beside the revision.
@@ -750,14 +774,86 @@ if [ -n "$rev" ]; then
   exit 0
 fi
 
-[ -n "$file" ] || { usage >&2; exit 2; }
-[ -f "$file" ] && [ -r "$file" ] || fail "\"$file\" is not a file that can be read." 1
+# --check: what Jared would take of these files, as one line of JSON, and nothing opened: the size and the status of each, in the order given, the names that
+# can be opened, and how many of the first of them fit in one review (at most 100 files and $max bytes in all).
+if [ "$check" = 1 ]; then
+  set -f
+  IFS=$nl
+  set -- $filelist
+  unset IFS
+  set +f
+  perl -MJSON::PP -e '
+    my ($max, @paths) = @ARGV;
+    my (%seen, @files, @use);
+    for my $path (@paths) {
+      next if $path eq "";
+      my $name = $path;
+      utf8::decode($name);
+      my ($size, $status) = (0, "ok");
+      if ($seen{$path}++) {
+        $size = -s $path // 0;
+        $status = "same-name";
+      } elsif (!(-f $path && -r _)) {
+        $status = "unreadable";
+      } else {
+        $size = -s _;
+        if ($size > $max) {
+          $status = "too-big";
+        } elsif (!open(my $in, "<:raw", $path)) {
+          $status = "unreadable";
+        } else {
+          local $/;
+          my $text = <$in>;
+          close $in;
+          if (!defined $text || !utf8::decode($text) || substr($text, 0, 8000) =~ /\0/) { $status = "not-text" }
+          elsif ($text =~ /\A[\s\x{FEFF}]*\z/) { $status = "empty" }
+        }
+      }
+      push @files, { name => $name, size => $size + 0, status => $status };
+      push @use, { name => $name, size => $size } if $status eq "ok";
+    }
+    my ($fit, $bytes, $all, $stopped) = (0, 0, 0, undef);
+    $all += $_->{size} for @use;
+    for my $u (@use) {
+      if ($fit >= 100) { $stopped = "files"; last }
+      if ($bytes + $u->{size} > $max) { $stopped = "bytes"; last }
+      $fit++;
+      $bytes += $u->{size};
+    }
+    print JSON::PP->new->ascii->canonical->encode({ files => \@files, use => [map { $_->{name} } @use], fit => $fit + 0, bytes => $bytes + 0, all => $all + 0, stoppedBy => $stopped, limit => { files => 100, bytes => $max + 0 } }), "\n";
+  ' "$max" "$@" || fail 'The files could not be checked.' 1
+  exit 0
+fi
 
-size=$(wc -c < "$file" | tr -d ' ')
-if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
-  [ "$size" -le "$max" ] || fail "\"$file\" is $size bytes, and $max is the most that Jared opens." 3
+[ -n "$file" ] || { usage >&2; exit 2; }
+
+if [ "$nfiles" -gt 1 ]; then
+  # A set: 2 to 100 files, none more than $max bytes and all together not more than $max, which is what Jared opens for one review. A name given twice
+  # is refused, and so is the first file that goes over a limit, by its name.
+  [ "$nfiles" -le 100 ] || fail "$nfiles files are more than the 100 that Jared opens in one review." 3
+  seen=$nl
+  total=0
+  while IFS= read -r one; do
+    [ -n "$one" ] || continue
+    [ -f "$one" ] && [ -r "$one" ] || fail "\"$one\" is not a file that can be read." 1
+    case $seen in *"$nl$one$nl"*) fail "\"$one\" is given twice." 2 ;; esac
+    seen=$seen$one$nl
+    one_size=$(wc -c < "$one" | tr -d ' ')
+    [ "$one_size" -le "$max" ] || fail "\"$one\" is $one_size bytes, and $max is the most that Jared opens." 3
+    total=$((total + one_size))
+    [ "$total" -le "$max" ] || fail "With \"$one\" the files are $total bytes, and $max is the most that Jared opens in one review." 3
+  done <<LIST
+$filelist
+LIST
 else
-  [ "$size" -le "$max" ] || fail "\"$file\" is $size bytes, and $max is the most for a link." 3
+  [ -f "$file" ] && [ -r "$file" ] || fail "\"$file\" is not a file that can be read." 1
+
+  size=$(wc -c < "$file" | tr -d ' ')
+  if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
+    [ "$size" -le "$max" ] || fail "\"$file\" is $size bytes, and $max is the most that Jared opens." 3
+  else
+    [ "$size" -le "$max" ] || fail "\"$file\" is $size bytes, and $max is the most for a link." 3
+  fi
 fi
 
 name=$(basename "$file")
@@ -798,13 +894,29 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
 
   # The request, as the script that sets window.__JARED_BOOT: perl does the JSON, in ASCII, so that no byte of the file is for the browser to decode.
   # With --serve the request also has the button's words and what happens when the review is taken (empty words are left out).
-  perl -MJSON::PP -e '
-    my ($file, $name, $now, $out, $label, $closes, $message, $banner) = @ARGV;
-    open(my $in, "<:raw", $file) or exit 1;
-    local $/;
-    my $text = <$in>;
-    utf8::decode($text) or exit 4;
-    my $request = { protocol => 1, id => "boot1", type => "open", name => $name, text => $text, review => undef, now => $now, submitTarget => "Claude" };
+  # One file is the request's name and text; several are its files, each with its name as it was given, and a file that is not text is named on stdout.
+  set -f
+  IFS=$nl
+  set -- $filelist
+  unset IFS
+  set +f
+  bad=$(perl -MJSON::PP -e '
+    my ($now, $out, $label, $closes, $message, $banner, $name, @files) = @ARGV;
+    my $read = sub {
+      my ($path) = @_;
+      open(my $in, "<:raw", $path) or exit 1;
+      local $/;
+      my $text = <$in>;
+      utf8::decode($text) or do { print $path; exit 4 };
+      return $text;
+    };
+    my $request = { protocol => 1, id => "boot1", type => "open", review => undef, now => $now, submitTarget => "Claude" };
+    if (@files > 1) {
+      $request->{files} = [map { my $path = $_; utf8::decode($path); +{ name => $path, text => $read->($_) } } @files];
+    } else {
+      $request->{name} = $name;
+      $request->{text} = $read->($files[0]);
+    }
     # The words as the page takes them (src/engine/protocol.ts, words): trimmed, something that can be seen in them, no control or
     # invisible characters but a joiner and a non-joiner, at most $max characters, and (here) not starting with two hyphens.
     my $clean = sub {
@@ -830,11 +942,11 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
     open(my $o, ">", $out) or exit 7;
     print $o "window.__JARED_BOOT = $json\n";
     close($o) or exit 7;
-  ' "$file" "$name" "$now" "$dir/jared-boot.js" "$label" "$closes" "$message" "$banner" || {
+  ' "$now" "$dir/jared-boot.js" "$label" "$closes" "$message" "$banner" "$name" "$@") || {
     status=$?
     rm -rf "$dir"
     case $status in
-      4) fail "\"$file\" is not text in UTF-8." 4 ;;
+      4) fail "\"${bad:-$file}\" is not text in UTF-8." 4 ;;
       7) fail "The script for the review cannot be written in \"$dir\"." 7 ;;
       9) fail '--label must be 1 to 40 characters, with no control or invisible characters, and must not start with two hyphens.' 2 ;;
       10) fail '--message must be 1 to 80 characters, with no control or invisible characters, and must not start with two hyphens.' 2 ;;

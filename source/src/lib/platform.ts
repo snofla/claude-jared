@@ -1,4 +1,5 @@
-import type { Review, SourceFile } from '../types.ts'
+import type { Review, SetReview, SourceFile } from '../types.ts'
+import type { ReadMany } from './set-pick.ts'
 import type { OpenResult } from './source.ts'
 import type { RecentEntry } from './storage.ts'
 import type { Theme } from './theme.ts'
@@ -19,6 +20,12 @@ export interface KeptSession {
   review: Review
 }
 
+/** The files of a review of several files and the review, as kept between visits: the files in the order of the review. */
+export interface KeptSet {
+  files: SourceFile[]
+  review: SetReview
+}
+
 /** What is kept between visits: the reviews, the sources of the files, and which file was open last. */
 export interface ReviewsService {
   /** The file that was open at the last visit, with its review. */
@@ -29,9 +36,23 @@ export interface ReviewsService {
   session(hash: string): KeptSession | null
   saveSource(file: SourceFile): void
   saveReview(review: Review): void
+  /** The set that was open at the last visit, with its review; `null` when the last was a single file or none. */
+  lastSet(): KeptSet | null
+  /** The review of the set with this hash (`setHashOf`), or `null`; for restoring it when the same files are opened again. */
+  setReview(setHash: string): SetReview | null
+  /** The set with this hash, with its review, when all its files are kept. */
+  savedSet(setHash: string): KeptSet | null
+  /** Keep the files of a set and its review; `files` are in the order of `review.files`. */
+  saveSet(files: readonly SourceFile[], review: SetReview): void
+  /** Keep the review of a set again after a change. */
+  saveSetReview(review: SetReview): void
   /** Which file is the last one open; `null` when none is. */
   setLast(hash: string | null): void
+  /** Forget a file, or a set (by its hash): its review and its place in the list. The text of a file stays while another review that is kept has it. */
   forget(hash: string): void
+  /** The ids of the files of a review that the reviewer marked as viewed: their own place in the review, not part of it. */
+  viewed(hash: string): string[]
+  setViewed(hash: string, ids: readonly string[]): void
   /** Whether the last attempt to keep something failed (a full or blocked store); `subscribe` tells when that changes. */
   failed(): boolean
   subscribe(listener: () => void): () => void
@@ -48,6 +69,10 @@ export interface Platform {
   /** Getting a source file in: the platform reads what it picked, and gives its name and text, or why it cannot be opened. */
   input: {
     read(picked: Picked): Promise<OpenResult>
+    /** What a drop holds, taken at once, in the event itself (a browser empties it afterwards), so that `readMany` can read it later. */
+    capture(drop: unknown): Picked
+    /** Read what was picked or dropped when it may be several files or a folder: each file with its name, size and text (not read when over the size). */
+    readMany(picked: Picked): Promise<ReadMany>
   }
   /** Getting a review out, as a file or as text on the clipboard; `copy` says whether it worked. */
   submit: {

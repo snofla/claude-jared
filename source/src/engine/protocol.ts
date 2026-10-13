@@ -1,5 +1,5 @@
-import type { Review } from '../types.ts'
-import { parseReview } from '../lib/review.ts'
+import type { Review, SetReview } from '../types.ts'
+import { parseAnyReview, parseReview, parseSetReview } from '../lib/review.ts'
 
 /**
  * The messages between a caller and the Jared engine. Every message is a JSON object, so it can cross a function
@@ -46,7 +46,8 @@ export interface SubmitOptions {
 }
 
 /**
- * Open a file from its name and text. With a `review`, that review is restored; it must be for this very text.
+ * Open a file from its name and text, or 2 or more files from their names and texts (`files`; exactly one of the two forms). With a `review`, that
+ * review is restored; it must be for this very text (for several files, version 2 and for those same files, which may be in another order).
  *
  * `submitLabel` and `submitTarget` are what the caller tells Jared to call the delivery of the review: the words on the button
  * (none: "Export review") and the name of whoever is to receive it (none: "the program that opened Jared"). The engine keeps
@@ -54,16 +55,35 @@ export interface SubmitOptions {
  * `submitOptions` is what the caller says about what happens once the review has been taken (see `SubmitOptions`); it is kept and given
  * back in the same way.
  */
-export interface OpenRequest extends RequestBase {
+interface OpenBase extends RequestBase {
   type: 'open'
-  name: string
-  text: string
-  review: Review | null
   now: string
   submitLabel?: string
   submitTarget?: string
   submitOptions?: SubmitOptions
 }
+
+export interface OpenOneRequest extends OpenBase {
+  name: string
+  text: string
+  review: Review | null
+  files?: undefined
+}
+
+/** A file to be opened with others: its name as the caller calls it (unique among them) and its text. */
+export interface OpenFile {
+  name: string
+  text: string
+}
+
+export interface OpenSetRequest extends OpenBase {
+  files: OpenFile[]
+  review: SetReview | null
+  name?: undefined
+  text?: undefined
+}
+
+export type OpenRequest = OpenOneRequest | OpenSetRequest
 
 export interface CloseRequest extends RequestBase {
   type: 'close'
@@ -83,9 +103,14 @@ export interface SetLanguageRequest extends RequestBase {
   language: string
 }
 
-/** Add a comment, or replace the one whose id is `commentId`. Lines are numbered from 1, the range is inclusive. */
+/**
+ * Add a comment, or replace the one whose id is `commentId` (in a review of several files, the one of that id in the file `file`). Lines are numbered
+ * from 1, the range is inclusive, and in a review of several files they are the lines of that file.
+ */
 export interface SaveCommentRequest extends RequestBase {
   type: 'saveComment'
+  /** The id of the file the comment is about: needed for a review of several files; for one file it may be left out, or be "f1". */
+  file?: string
   commentId: string
   startLine: number
   endLine: number
@@ -112,12 +137,12 @@ export interface MarkSubmittedRequest extends RequestBase {
 }
 
 /**
- * Hand over a finished review of the open file. It must be for this very text; it is kept as it is, marked submitted at
- * `now`. Unlike `open` it does not replace the file, so a review for another file is refused instead of opened.
+ * Hand over a finished review of the open file, or of the open files (version 2). It must be for this very text; it is kept as it is, marked
+ * submitted at `now`. Unlike `open` it does not replace the file, so a review for another file is refused instead of opened.
  */
 export interface SubmitRequest extends RequestBase {
   type: 'submit'
-  review: Review
+  review: Review | SetReview
   now: string
 }
 
@@ -169,23 +194,50 @@ export interface SessionFile {
   hash: string
 }
 
+/** A file of several that are open: what `SessionFile` has, and the id that its comments name it by. */
+export interface SetSessionFile extends SessionFile {
+  id: string
+}
+
 /** The state after a request: what is open and its review, or both `null`. The text is not sent back. */
 export interface SessionReply extends ReplyBase {
   replyTo: string
   type: 'session'
   file: SessionFile | null
   review: Review | null
+  files?: undefined
+}
+
+/** The state after a request when several files are open: no `file`, their `files` in the order of the review, and its version-2 `review`. */
+export interface SetSessionReply extends ReplyBase {
+  replyTo: string
+  type: 'session'
+  file: null
+  files: SetSessionFile[]
+  review: SetReview
+}
+
+interface SourceDelivery {
+  submitLabel?: string
+  submitTarget?: string
+  submitOptions?: SubmitOptions
 }
 
 /** The open file and its text, with the words for delivering its review if the caller gave any (see `OpenRequest`). */
-export interface SourceReply extends ReplyBase {
+export interface SourceReply extends ReplyBase, SourceDelivery {
   replyTo: string
   type: 'source'
   file: SessionFile
   text: string
-  submitLabel?: string
-  submitTarget?: string
-  submitOptions?: SubmitOptions
+  files?: undefined
+}
+
+/** The open files and the text of each, in the order of the review, with the words for delivering its review if the caller gave any. */
+export interface SetSourceReply extends ReplyBase, SourceDelivery {
+  replyTo: string
+  type: 'source'
+  file: null
+  files: Array<SetSessionFile & { text: string }>
 }
 
 export interface ExportedReply extends ReplyBase {
@@ -209,6 +261,8 @@ export const ERROR_CODES = [
   'bad-language',
   'empty-comment',
   'no-such-comment',
+  'no-such-file',
+  'too-big',
   'declined',
 ] as const
 
@@ -220,7 +274,7 @@ export interface ErrorReply extends ReplyBase {
   message: string
 }
 
-export type Reply = SessionReply | SourceReply | ExportedReply | ErrorReply
+export type Reply = SessionReply | SetSessionReply | SourceReply | SetSourceReply | ExportedReply | ErrorReply
 
 /**
  * A message from the engine's side that answers no request: something happened that its peer may want to know. `submitted` is sent when
@@ -234,7 +288,8 @@ export interface SubmittedEvent extends Envelope {
    * no call had taken still has its number, so that a gap tells the program that one was replaced.
    */
   revision: number
-  review: Review
+  /** The review as it is: of one file (version 1) or of a set of files (version 2). */
+  review: Review | SetReview
   /** What differs from the last review that a program took. A help and never the truth, which is `review`; absent when the page does not say. */
   changes?: ReviewChanges
 }
@@ -376,31 +431,43 @@ export function parseRequest(value: unknown): ParsedRequest {
 
   switch (type as RequestType) {
     case 'open': {
-      if (!isNonEmpty(value.name)) return bad('name', 'a non-empty string')
-      if (!isString(value.text)) return bad('text', 'a string')
       if (!isNonEmpty(value.now)) return bad('now', 'a non-empty string')
-      let review: Review | null = null
-      if (value.review !== undefined && value.review !== null) {
-        review = parseReview(value.review)
-        if (review === null) return fail(id, 'invalid-review', 'open: "review" is not a Jared review of version 1.')
+      const several = value.files !== undefined && value.files !== null
+      if (several && (value.name !== undefined || value.text !== undefined)) return bad('files', 'left out when "name" and "text" are given: a request opens one file or several, not both')
+      let files: OpenFile[] | null = null
+      if (several) {
+        const given = value.files
+        if (!Array.isArray(given)) return bad('files', 'a list of files, each with a name and a text')
+        if (given.length < 2) return bad('files', 'a list of 2 or more files: one file is opened with "name" and "text"')
+        const names = new Set<string>()
+        files = []
+        for (const entry of given) {
+          if (!isRecord(entry) || !isNonEmpty(entry.name) || !isString(entry.text)) return bad('files', 'a list of files, each with a non-empty name and a text')
+          if (names.has(entry.name)) return bad('files', `a list of files with names that differ: "${entry.name}" is there twice`)
+          names.add(entry.name)
+          files.push({ name: entry.name, text: entry.text })
+        }
+      } else {
+        if (!isNonEmpty(value.name)) return bad('name', 'a non-empty string')
+        if (!isString(value.text)) return bad('text', 'a string')
       }
+      const hasReview = value.review !== undefined && value.review !== null
+      const review = hasReview ? (files ? parseSetReview(value.review) : parseReview(value.review)) : null
+      if (hasReview && review === null) return fail(id, 'invalid-review', `open: "review" is not a Jared review of version ${files ? 2 : 1}.`)
       const submitLabel = words(value.submitLabel)
       if (submitLabel === false) return bad('submitLabel', `a string of 1 to ${MAX_WORDS} characters with no control characters, line breaks or invisible characters`)
       const submitTarget = words(value.submitTarget)
       if (submitTarget === false) return bad('submitTarget', `a string of 1 to ${MAX_WORDS} characters with no control characters, line breaks or invisible characters`)
       const options = submitOptions(value.submitOptions)
       if (!options.ok) return bad(options.field, options.wanted)
-      return ok({
-        ...base,
-        type: 'open',
-        name: value.name,
-        text: value.text,
-        review,
+      const delivery = {
         now: value.now,
         ...(submitLabel === undefined ? {} : { submitLabel }),
         ...(submitTarget === undefined ? {} : { submitTarget }),
         ...(options.options === undefined ? {} : { submitOptions: options.options }),
-      })
+      }
+      if (files) return ok({ ...base, type: 'open', files, review: review as SetReview | null, ...delivery })
+      return ok({ ...base, type: 'open', name: value.name as string, text: value.text as string, review: review as Review | null, ...delivery })
     }
     case 'close':
       return ok({ ...base, type: 'close' })
@@ -412,6 +479,7 @@ export function parseRequest(value: unknown): ParsedRequest {
       if (!isNonEmpty(value.language)) return bad('language', 'a non-empty string')
       return ok({ ...base, type: 'setLanguage', language: value.language })
     case 'saveComment': {
+      if (value.file !== undefined && value.file !== null && !isNonEmpty(value.file)) return bad('file', 'a non-empty string')
       if (!isNonEmpty(value.commentId)) return bad('commentId', 'a non-empty string')
       if (!isLine(value.startLine)) return bad('startLine', 'a whole number from 1')
       if (!isLine(value.endLine)) return bad('endLine', 'a whole number from 1')
@@ -421,6 +489,7 @@ export function parseRequest(value: unknown): ParsedRequest {
       return ok({
         ...base,
         type: 'saveComment',
+        ...(isNonEmpty(value.file) ? { file: value.file } : {}),
         commentId: value.commentId,
         startLine: value.startLine,
         endLine: value.endLine,
@@ -442,8 +511,8 @@ export function parseRequest(value: unknown): ParsedRequest {
       return ok({ ...base, type: 'markSubmitted', now: value.now })
     case 'submit': {
       if (!isNonEmpty(value.now)) return bad('now', 'a non-empty string')
-      const review = parseReview(value.review)
-      if (review === null) return fail(id, 'invalid-review', 'submit: "review" is not a Jared review of version 1.')
+      const review = parseAnyReview(value.review)
+      if (review === null) return fail(id, 'invalid-review', 'submit: "review" is not a Jared review of version 1 or 2.')
       return ok({ ...base, type: 'submit', review, now: value.now })
     }
     case 'export':

@@ -19,11 +19,11 @@ import {
   type Format,
   type SendResult,
 } from '../state/submit'
-import type { Review } from '../types'
+import type { AnyReview } from '../types'
 import { Button, Dialog, DialogFoot, Disclosure, IconCheck, IconCopy, IconDownload, IconSend, LiveStatus, Notice, SegmentedControl, TextField, type SegmentedOption } from '../ui'
 
 interface Props {
-  review: Review
+  review: AnyReview
   onSummary: (summary: string) => void
   /** Called once the review has actually left the app by being copied or downloaded: a delivery is marked by whoever runs it. */
   onSubmitted: () => void
@@ -161,7 +161,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
       title={label}
       subtitle={
         <>
-          <code>{review.file.name}</code> · {COPY.commentCount(count)}
+          <code>{review.version === 2 ? COPY.fileCount(review.files.length) : review.file.name}</code> · {COPY.commentCount(count)}
         </>
       }
       closeLabel={COPY.close}

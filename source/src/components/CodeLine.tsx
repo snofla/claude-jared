@@ -6,6 +6,8 @@ import { Tokens } from './Tokens'
 
 interface Props {
   n: number
+  /** The number shown in the gutter and named in the add button, when it is not `n`: in a set of files the number of the line in its own file. */
+  shownAs?: number
   text: string
   tokens: LineTokens | null
   /** The line is too long to colour; a note says so. */
@@ -27,6 +29,7 @@ const LONG_LINE_NOTE = 'Not highlighted: this line is too long'
 /** One source line. Memoised on booleans so a selection change only re-renders the lines it touches. */
 export const CodeLine = memo(function CodeLine({
   n,
+  shownAs = n,
   text,
   tokens,
   uncoloured,
@@ -50,13 +53,13 @@ export const CodeLine = memo(function CodeLine({
           type="button"
           className="gutter-add"
           tabIndex={-1}
-          aria-label={`Comment on line ${n}`}
+          aria-label={`Comment on line ${shownAs}`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => onAdd(n)}
         >
           <IconPlus />
         </button>
-        <span className="num">{n}</span>
+        <span className="num">{shownAs}</span>
       </div>
       <div className="code" data-note={uncoloured ? LONG_LINE_NOTE : undefined}>
         <Tokens tokens={tokens} fallback={text} />

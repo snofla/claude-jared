@@ -1,5 +1,7 @@
+import { Fragment } from 'react'
 import { COPY } from '../lib/copy'
 import type { Mark } from '../lib/changes'
+import { fileAt, type FileEntry } from '../lib/files'
 import { commentLabel } from '../lib/review'
 import type { ReviewComment } from '../types'
 import { Badge, IconButton, IconMessage, IconX, Kbd } from '../ui'
@@ -12,9 +14,12 @@ interface Props {
   onHover: (id: string | null) => void
   onJump: (comment: ReviewComment) => void
   onClose: () => void
+  /** The files of the diff, when it has a list: the comments are then grouped under the file that each is on. */
+  files?: readonly FileEntry[]
 }
 
-export function ReviewPanel({ comments, marks, hoveredId, onHover, onJump, onClose }: Props) {
+export function ReviewPanel({ comments, marks, hoveredId, onHover, onJump, onClose, files = [] }: Props) {
+  const grouped = files.length > 1
   return (
     <aside className="side" aria-label="Review comments">
       <header className="side-head">
@@ -36,8 +41,20 @@ export function ReviewPanel({ comments, marks, hoveredId, onHover, onJump, onClo
         </div>
       ) : (
         <ol className="side-list">
-          {comments.map((c) => (
-            <li key={c.id}>
+          {comments.map((c, i) => {
+            const file = grouped ? fileAt(files, c.startLine) : -1
+            const heading = grouped && file >= 0 && (i === 0 || fileAt(files, comments[i - 1].startLine) !== file)
+            const path = file >= 0 ? files[file].path : ''
+            const slash = path.lastIndexOf('/') + 1
+            return (
+            <Fragment key={c.id}>
+              {heading && (
+                <li className="side-group">
+                  <span>{path.slice(0, slash)}</span>
+                  <span className="files-name">{path.slice(slash)}</span>
+                </li>
+              )}
+              <li>
               <button
                 type="button"
                 className={c.id === hoveredId ? 'side-item is-active' : 'side-item'}
@@ -54,8 +71,10 @@ export function ReviewPanel({ comments, marks, hoveredId, onHover, onJump, onClo
                 </span>
                 <span className="side-item-text">{c.comment || 'Suggested change'}</span>
               </button>
-            </li>
-          ))}
+              </li>
+            </Fragment>
+            )
+          })}
         </ol>
       )}
     </aside>

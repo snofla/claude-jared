@@ -1,5 +1,5 @@
 import type { ReviewChanges } from '../engine/protocol.ts'
-import type { Review } from '../types.ts'
+import type { AnyReview } from '../types.ts'
 
 /**
  * What changed in a review since a press, for the button that sends the changes and for the list that marks them. A press sends the whole review; this
@@ -11,7 +11,7 @@ export interface Snapshot {
   comments: Readonly<Record<string, string>>
 }
 
-export const snapshotOf = (review: Review): Snapshot => ({ summary: review.summary, comments: Object.fromEntries(review.comments.map((c) => [c.id, c.updatedAt])) })
+export const snapshotOf = (review: AnyReview): Snapshot => ({ summary: review.summary, comments: Object.fromEntries(review.comments.map((c) => [c.id, c.updatedAt])) })
 
 /** What differs from a snapshot: the ids of the comments that are new, edited or deleted, and whether the summary changed. */
 export interface Delta {
@@ -25,7 +25,7 @@ export interface Delta {
  * What differs between `before` and the review as it is. `before` is `null` when nothing was sent: then every comment is new, and the summary changed
  * if there is one. New and edited comments come in the order of the review, deleted ones in the order of what was sent.
  */
-export function deltaSince(before: Snapshot | null, review: Review): Delta {
+export function deltaSince(before: Snapshot | null, review: AnyReview): Delta {
   const was = before?.comments ?? {}
   const fresh: string[] = []
   const edited: string[] = []

@@ -4,7 +4,7 @@ Jared /ˈdʒær.əd/ is not Gerrit /ˈɡɛr.ɪt/.
 
 Syntax-highlighted, file-based review for Claude.
 
-A Claude Code plugin. It opens a source file, a diff or a commit in Jared, a line-by-line review app, and brings your review back into the session.
+A Claude Code plugin. It opens a source file, several files, a diff or a commit in Jared, a line-by-line review app, and brings your review back into the session.
 
 ## What it looks like
 
@@ -15,7 +15,7 @@ A file in Jared, with two comments. The first has a suggested change.
   <img alt="Jared showing retry.ts, a short TypeScript file, with two comments, each under the lines that it is about, the first with a suggested change, and a list of the comments on the right." src="screenshots/review-light.png">
 </picture>
 
-A diff is shown as changes. A comment on it says which file it is about, and which lines of the old and the new version.
+A diff is shown as changes. A comment on it says which file it is about, and which lines of the old and the new version. A diff of several files has a list of its files beside the code, where you can mark each file as viewed.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="screenshots/diff-dark.png">
@@ -49,6 +49,12 @@ In a Claude Code session, give the plugin a source file, a diff or a commit:
 
 A commit is opened as its change, with its message above it; the plugin looks it up in the git repository of the folder your session is in.
 
+To review several files together, give a wildcard, a list separated by spaces or commas, or both: `/jared:review src/lib/*.ts`, or `/jared:review a.ts, b.ts`. Put a path with a space in quotes. Claude finds the files and tells you how many it found, and asks before it opens more than 20. It leaves out a file that is empty, is not text, or is more than 512 KB, and says so.
+
+Jared opens at most 100 files, and 512 KB in all. When the files are together more than that, Claude says the total and offers the first files that fit. Several files open only in your session's browser: if your session has none, or you gave `--jared` or set `jared_url`, Claude says so and stops.
+
+You can also pick several files on the start page, or drop several files or a folder on it. They open in one scroll, with a list of the files beside the code (the **Files** button), where you can mark each file as **Viewed**.
+
 You can also ask in words: "review `path/to/file.ts` in Jared" or "review commit `74664abd` in Jared".
 
 To see which version of the plugin you have, run `/jared:version`.
@@ -58,6 +64,8 @@ Jared opens with your file, in your session's browser if it has one (the browser
 ### In your session's browser
 
 Press **Submit review**. The review goes to the session. If the session has not answered in a minute, tell it that you pressed the button.
+
+Claude waits for the review for up to ten minutes. If the time runs out, Claude Code may show the wait as a command that "failed with exit code 3". That is the end of the wait and not a failure: press the button when you are ready, and tell the session.
 
 Your session's browser gets Jared from a small service on your computer. It stops by itself after half an hour without use. To see whether it is running, and when it ends, run `/jared:status`. To stop it sooner, run `/jared:stop`.
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ParsedDiff } from '../lib/diff'
+import type { SetLayout } from '../lib/set-view'
 import { tokenize, tokenizeDiff, type LineTokens } from '../lib/highlight'
 
 /**
@@ -39,6 +40,33 @@ export function useDiffTokens(diff: ParsedDiff | null, lines: readonly string[])
   }, [diff, lines])
 
   return diff && result?.diff === diff ? result.tokens : null
+}
+
+/**
+ * The colours of every row of a set of files, each file coloured as its own language: one entry for each row, `null` for a header, until they
+ * are ready (the rows are drawn plain first), and `null` for the whole while they are not.
+ */
+export function useSetTokens(layout: SetLayout | null): Array<LineTokens | null> | null {
+  const [result, setResult] = useState<{ layout: SetLayout; tokens: Array<LineTokens | null> } | null>(null)
+
+  useEffect(() => {
+    if (!layout) return
+    let cancelled = false
+    void Promise.all(layout.texts.map((text) => tokenize(text.lines.join('\n'), text.language))).then((perFile) => {
+      if (cancelled) return
+      const tokens: Array<LineTokens | null> = []
+      perFile.forEach((fileTokens, file) => {
+        tokens.push(null)
+        layout.texts[file].lines.forEach((_, line) => tokens.push(fileTokens?.[line] ?? null))
+      })
+      setResult({ layout, tokens })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [layout])
+
+  return layout && result?.layout === layout ? result.tokens : null
 }
 
 /** Always-current ref to a value, for event handlers that must stay referentially stable. */

@@ -2,6 +2,24 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.15.0 — 2026-10-13
+
+- **You can review several files together.** Name them after `/jared:review` by wildcard or by a list, for example `/jared:review src/lib/*.ts` or `/jared:review a.ts, b.ts`, and they open as one review.
+  - Claude says in one line how many files it found. It asks before it opens more than 20 files, and when a pattern matches nothing, and it leaves out a file that is empty, is not text or is too big, and says so.
+  - Jared opens at most 100 files, and 512 KB in all. When the files are together more than that, Claude says the total and offers the first files that fit, and does not offer to open them all.
+  - Several files open in your session's browser only. If your session has no browser, or you set an address for Jared, Claude says so and stops.
+  - In Jared the files are in one scroll, each with a header that has its name, its language and a **Viewed** button. You can comment on any of them. A diff among them is shown as plain lines, coloured as a diff.
+  - The review is kept: **Continue reviewing** on the start page lists it as "3 files", with the names of the first.
+  - When the review comes back, Claude works through it file by file, and edits only the file that each comment names.
+- **A list of the files, beside the code, for several files and for a diff of several files.** The new **Files** button in the header opens it.
+  - Each file shows its number of comments and a tick for **Viewed**, and, for a file of a diff, its status: added, modified, deleted or renamed. On a narrow window the list is a rail or a drawer.
+  - `]` and `[` go to the next and the previous file, and `V` marks the one in view. Each file's header has a **Viewed** button too, and the comments are grouped by file.
+  - For a diff of several files, the header says, for example, "3 files, +18 −7".
+- **On the start page you can pick several files at once, and drop several files or a folder.** They open together as one review, in order of path.
+  - A folder's files are named by their path. Files and folders whose names start with a dot, and `node_modules`, are skipped.
+  - A line says which files were left out. If there are more than 100 files, or more than 512 KB in all, none is opened and a message says so.
+- **Claude now says beforehand that a wait that ran out of time is not a failure.** Claude Code shows such a wait, and one that ended because you discarded or skipped the review, as a command that "failed with exit code 3". Claude says in advance that it is the end of the wait.
+
 ## 0.14.1 — 2026-10-12
 
 - After an update of the plugin, the next review replaces a Jared service that an earlier version started with one of the new version, so you need not run `/jared:stop` yourself; this holds for the update to 0.14.1 from any earlier version. A service of a newer version is never replaced by an older one. `/jared:status` also says which version of the plugin started the service.

@@ -1,5 +1,5 @@
 import { COPY } from '../lib/copy.ts'
-import type { Review } from '../types.ts'
+import type { AnyReview } from '../types.ts'
 import { httpClientTransport } from './http-client.ts'
 import { PROTOCOL_VERSION, submitOptions, words, type ErrorReply, type Reply, type ReviewChanges, type SubmitOptions } from './protocol.ts'
 import { createClient, type RequestInput } from './transport.ts'
@@ -59,7 +59,7 @@ export async function fetchSource(address: string, options: ReceiverClientOption
   if ('error' in answer) return { ok: false, error: answer.error }
   const { reply } = answer
   // The words are shown as they come, so they are checked as a request's are: what will not do is no words, and settings that will not do are no settings.
-  if (reply.type === 'source') {
+  if (reply.type === 'source' && reply.file !== null) {
     const options = submitOptions(reply.submitOptions)
     return { ok: true, name: reply.file.name, text: reply.text, submitLabel: words(reply.submitLabel) || null, submitTarget: words(reply.submitTarget) || null, submitOptions: (options.ok && options.options) || null }
   }
@@ -67,7 +67,7 @@ export async function fetchSource(address: string, options: ReceiverClientOption
 }
 
 /** Hand a finished review to a receiver. It is delivered once the receiver has said so, not before. */
-export async function sendReview(address: string, review: Review, now: string, options: ReceiverClientOptions = {}): Promise<SendResult> {
+export async function sendReview(address: string, review: AnyReview, now: string, options: ReceiverClientOptions = {}): Promise<SendResult> {
   const answer = await ask(address, { type: 'submit', review, now }, options)
   if ('error' in answer) return { ok: false, error: answer.error }
   const { reply } = answer
@@ -120,7 +120,7 @@ function serviceAnswer(value: unknown, delivered: boolean): { ok: true; revision
  * the reply says how. It is delivered once the service has said that the file is written, not before, which is not that a program has taken it. It is
  * not tried again.
  */
-export async function sendToService(address: string, review: Review, now: string, options: ServiceSendOptions = {}): Promise<ServiceSendResult> {
+export async function sendToService(address: string, review: AnyReview, now: string, options: ServiceSendOptions = {}): Promise<ServiceSendResult> {
   const target = options.target ?? null
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS)

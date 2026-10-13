@@ -11,3 +11,11 @@ export function hashString(str: string, seed = 0): string {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
 }
+
+/**
+ * The key of a review of several files: the small hash of its files' `name`, a NUL and their hash, one line for each, sorted. The same files in
+ * another order are the same review, so the key does not depend on the order they were opened in.
+ */
+export function setHashOf(files: ReadonlyArray<{ name: string; hash: string }>): string {
+  return hashString(files.map((file) => `${file.name}\0${file.hash}`).sort().join('\n'))
+}

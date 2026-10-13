@@ -1,5 +1,5 @@
 import type { Closes, SubmitOptions } from '../engine/protocol.ts'
-import type { Review } from '../types.ts'
+import type { AnyReview } from '../types.ts'
 import { COPY } from './copy.ts'
 import { hasUnsubmittedChanges } from './review.ts'
 import { formatTime } from './util.ts'
@@ -82,7 +82,7 @@ export type Tone = 'muted' | 'ok' | 'warn'
  * What the header says about the review. `handedOver` is a review that the page has given to a caller that has not taken it:
  * that is not sent yet, and the header does not say it is.
  */
-export function statusOf(review: Review, handedOver: boolean, sentAt: string | null): { text: string; tone: Tone } {
+export function statusOf(review: AnyReview, handedOver: boolean, sentAt: string | null): { text: string; tone: Tone } {
   if (handedOver) return { text: COPY.waiting, tone: 'warn' }
   // Sent is said only of a review that reached its delivery; one that was copied or downloaded was exported, even on a page that has a delivery.
   if (sentAt !== null) return review.updatedAt > sentAt ? { text: COPY.editedSinceSent, tone: 'warn' } : { text: COPY.sent(formatTime(sentAt)), tone: 'ok' }
@@ -92,24 +92,24 @@ export function statusOf(review: Review, handedOver: boolean, sentAt: string | n
 }
 
 /** The dialog's line about the last delivery, or `null` before there was one: the time, and that later changes have not gone. */
-export function lastDelivery(review: Review, delivery: Delivery | null, sentAt: string | null): string | null {
+export function lastDelivery(review: AnyReview, delivery: Delivery | null, sentAt: string | null): string | null {
   if (!delivery || sentAt === null) return null
   const time = formatTime(sentAt)
   return review.updatedAt > sentAt ? COPY.sentAtChanged(time) : COPY.sentAt(time)
 }
 
 /** Whether the review is as it was when the button was pressed, at `pressedAt`: nothing was changed since (`updatedAt` moves with every edit, and sending does not move it). */
-export const sentUnchanged = (review: Review, pressedAt: string): boolean => review.updatedAt <= pressedAt
+export const sentUnchanged = (review: AnyReview, pressedAt: string): boolean => review.updatedAt <= pressedAt
 
 /** Whether a program has taken the review as it is: it was sent, at `sentAt`, and nothing has changed since. The review has then been delivered, and the dialog does not offer to give it up. */
-export const takenAsItIs = (review: Review, sentAt: string | null): boolean => sentAt !== null && sentUnchanged(review, sentAt)
+export const takenAsItIs = (review: AnyReview, sentAt: string | null): boolean => sentAt !== null && sentUnchanged(review, sentAt)
 
 /**
  * Whom giving the review up tells: the program that started the review, as long as it has not taken the review as it is. The answer is the name
  * that the program gave for whoever receives the review, `null` when it gave none, and `undefined` when nobody is told: no program started the
  * review, or the one that did has the review as it is and waits for nothing.
  */
-export const toldOfCancel = (delivery: Delivery | null, review: Review, sentAt: string | null): string | null | undefined =>
+export const toldOfCancel = (delivery: Delivery | null, review: AnyReview, sentAt: string | null): string | null | undefined =>
   delivery === null || takenAsItIs(review, sentAt) ? undefined : delivery.target
 
 /**
@@ -177,7 +177,7 @@ export function afterSent({ dialogOpen, unchanged, closes = 'moment' }: { dialog
  * The dialog's line under the preview: where the review will go, and, once it has been taken with nothing changed since, where it went. After
  * a change it is the future again, which is true of the changed review, and the footer says that the changes have not been sent.
  */
-export function destinationLine(delivery: Delivery, address: string | null, review: Review, sentAt: string | null): string {
+export function destinationLine(delivery: Delivery, address: string | null, review: AnyReview, sentAt: string | null): string {
   return sentAt !== null && review.updatedAt <= sentAt ? COPY.wasSentTo(delivery.target) : COPY.willBeSentTo(delivery.target, address)
 }
 

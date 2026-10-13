@@ -2,7 +2,8 @@ import { memo, type PointerEvent } from 'react'
 import { bodyOf, rowName, signOf, type RowKind } from '../lib/diff'
 import type { LineTokens } from '../lib/highlight'
 import { cx } from '../lib/util'
-import { Badge, IconPlus } from '../ui'
+import { COPY } from '../lib/copy'
+import { Badge, Button, IconCheck, IconPlus } from '../ui'
 import { Tokens } from './Tokens'
 
 interface Props {
@@ -16,6 +17,11 @@ interface Props {
   /** For a file's header row: what it says, and a word for what happened to the file. */
   title: string | null
   badge: string | null
+  /** For a file's header row when the diff has a list of files: whether the reviewer has marked the file as viewed, and the press that toggles it. Both are left out for every other row. */
+  viewed?: boolean
+  onViewed?: () => void
+  /** The name of that button for a screen reader: it says the file, as the visible word does not. */
+  viewedName?: string
   /** The code is too long to colour; a note says so. */
   uncoloured: boolean
   selected: boolean
@@ -42,6 +48,9 @@ export const DiffLine = memo(function DiffLine({
   tokens,
   title,
   badge,
+  viewed,
+  onViewed,
+  viewedName,
   uncoloured,
   selected,
   reviewed,
@@ -81,6 +90,20 @@ export const DiffLine = memo(function DiffLine({
           <>
             <span className="file-path">{title}</span>
             {badge && <Badge className="file-badge">{badge}</Badge>}
+            {onViewed && (
+              <Button
+                size="sm"
+                className="file-viewed"
+                pressed={viewed}
+                aria-label={viewedName}
+                icon={<IconCheck />}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={onViewed}
+              >
+                {COPY.viewed}
+              </Button>
+            )}
           </>
         ) : isCode ? (
           <Tokens tokens={tokens} fallback={bodyOf(text, kind)} />

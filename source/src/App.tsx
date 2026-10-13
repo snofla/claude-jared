@@ -3,6 +3,7 @@ import { CodeViewer } from './components/CodeViewer'
 import { CancelDialog } from './components/CancelDialog'
 import { SkipDialog } from './components/SkipDialog'
 import { DeliveryStrip } from './components/DeliveryStrip'
+import { FilesPane } from './components/FilesPane'
 import { Header } from './components/Header'
 import { Alert, IconCheck } from './ui'
 import { Landing } from './components/Landing'
@@ -16,11 +17,13 @@ import { useMediaQuery } from './hooks/useMediaQuery'
 import { usePlatform } from './hooks/usePlatform'
 import { useLate } from './hooks/useLate'
 import { usePageApi } from './hooks/usePageApi'
-import { useDiffTokens, useLatest, useTokens } from './hooks/useTokens'
+import { useDiffTokens, useLatest, useSetTokens, useTokens } from './hooks/useTokens'
 import { COPY } from './lib/copy'
 import { changeCount, deltaSince, marksOf, noteOf, snapshotOf, type Mark, type Snapshot } from './lib/changes'
 import { afterSent, afterSentSettings, canTryAgain, closeDelayMs, closesAtPress, deliveryOf, failureIsTold, mustTellProgram, programWaits, sentMessage, sentUnchanged, takenAsItIs, toldOfCancel, waitingWords } from './lib/delivery'
 import { diffOf } from './lib/diff'
+import { setEntries, viewComments } from './lib/set-view'
+import { autoFilesMode, commentCounts, fileEntries, hasFileList, stepFile, toggled, totals, type FilesMode } from './lib/files'
 import { BOOT_EXPIRED_KEY, BOOT_KEY, bootExpired, readBoot, readFragment } from './lib/fragment-link'
 import { SERVICE_KEY, hostFromSearch, serviceAddress } from './lib/host-link'
 import type { Platform, Picked } from './lib/platform'
@@ -29,7 +32,7 @@ import { draftHasText } from './lib/review'
 import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/sample'
 import { buildSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
-import { cancelReview, closeFile, keepOpen, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openRecent, openText, replaceQuestion, type OpenOutcome } from './state/flows'
+import { cancelReview, closeFile, keepOpen, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
 import { expiredNotice } from './state/expired'
 import { emptyState, reducer, type AppState } from './state/reducer'
 import type { ReviewComment } from './types'
@@ -41,6 +44,8 @@ interface Notice {
 
 /** The width at which the comments panel stops being an overlay: the breakpoint of `.side` in styles.css. */
 const WIDE_QUERY = '(min-width: 900px)'
+/** The width from which the list of files is open as a column; from `WIDE_QUERY` it is a rail. */
+const OPEN_FILES_QUERY = '(min-width: 1180px)'
 const NO_LINES: string[] = [] // the same array each time, so that a hook that depends on it does not run again
 const NO_MARKS: ReadonlyMap<string, Mark> = new Map()
 
@@ -50,9 +55,9 @@ const STORAGE_WARNING: Notice = {
 }
 
 function init(platform: Platform): AppState {
-  const last = platform.reviews.last()
-  // The file that was open at the last visit comes back through the engine, as any file is opened.
-  return last ? reducer(emptyState, { type: 'open', name: last.file.name, text: last.file.content, review: last.review, now: platform.environment.now() }) : emptyState
+  // What was open at the last visit, a file or a set of files, comes back through the engine, as it is opened.
+  const last = restoreLast(platform)
+  return last ? reducer(emptyState, last) : emptyState
 }
 
 export default function App() {
@@ -113,7 +118,7 @@ export default function App() {
   const [dragActive, setDragActive] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
-  const [scrollRequest, setScrollRequest] = useState<{ line: number; nonce: number; comment?: string } | null>(null)
+  const [scrollRequest, setScrollRequest] = useState<{ line: number; nonce: number; comment?: string; block?: 'start' | 'center' } | null>(null)
   const [, refreshRecent] = useReducer((n: number) => n + 1, 0) // re-read the recent list after forgetting a file
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -125,9 +130,33 @@ export default function App() {
 
   // A text whose language is diff, and that has a hunk, is shown as a diff: then its colours come row by row, from the file each row is in.
   const diff = useMemo(() => (file ? diffOf(file.language, file.lines) : null), [file])
-  const fileTokens = useTokens(diff || !file ? null : file.content, file?.language ?? PLAIN_TEXT)
+  // Several files open together are drawn as one list of rows, a header for each file and then its lines; the comments are then in those rows too.
+  const layout = state.set?.layout ?? null
+  const comments = useMemo(() => (review ? (layout ? viewComments(layout, review.comments) : review.comments) : []), [review, layout])
+
+  // The list of the files of a diff of two files or more: how it is shown follows the window width until the reviewer chooses, and below the width of the
+  // comments panel it is a drawer, opened and closed by hand like that panel. The marks for the files that the reviewer has looked at are the page's own, kept by the review's hash.
+  const entries = useMemo(() => (layout ? setEntries(layout) : fileEntries(diff)), [layout, diff])
+  const hasList = hasFileList(entries)
+  const fileTotals = useMemo(() => totals(entries), [entries])
+  const roomToOpen = useMediaQuery(OPEN_FILES_QUERY)
+  const [filesChoice, setFilesChoice] = useState<FilesMode | null>(null)
+  const [filesDrawer, setFilesDrawer] = useState(false)
+  const filesMode = filesChoice ?? autoFilesMode(roomToOpen, wide)
+  const [fileInView, setFileInView] = useState(0)
+  const [viewedState, setViewedState] = useState<{ hash: string; ids: ReadonlySet<string> } | null>(null)
+  const hash = file?.hash ?? ''
+  const viewed = useMemo(
+    () => (viewedState && viewedState.hash === hash ? viewedState.ids : new Set(file ? services.reviews.viewed(hash) : [])),
+    [viewedState, hash, file, services],
+  )
+  // By their place in the diff, for the header of each file in the code: the marks themselves are kept by the ids that name the files.
+  const viewedFiles = useMemo(() => new Set(entries.flatMap((e, i) => (viewed.has(e.id) ? [i] : []))), [entries, viewed])
+  const fileCounts = useMemo(() => commentCounts(entries, comments), [entries, comments])
+  const fileTokens = useTokens(diff || layout || !file ? null : file.content, file?.language ?? PLAIN_TEXT)
   const diffTokens = useDiffTokens(diff, file?.lines ?? NO_LINES)
-  const tokens = diff ? diffTokens : fileTokens
+  const setTokens = useSetTokens(layout)
+  const tokens = layout ? setTokens : diff ? diffTokens : fileTokens
   const delivery = deliveryOf(sendTo, state.submitLabel, state.submitTarget)
   const sentTextRef = useLatest(sentText)
   // A message that replaces one is emptied before it is set, so that a second one with the same words is read again. One that comes when there
@@ -171,7 +200,7 @@ export default function App() {
     failedSend.current = null
     if (stale) setNotice((shown) => (shown === stale ? null : shown))
     const now = services.environment.now()
-    const hash = current.file.hash
+    const hash = stateRef.current.file?.hash ?? ''
     let outcome: { ok: true } | { ok: false; error: string }
     if (host) {
       outcome = await sendReview(host, current, now, { target: stateRef.current.submitTarget })
@@ -215,7 +244,7 @@ export default function App() {
     dispatch({ type: 'markSent', now, hash })
     // Edits made while the review was on its way have moved `updatedAt` past the time of the press; the state read here is from before `markSent`, which does not move it.
     const latest = stateRef.current.review
-    const unchanged = !!latest && latest.file.hash === hash && sentUnchanged(latest, now)
+    const unchanged = !!latest && stateRef.current.file?.hash === hash && sentUnchanged(latest, now)
     const settings = afterSentSettings(stateRef.current.submitOptions)
     const next = afterSent({ dialogOpen: submitOpenRef.current, unchanged, closes: settings.closes })
     if (next === 'tells') tellSent(sentMessage(stateRef.current.submitTarget, settings, viaService))
@@ -251,23 +280,36 @@ export default function App() {
   const banner = notice ?? (unsaved ? STORAGE_WARNING : null)
   const recent = file ? [] : services.reviews.recent()
 
-  // Every change to the review is persisted immediately.
+  // Every change to the review is persisted immediately. A set of files is kept whole the first time, with its texts, and then its review alone.
+  const keptSet = useRef<string | null>(null)
   useEffect(() => {
-    if (review) services.reviews.saveReview(review)
-  }, [review, services])
+    if (!review || !file) {
+      keptSet.current = null
+    } else if (review.version === 1) {
+      services.reviews.saveReview(review)
+    } else if (state.set) {
+      if (keptSet.current === file.hash) {
+        services.reviews.saveSetReview(review)
+      } else {
+        services.reviews.saveSet(state.set.files, review)
+        services.reviews.setLast(file.hash)
+        keptSet.current = file.hash
+      }
+    }
+  }, [review, file, state.set, services])
 
   // The protocol of the engine, for a script on the page: `window.jared.handleMessage(request)`.
   const applyRequest = usePageApi(
     state,
     dispatch,
-    (adoptedFile, another) => {
+    (adoptedFile, another, isSet) => {
       if (!adoptedFile) {
         closeFile(services)
         setSubmitOpen(false)
         clearSent()
         forgetPresses()
       } else if (another) {
-        keepOpen(services, adoptedFile) // as opening a file does
+        if (!isSet) keepOpen(services, adoptedFile) // as opening a file does; a set is kept by the effect that keeps the review
         setNotice(null)
         clearSent()
         forgetPresses()
@@ -289,7 +331,7 @@ export default function App() {
   const applyOutcome = useCallback((outcome: OpenOutcome | { kind: 'gone' }) => {
     if (outcome.kind === 'refused') setNotice({ kind: 'error', text: outcome.error })
     else if (outcome.kind === 'opened') {
-      setNotice(null)
+      setNotice(outcome.note ? { kind: 'warn', text: outcome.note } : null)
       clearSent()
       forgetPresses()
       setHoveredId(null)
@@ -301,7 +343,12 @@ export default function App() {
     async (picked: Picked) => applyOutcome(await openPicked(services, stateRef.current, picked)),
     [services, stateRef, applyOutcome],
   )
-  const openFileRef = useLatest(openPickedFile)
+  // What was picked or dropped when it may be several files or a folder: one file opens as it always did.
+  const openPickedSet = useCallback(
+    async (picked: Picked) => applyOutcome(await openPickedMany(services, stateRef.current, picked)),
+    [services, stateRef, applyOutcome],
+  )
+  const openSetRef = useLatest(openPickedSet)
 
   // Open the file that the receiver of the link holds, as a dropped file would be opened.
   useEffect(() => {
@@ -365,9 +412,10 @@ export default function App() {
   }, [applyRequest, stateRef, services])
 
   const onPickerChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const picked = e.target.files?.[0]
-    e.target.value = '' // allow picking the same file again
-    if (picked) void openPickedFile(picked)
+    const picked = Array.from(e.target.files ?? [])
+    e.target.value = '' // allow picking the same files again
+    if (picked.length === 1) void openPickedFile(picked[0])
+    else if (picked.length > 1) void openPickedSet(picked)
   }
 
   // Drop a file anywhere in the window.
@@ -393,8 +441,8 @@ export default function App() {
       depth = 0
       setDragActive(false)
       if (submitOpenRef.current) return // the dialog is modal: nothing behind it can be replaced
-      const dropped = e.dataTransfer?.files[0]
-      if (dropped) void openFileRef.current(dropped)
+      // Taken now, in the event: a browser empties the drop once the event is over, and a folder is read after.
+      if (e.dataTransfer?.files.length) void openSetRef.current(services.input.capture(e.dataTransfer))
     }
     window.addEventListener('dragenter', onEnter)
     window.addEventListener('dragleave', onLeave)
@@ -406,7 +454,7 @@ export default function App() {
       window.removeEventListener('dragover', onOver)
       window.removeEventListener('drop', onDrop)
     }
-  }, [openFileRef, submitOpenRef])
+  }, [openSetRef, services, submitOpenRef])
 
   const goHome = () => {
     // A program that waits for the review is not left waiting in silence: the question comes first, and Skip review is its way out.
@@ -482,6 +530,29 @@ export default function App() {
   const openSample = (name: string, text: string) => applyOutcome(openFile(services, stateRef.current, buildSource(name, text)))
 
   // The comments panel goes to the first line of a comment; a click on a comment bar in the gutter goes to its card, which is under its last line.
+  const goToFile = (index: number) => {
+    const entry = entries[index]
+    if (!entry) return
+    setScrollRequest({ line: entry.startRow, nonce: Date.now(), block: 'start' })
+    setFileInView(index)
+    setFilesDrawer(false)
+  }
+  const toggleViewed = (index: number) => {
+    const entry = entries[index]
+    if (!entry) return
+    const ids = toggled(viewed, entry.id)
+    setViewedState({ hash, ids })
+    services.reviews.setViewed(hash, [...ids])
+  }
+  const onFileKey = (key: 'next' | 'previous' | 'viewed') =>
+    key === 'viewed' ? toggleViewed(fileInView) : goToFile(stepFile(entries.length, fileInView, key === 'next' ? 1 : -1))
+  const toggleFiles = () => {
+    if (wide) return setFilesChoice(filesMode === 'closed' ? 'open' : 'closed')
+    setFilesDrawer(!filesDrawer)
+    if (!filesDrawer) setPanelChoice(false)
+  }
+  const filesShown = wide ? filesMode !== 'closed' : filesDrawer
+
   const jumpTo = (comment: ReviewComment, toCard = false) => {
     setScrollRequest({ line: comment.startLine, nonce: Date.now(), ...(toCard ? { comment: comment.id } : {}) })
     setFlashId(comment.id)
@@ -497,7 +568,22 @@ export default function App() {
             file={file}
             review={review}
             panelOpen={panelOpen}
-            onTogglePanel={() => setPanelChoice(!panelOpen)}
+            onTogglePanel={() => {
+              if (!wide && !panelOpen) setFilesDrawer(false)
+              setPanelChoice(!panelOpen)
+            }}
+            files={
+              hasList
+                ? {
+                    count: fileTotals.files,
+                    added: layout ? null : fileTotals.added,
+                    deleted: layout ? null : fileTotals.deleted,
+                    lines: layout ? layout.texts.reduce((n, text) => n + text.lines.length, 0) : file.lines.length,
+                    open: filesShown,
+                    onToggle: toggleFiles,
+                  }
+                : null
+            }
             onHome={goHome}
             onOpen={() => inputRef.current?.click()}
             onLanguage={(language) => dispatch({ type: 'setLanguage', language })}
@@ -521,30 +607,50 @@ export default function App() {
           />
           <SentBanner message={sentText} drawn={afterSentSettings(state.submitOptions).banner} onDismiss={clearSent} />
           <div className="main">
+            {hasList && filesShown && (
+              <FilesPane
+                entries={entries}
+                counts={fileCounts}
+                viewed={viewed}
+                current={Math.min(fileInView, entries.length - 1)}
+                rail={wide && filesMode === 'rail'}
+                drawer={!wide}
+                onPick={goToFile}
+                onToggleViewed={toggleViewed}
+                onRail={() => setFilesChoice(filesMode === 'rail' ? 'open' : 'rail')}
+                onClose={() => setFilesDrawer(false)}
+              />
+            )}
             <CodeViewer
               file={file}
               diff={diff}
+              layout={layout}
               tokens={tokens}
-              comments={review.comments}
+              comments={comments}
               selection={selection}
               draft={draft}
               hoveredId={hoveredId}
               flashId={flashId}
               scrollRequest={scrollRequest}
+              onFileInView={hasList ? setFileInView : undefined}
+              onFileKey={hasList ? onFileKey : undefined}
+              viewedFiles={hasList ? viewedFiles : undefined}
+              onToggleViewed={hasList ? toggleViewed : undefined}
               onHover={setHoveredId}
               onReach={(id) => {
-                const comment = review.comments.find((c) => c.id === id)
+                const comment = comments.find((c) => c.id === id)
                 if (comment) jumpTo(comment, true)
               }}
               dispatch={dispatch}
             />
             {panelOpen && (
               <ReviewPanel
-                comments={review.comments}
+                comments={comments}
                 marks={marks}
                 hoveredId={hoveredId}
                 onHover={setHoveredId}
                 onJump={jumpTo}
+                files={hasList ? entries : undefined}
                 onClose={() => setPanelChoice(false)}
               />
             )}
@@ -607,11 +713,11 @@ export default function App() {
 
       {dragActive && (
         <div className="drop-overlay" aria-hidden="true">
-          <div className="drop-card">Drop a file to review it</div>
+          <div className="drop-card">Drop files or a folder to review them</div>
         </div>
       )}
 
-      <input ref={inputRef} type="file" hidden onChange={onPickerChange} />
+      <input ref={inputRef} type="file" multiple hidden onChange={onPickerChange} />
     </div>
   )
 }

@@ -32,7 +32,7 @@ declare global {
  * Offer the protocol to scripts on the page (a browser tool, a test, the console) as `window.jared`. All the rules are in
  * `handleAppMessage`; this keeps a copy of the page's state that a call replaces at once, so that two calls in one script
  * see each other, and gives what a call changes to the page. `onAdopted` says what the page also does for a file that a
- * request has opened or closed: the file, or `null`, and whether it is another file than before. `onDeclined` is given the words for
+ * request has opened or closed: the file, or `null`, whether it is another file than before, and whether it is a set of files (then the file is the one that stands for them). `onDeclined` is given the words for
  * the reviewer when a script's `open` or `close` through `window.jared.handleMessage` is declined: the script gets the reply, and the
  * reviewer would be told nothing. A request that the page's own code applies is not told this way, as that code asks the reviewer itself.
  *
@@ -42,7 +42,7 @@ declare global {
 export function usePageApi(
   state: AppState,
   dispatch: Dispatch<Action>,
-  onAdopted: (file: SourceFile | null, another: boolean) => void,
+  onAdopted: (file: SourceFile | null, another: boolean, isSet: boolean) => void,
   outbox: Outbox<Event>,
   onDeclined: (text: string) => void,
 ): (value: unknown, discard?: boolean) => Reply[] {
@@ -57,17 +57,17 @@ export function usePageApi(
   const apply = useCallback(
     (value: unknown, discard = false): Reply[] => {
       const session = discard ? { file: null, review: null, draft: null } : mirror.current
-      const outcome = handleAppMessage(session, value, reviews.review)
+      const outcome = handleAppMessage(session, value, reviews.review, reviews.setReview)
       if (outcome.adopt) {
         const action: Action = { type: 'adopt', ...outcome.adopt }
         const another = outcome.adopt.file?.hash !== mirror.current.file?.hash
         mirror.current = reducer(mirror.current, action)
         dispatch(action)
-        adopted.current(outcome.adopt.file, another)
+        adopted.current(outcome.adopt.file, another, outcome.adopt.set !== null)
       }
       return outcome.replies
     },
-    [dispatch, adopted, reviews.review],
+    [dispatch, adopted, reviews.review, reviews.setReview],
   )
 
   useEffect(() => {

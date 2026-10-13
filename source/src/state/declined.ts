@@ -22,5 +22,5 @@ export function declinedNotice(value: unknown, replies: Reply[], page: DeclinedP
   if (request.type !== 'open' && request.type !== 'close') return null
   if (!replies.some((reply) => reply.type === 'error' && reply.code === 'declined' && reply.replyTo === request.id)) return null
   if (request.type === 'close') return COPY.declinedClose(page.submitTarget, page.fileName)
-  return COPY.declinedOpen(request.submitTarget ?? page.submitTarget, request.name, page.fileName)
+  return COPY.declinedOpen(request.submitTarget ?? page.submitTarget, request.name ?? COPY.fileCount(request.files.length), page.fileName)
 }

@@ -1,5 +1,6 @@
-import type { Review, SourceFile } from '../types.ts'
-import type { Platform, KeptSession } from './platform.ts'
+import type { Review, SetReview, SourceFile } from '../types.ts'
+import { setHashOf } from './hash.ts'
+import type { Platform, KeptSession, KeptSet } from './platform.ts'
 import { buildSource, prepareSource } from './source.ts'
 import type { RecentEntry } from './storage.ts'
 import { parseTheme, type Theme } from './theme.ts'
@@ -8,6 +9,12 @@ import { parseTheme, type Theme } from './theme.ts'
 export interface MemoryPicked {
   name: string
   text: string
+}
+
+/** What it takes as a pick of several files, or a drop of them: the files, and how many more were seen and not read. */
+export interface MemoryPickedMany {
+  files: MemoryPicked[]
+  unread?: number
 }
 
 export interface MemoryPlatformOptions {
@@ -34,6 +41,9 @@ export interface MemoryPlatform extends Platform {
 export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatform {
   const sources = new Map<string, { name: string; content: string }>()
   const reviews = new Map<string, Review>()
+  const viewed = new Map<string, string[]>()
+  /** The sets that are kept, by the hash of the set: the review, whose files name the texts in `sources` by their own hashes. */
+  const sets = new Map<string, SetReview>()
   let index: RecentEntry[] = []
   let last: string | null = null
   let theme: Theme = 'system'
@@ -62,6 +72,33 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
     return source && review ? { file: buildSource(source.name, source.content, review.file.language), review } : null
   }
 
+  /** The index entry of a set, as the browser keeps it. */
+  const setEntry = (setHash: string, review: SetReview): RecentEntry => ({
+    hash: setHash,
+    name: review.files[0].name,
+    lineCount: review.files.reduce((total, file) => total + file.lineCount, 0),
+    comments: review.comments.length,
+    updatedAt: review.updatedAt,
+    submittedAt: review.submittedAt,
+    files: review.files.length,
+    names: review.files.slice(0, 3).map((file) => file.name),
+  })
+  const storeSetReview = (review: SetReview): void => {
+    const setHash = setHashOf(review.files)
+    sets.set(setHash, review)
+    index = [setEntry(setHash, review), ...index.filter((e) => e.hash !== setHash)]
+  }
+  const savedSet = (setHash: string): KeptSet | null => {
+    const review = sets.get(setHash)
+    const files = review?.files.map((entry) => {
+      const source = sources.get(entry.hash)
+      return source ? buildSource(source.name, source.content, entry.language) : null
+    })
+    return review && files && files.every((file) => file !== null) ? { files: files as SourceFile[], review } : null
+  }
+  /** Whether a review that is kept still has the file with this hash, alone or in a set. */
+  const referenced = (fileHash: string): boolean => index.some((entry) => (entry.files === undefined ? entry.hash === fileHash : !!sets.get(entry.hash)?.files.some((file) => file.hash === fileHash)))
+
   const platform: MemoryPlatform = {
     asked: [],
     downloads: [],
@@ -69,7 +106,7 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
     applied: [],
     reviews: {
       last: () => (last ? session(last) : null),
-      recent: () => index.filter((entry) => sources.has(entry.hash)),
+      recent: () => index.filter((entry) => (entry.files === undefined ? sources.has(entry.hash) : savedSet(entry.hash) !== null)),
       review: (hash) => reviews.get(hash) ?? null,
       session,
       saveSource: (file: SourceFile) => keep(() => sources.set(file.hash, { name: file.name, content: file.content })),
@@ -82,10 +119,26 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
       setLast: (hash) => {
         last = hash
       },
+      lastSet: () => (last ? savedSet(last) : null),
+      setReview: (setHash) => sets.get(setHash) ?? null,
+      savedSet,
+      saveSet: (files, review) =>
+        keep(() => {
+          for (const file of files) sources.set(file.hash, { name: file.name, content: file.content })
+          storeSetReview(review)
+        }),
+      saveSetReview: (review) => keep(() => storeSetReview(review)),
       forget: (hash) => {
-        sources.delete(hash)
+        const files = sets.get(hash)?.files ?? [{ hash }]
+        sets.delete(hash)
         reviews.delete(hash)
+        viewed.delete(hash)
         index = index.filter((entry) => entry.hash !== hash)
+        for (const file of files) if (!referenced(file.hash)) sources.delete(file.hash)
+      },
+      viewed: (hash) => viewed.get(hash) ?? [],
+      setViewed: (hash, ids) => {
+        viewed.set(hash, [...ids])
       },
       failed: () => failed,
       subscribe: (listener) => {
@@ -108,6 +161,11 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
       read: async (picked) => {
         const { name, text } = picked as MemoryPicked
         return prepareSource(name, text)
+      },
+      capture: (drop) => drop,
+      readMany: async (picked) => {
+        const { files, unread } = picked as MemoryPickedMany
+        return { unread: unread ?? 0, files: files.map(({ name, text }) => ({ name, text, size: new TextEncoder().encode(text).length })) }
       },
     },
     submit: {

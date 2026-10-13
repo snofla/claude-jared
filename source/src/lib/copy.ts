@@ -5,6 +5,12 @@
  * its gaps for names, so that it can be translated as it is. The dialog's other labels (its field names, such as Overall summary,
  * and Copy, Download, Markdown and JSON) are not here yet: they wait for localisation.
  */
+/**
+ * Names in one line, as both lists of the page say them: "a and b", "a, b and c", and, when there are more than are named, "a, b, c and 2 more". English-only:
+ * localisation replaces it with `Intl.ListFormat`.
+ */
+const listed = (items: readonly string[]): string => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : items[0])
+
 export const COPY = {
   /** The button, the dialog's title and the header's status when nothing takes the review. */
   exportLabel: 'Export review',
@@ -78,6 +84,52 @@ export const COPY = {
   keyEscape: 'Esc',
   /** The ⋯ button of the header: its accessible name and its tooltip. The menu holds the actions that are needed now and then, which have no place in the header all the time. */
   moreActions: 'More actions',
+  /** The list of the files of a diff beside the code: its name, the button of the header that shows and hides it, and the button in it that makes it narrow and wide again. */
+  files: 'Files',
+  /** The tooltip of the header button that shows and hides the list. The button's name is `files`, its visible text: the name has to contain what is seen, so that a voice control that says "Files" finds it. */
+  filesToggle: 'Show or hide the file list',
+  filesCollapse: 'Collapse the file list',
+  filesExpand: 'Expand the file list',
+  /** The button that closes the list when it is a drawer (below the width of the comments drawer): the same noun as the two above. */
+  filesClose: 'Close the file list',
+  /** How many of the files the reviewer has marked, and how many files the diff has. English-only plurals: localisation replaces them with `Intl.PluralRules`. */
+  filesViewed: (viewed: number, total: number): string => `${viewed} of ${total} viewed`,
+  fileCount: (count: number): string => (count === 1 ? '1 file' : `${count} files`),
+  /** What a kept review of several files shows in the list on the start page, after its number of files: the names of the first, and how many more. English-only plural, like the ones above. */
+  recentFiles: (count: number, names: readonly string[]): string => listed(count > names.length ? [...names, `${count - names.length} more`] : names),
+  /** The title of the button that forgets a kept review of several files, on the start page. */
+  forgetSet: 'Forget these files and their review',
+  /**
+   * What the page leaves out of a pick of several files, in one line: each name with the reason, and, after five, how many more. The reasons are
+   * five separate messages; `limit` is the size of the largest file, as the page writes sizes. English-only list, like the plurals around it.
+   */
+  setLeftOut: (items: ReadonlyArray<{ name: string; why: 'not-text' | 'too-big' | 'empty' | 'unreadable' | 'same-name' }>, limit: string): string => {
+    const reason = { 'not-text': 'not text', 'too-big': `more than ${limit}`, empty: 'empty', unreadable: 'could not be read', 'same-name': 'same name as another file' } as const
+    const shown = items.slice(0, 5).map((item) => `${item.name} (${reason[item.why]})`)
+    const rest = items.length - shown.length
+    return `Left out: ${listed(rest > 0 ? [...shown, `${rest} more`] : shown)}.`
+  },
+  /** Why a pick of several files opens none: no file that is text, more files than a review holds, or more text than a review holds. `limit` and `most` are sizes, as the page writes them. */
+  setNothing: 'There is no file here that Jared can open.',
+  /** A picked file that the browser would not read. */
+  couldNotRead: (name: string): string => `Could not read ${name}.`,
+  setTooMany: (count: number, most: number): string => `${count} files are more than the ${most} that Jared opens in one review. Choose fewer files.`,
+  /** A folder with more files in it than the page looks at: the number is the most that it looks at, so it is not a count of the files in the folder. */
+  setTooManyFound: (looked: number, most: number): string => `There are more than ${looked} files here, and Jared opens at most ${most} in one review. Choose fewer files.`,
+  /** The files are more than a review holds, and how much more is not said: the page stops reading once it is sure of it. */
+  setTooBigTogether: (limit: string): string => `Together, these files are more than the ${limit} that Jared opens in one review. Choose fewer files.`,
+  /** The summary in the header's chip for a diff of two files or more: one message with its three numbers, so that a language can put the parts in its own order. */
+  filesChip: (count: number, added: number, deleted: number): string => `${COPY.fileCount(count)}, +${added} −${deleted}`,
+  /** The same chip for a screen reader and its tooltip: "+18 −7" is read "plus 18 minus 7". English-only plural of "line", like the two above. */
+  filesChipName: (count: number, added: number, deleted: number): string =>
+    `${COPY.fileCount(count)}, ${added} ${added === 1 ? 'line' : 'lines'} added and ${deleted} removed`,
+  /** The mark on a file that the reviewer has looked at: the button's text in a file's header, and its accessible name in the list. */
+  viewed: 'Viewed',
+  viewedMark: (path: string): string => `Viewed: ${path}`,
+  /** What a letter in the list stands for, for a screen reader and the tooltip: the status of a file, in four separate messages. The letters are git's and are not translated. */
+  fileStatus: { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed' },
+  /** The key hints at the foot of the list: each beside its key, so each is a whole message. */
+  filesKeys: { next: 'next file', previous: 'previous file', viewed: 'viewed' },
   /** The heading of the choice of colour scheme in that menu. */
   colourScheme: 'Colour scheme',
   /** The names of its three choices. */

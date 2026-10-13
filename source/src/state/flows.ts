@@ -1,8 +1,12 @@
-import type { Draft, Review, SourceFile } from '../types'
+import type { AnyReview, Draft, SourceFile } from '../types'
+import type { KeptSet } from '../lib/platform'
 import { COPY } from '../lib/copy'
+import { setHashOf } from '../lib/hash'
 import type { Platform, Picked } from '../lib/platform'
 import { draftHasText, planOpen } from '../lib/review'
-import { prepareSource } from '../lib/source'
+import { MAX_BYTES, MAX_SET_BYTES, buildSource, prepareSource, tooBig } from '../lib/source'
+import { MAX_SCANNED, MAX_SET_FILES, planPicked, type SetPlan } from '../lib/set-pick'
+import { formatBytes } from '../lib/util'
 import type { Action } from './reducer'
 
 /**
@@ -13,8 +17,11 @@ import type { Action } from './reducer'
 
 /** What came of asking to open a file. */
 export type OpenOutcome =
-  /** Open it: dispatch the action. The file is the one that the page will hold, with the language of its kept review. */
-  | { kind: 'opened'; action: Action; file: SourceFile }
+  /**
+   * Open it: dispatch the action. The file is the one that the page will hold, with the language of its kept review; `null` for a set of files,
+   * which the page builds itself. `note` is what to tell the reviewer once it is open, such as which files of a pick were left out.
+   */
+  | { kind: 'opened'; action: Action; file: SourceFile | null; note?: string }
   /** The file that is open already: nothing changes. */
   | { kind: 'same' }
   /** The reviewer chose to keep what is open. */
@@ -24,7 +31,7 @@ export type OpenOutcome =
 
 /** What a flow needs to know of the page: the review that is open, and the comment being written. */
 export interface OpenSession {
-  review: Review | null
+  review: AnyReview | null
   draft: Draft | null
 }
 
@@ -78,8 +85,67 @@ export function openText(platform: Platform, session: OpenSession, name: string,
   return prepared.ok ? openFile(platform, session, prepared.file) : { kind: 'refused', error: prepared.error }
 }
 
-/** Go back to a file that was kept; when it is not there any more it is forgotten, and that is said. */
+/** Open the files of a set that was kept, with the review that was kept for them. */
+function openSetAction(platform: Platform, set: KeptSet): Action {
+  return { type: 'openSet', files: set.files.map((file) => ({ name: file.name, text: file.content })), review: set.review, now: platform.environment.now() }
+}
+
+/** What to open at the start, when something was open at the last visit: the file with its review, or the set of files with its review. */
+export function restoreLast(platform: Platform): Action | null {
+  const last = platform.reviews.last()
+  if (last) return { type: 'open', name: last.file.name, text: last.file.content, review: last.review, now: platform.environment.now() }
+  const set = platform.reviews.lastSet()
+  return set ? openSetAction(platform, set) : null
+}
+
+/** What to tell the reviewer of a pick that opens none: the reason, and what was left out. */
+function refusal(plan: Extract<SetPlan, { kind: 'refused' }>): string {
+  const reason =
+    plan.reason === 'nothing'
+      ? COPY.setNothing
+      : plan.reason === 'too-many'
+        ? COPY.setTooMany(plan.count, MAX_SET_FILES)
+        : plan.reason === 'too-many-found'
+          ? COPY.setTooManyFound(MAX_SCANNED, MAX_SET_FILES)
+          : COPY.setTooBigTogether(formatBytes(MAX_SET_BYTES))
+  return plan.leftOut.length > 0 ? `${reason} ${COPY.setLeftOut(plan.leftOut, formatBytes(MAX_BYTES))}` : reason
+}
+
+/**
+ * Open what was picked or dropped when it may be several files or a folder. One file is opened exactly as `openPicked` opens it, with the same
+ * words when it is refused. Several are a set when two or more are text: in path order, what is left out is said, and nothing is opened of a pick
+ * that is too much, which is not cut to size. The question about replacing a review comes after the read, as for a file.
+ */
+export async function openPickedMany(platform: Platform, session: OpenSession, picked: Picked): Promise<OpenOutcome> {
+  const read = await platform.input.readMany(picked)
+  if (read.files.length === 1 && read.unread === 0) {
+    const only = read.files[0]
+    if (only.text === null) return { kind: 'refused', error: only.size > MAX_BYTES ? tooBig(only.name, only.size) : COPY.couldNotRead(only.name) }
+    return openText(platform, session, only.name, only.text)
+  }
+  const plan = planPicked(read)
+  if (plan.kind === 'refused') return { kind: 'refused', error: refusal(plan) }
+  const note = plan.leftOut.length > 0 ? COPY.setLeftOut(plan.leftOut, formatBytes(MAX_BYTES)) : undefined
+  if (plan.kind === 'one') {
+    const outcome = openText(platform, session, plan.file.name, plan.file.text)
+    return outcome.kind === 'opened' ? { ...outcome, note } : outcome
+  }
+  // The set stands for its files in the one question and the one comparison that a file would: its name says how many there are, its hash is the set's.
+  const incoming = { name: COPY.fileCount(plan.files.length), hash: setHashOf(plan.files.map((f) => buildSource(f.name, f.text))) }
+  const ask = planOpen(session.review, session.draft, incoming)
+  if (ask.kind === 'ignore') return { kind: 'same' }
+  if (ask.kind === 'ask' && !platform.prompts.confirm(ask.message)) return { kind: 'declined' }
+  // The same files again bring back the review that was kept for them, as the same file does: the page keeps a set on its own, so nothing is saved here.
+  return { kind: 'opened', file: null, note, action: { type: 'openSet', files: plan.files, review: platform.reviews.setReview(incoming.hash), now: platform.environment.now() } }
+}
+
+/** Go back to a file or a set of files that was kept; when it is not there any more it is forgotten, and that is said. */
 export function openRecent(platform: Platform, hash: string): OpenOutcome | { kind: 'gone' } {
+  const set = platform.reviews.savedSet(hash)
+  if (set) {
+    platform.reviews.setLast(hash)
+    return { kind: 'opened', file: null, action: openSetAction(platform, set) }
+  }
   const kept = platform.reviews.session(hash)
   if (kept) return open(platform, kept.file)
   platform.reviews.forget(hash)

@@ -955,6 +955,7 @@ pre {
 }
 
 @media (max-width: 720px) {
+  .files-toggle-label,
   .file-lines,
   .hint-keys {
     display: none;
@@ -1035,6 +1036,13 @@ pre {
 
 .row.is-file {
   --tint: var(--border);
+  /* The header of a file stays at the top while its lines go by, and the next file's header takes its place. */
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  content-visibility: visible;
+  /* A jump to a file puts its header at the very top, where it takes the place of the one before it; the margin of a row, which keeps a selection off the edge, would leave it below. */
+  scroll-margin-block-start: 0;
 }
 
 .sign {
@@ -1083,4 +1091,246 @@ pre {
 
 .row.is-file .file-badge {
   margin-left: var(--space-10);
+}
+
+.row.is-file .file-viewed {
+  margin-left: var(--space-12);
+  vertical-align: middle;
+}
+
+
+/* ---------- the files of a diff, beside the code ---------- */
+
+.files {
+  flex: 0 0 252px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  transition: flex-basis 120ms ease;
+}
+
+.files.is-rail {
+  flex-basis: 60px;
+}
+
+.files-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-12) var(--space-8);
+}
+
+.files-head h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--font-size-md);
+}
+
+.files-progress-text {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.files-progress {
+  height: 3px; /* raw: a thin bar, three pixels high by definition */
+  margin: 0 var(--space-12) var(--space-8);
+  border-radius: 2px; /* raw: the bar's ends, half its height, rounded to the pixel */
+  background: var(--border);
+  overflow: hidden;
+}
+
+.files-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.files-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--space-6);
+  list-style: none;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.files-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.files-item.is-current {
+  background: var(--accent-soft);
+}
+
+.files-tick {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px; /* raw: the round tick, as wide as it is high */
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent-ink);
+}
+
+.files-tick[aria-pressed='true'],
+.files-tick[data-on='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.files-tick svg {
+  width: 12px;
+  height: 12px; /* raw: the check mark inside the round tick */
+}
+
+button.files-tick {
+  cursor: pointer;
+}
+
+.files-file {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 13px/1.3 var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.files-path {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.files-name {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.files-dir {
+  flex: 0 1 auto;
+  margin-left: var(--space-6);
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.files-keys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-12);
+  border-top: 1px solid var(--border);
+  font: var(--font-size-xs) / 1.4 var(--sans);
+}
+
+.files-rail-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) 0;
+}
+
+.files-rail-progress {
+  font: var(--font-size-xs) / 1 var(--sans);
+}
+
+.files-rail-marks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.files-rail-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Below 900 px the list is a drawer over the code, as the comments panel is. */
+@media (max-width: 899px) {
+  .files.is-drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(360px, 92vw);
+    box-shadow: var(--shadow);
+    border-right: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
+/* A finger needs 44 px: the rows are that tall, and the round tick has a hit area that size round it. */
+@media (pointer: coarse) {
+  .files-file,
+  .files-rail-item {
+    min-height: 44px; /* raw: the height of a finger */
+  }
+
+  button.files-tick {
+    position: relative;
+  }
+
+  button.files-tick::after {
+    content: '';
+    position: absolute;
+    inset: -13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .files {
+    transition: none;
+  }
+}
+
+/* The comments panel, grouped by file: a heading when the file changes. */
+.side-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-10) var(--space-12) var(--space-4);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.side-group .files-name {
+  color: var(--text);
+}
+
+.header .files-toggle svg {
+  transform: scaleX(-1);
 }

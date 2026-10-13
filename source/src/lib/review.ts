@@ -1,6 +1,22 @@
-import type { DiffPlace, Draft, LineRange, LineSelection, Review, ReviewComment, SourceFile } from '../types.ts'
+import type { AnyReview, DiffPlace, Draft, LineRange, LineSelection, Review, ReviewComment, SetReview, SourceFile } from '../types.ts'
 import { COPY } from './copy.ts'
 import { diffOf, placeLabel, placeOf, type ParsedDiff } from './diff.ts'
+import { setHashOf } from './hash.ts'
+
+/** The most files that a review of several files has: more are refused when a set is opened. */
+export const MAX_SET_FILES = 100
+
+export function newSetReview(files: readonly Pick<SourceFile, 'name' | 'language' | 'hash' | 'lines'>[], now: string): SetReview {
+  return {
+    version: 2,
+    files: files.map((file, index) => ({ id: `f${index + 1}`, name: file.name, language: file.language, lineCount: file.lines.length, hash: file.hash })),
+    summary: '',
+    comments: [],
+    createdAt: now,
+    updatedAt: now,
+    submittedAt: null,
+  }
+}
 
 export function newReview(file: Pick<SourceFile, 'name' | 'language' | 'hash' | 'lines'>, now: string): Review {
   return {
@@ -36,7 +52,8 @@ export function labelOfRange(diff: ParsedDiff | null, start: number, end: number
 }
 
 /** What a comment is called: the file and lines it is about when it is on a diff, or else the numbers of its lines. */
-export function commentLabel(comment: Pick<ReviewComment, 'startLine' | 'endLine' | 'place'>): string {
+export function commentLabel(comment: Pick<ReviewComment, 'startLine' | 'endLine' | 'place'> & { viewLabel?: string }): string {
+  if (comment.viewLabel) return comment.viewLabel
   return comment.place ? placeLabel(comment.place) : rangeLabel(comment.startLine, comment.endLine)
 }
 
@@ -45,7 +62,7 @@ export function commentLabel(comment: Pick<ReviewComment, 'startLine' | 'endLine
  * comment's card, so that a diff's bar names the file and the old and new lines and not lines that are not there. The label's first
  * letter is lower-cased only where it begins with "Line" or "Lines" and a number, which a range label always does and a file name does not.
  */
-export function commentBarTitle(comment: Pick<ReviewComment, 'startLine' | 'endLine' | 'place'>): string {
+export function commentBarTitle(comment: Pick<ReviewComment, 'startLine' | 'endLine' | 'place'> & { viewLabel?: string }): string {
   const label = commentLabel(comment)
   return `Comment on ${/^Lines? \d/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label}`
 }
@@ -133,6 +150,11 @@ export function draftHasText(draft: Draft | null): boolean {
   return !!draft && (draft.comment.trim() !== '' || draft.suggestion !== null)
 }
 
+/** What names a review among the others that are kept: the hash of its file, or of its set of files, and the name that the reviewer knows it by. */
+export function identityOf(review: AnyReview): { hash: string; name: string } {
+  return review.version === 2 ? { hash: setHashOf(review.files), name: COPY.fileCount(review.files.length) } : { hash: review.file.hash, name: review.file.name }
+}
+
 export type OpenPlan = { kind: 'open' } | { kind: 'ignore' } | { kind: 'ask'; message: string }
 
 /**
@@ -140,14 +162,15 @@ export type OpenPlan = { kind: 'open' } | { kind: 'ignore' } | { kind: 'ask'; me
  * ignored. Otherwise the reviewer is asked only when something would be lost: saved comments (they stay on the
  * start page, under "Continue reviewing") or a draft in progress (it does not).
  */
-export function planOpen(review: Review | null, draft: Draft | null, incoming: { name: string; hash: string }): OpenPlan {
+export function planOpen(review: AnyReview | null, draft: Draft | null, incoming: { name: string; hash: string }): OpenPlan {
   if (!review) return { kind: 'open' }
-  if (review.file.hash === incoming.hash) return { kind: 'ignore' }
+  const open = identityOf(review)
+  if (open.hash === incoming.hash) return { kind: 'ignore' }
   const comments = review.comments.length
   const writing = draftHasText(draft)
   if (comments === 0 && !writing) return { kind: 'open' }
 
-  const name = review.file.name
+  const name = open.name
   const target = incoming.name === name ? 'a version of it that has different content' : `"${incoming.name}"`
   const lines = [`Replace "${name}" with ${target}?`, '']
   if (comments > 0) {
@@ -199,6 +222,65 @@ export function parseReview(value: unknown): Review | null {
 }
 
 /** "Edited" means touched after the last export (`submittedAt`, which the interface calls exported: the name is kept so the stored format stays at version 1). */
-export function hasUnsubmittedChanges(review: Review): boolean {
+export function hasUnsubmittedChanges(review: AnyReview): boolean {
   return review.submittedAt === null || review.updatedAt > review.submittedAt
+}
+
+const FILE_ID = /^f[1-9][0-9]*$/
+
+/**
+ * Read a review of several files (version 2) that arrived from outside: two to `MAX_SET_FILES` files with ids of the form "f1", each with a name,
+ * a language, a hash and a line count, none twice, and comments that each name one of the files and stay inside its lines.
+ */
+export function parseSetReview(value: unknown): SetReview | null {
+  if (!isRecord(value) || value.version !== 2) return null
+  const files = value.files
+  if (!Array.isArray(files) || files.length < 2 || files.length > MAX_SET_FILES) return null
+  const lineCounts = new Map<string, number>()
+  const names = new Set<string>()
+  for (const file of files) {
+    if (!isRecord(file) || typeof file.id !== 'string' || !FILE_ID.test(file.id) || lineCounts.has(file.id)) return null
+    if (typeof file.name !== 'string' || file.name === '' || names.has(file.name)) return null
+    if (typeof file.language !== 'string' || typeof file.hash !== 'string' || !isWholeFrom(file.lineCount, 1)) return null
+    lineCounts.set(file.id, file.lineCount)
+    names.add(file.name)
+  }
+  if (typeof value.summary !== 'string' || !Array.isArray(value.comments)) return null
+  for (const comment of value.comments) {
+    if (!isComment(comment) || typeof comment.file !== 'string') return null
+    const lineCount = lineCounts.get(comment.file)
+    if (lineCount === undefined || comment.endLine > lineCount) return null
+  }
+  if (typeof value.createdAt !== 'string' || typeof value.updatedAt !== 'string') return null
+  if (!(typeof value.submittedAt === 'string' || value.submittedAt === null)) return null
+  return value as unknown as SetReview
+}
+
+/** A review of either version that arrived from outside, or `null`. */
+export function parseAnyReview(value: unknown): Review | SetReview | null {
+  return parseReview(value) ?? parseSetReview(value)
+}
+
+/**
+ * Add the comment to one file of a set, or replace the one that has the same id, as `upsertComment` does for a review of one file: the same rules
+ * for the words, the suggestion and a diff, with the lines those of that file. `null` when there is nothing to save or the file is not in the set.
+ * The comments stay in the order of the files.
+ */
+export function upsertSetComment(review: SetReview, fileId: string, lines: string[], input: CommentInput, now: string): SetReview | null {
+  const file = review.files.find((candidate) => candidate.id === fileId)
+  if (!file) return null
+  const alone: Review = {
+    version: 1,
+    file: { name: file.name, language: file.language, lineCount: file.lineCount, hash: file.hash },
+    summary: review.summary,
+    comments: review.comments.filter((comment) => comment.file === fileId),
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt,
+    submittedAt: review.submittedAt,
+  }
+  const next = upsertComment(alone, lines, input, now)
+  if (!next) return null
+  const mine = next.comments.map((comment): ReviewComment => ({ ...comment, file: fileId }))
+  const comments = review.files.flatMap((candidate) => (candidate.id === fileId ? mine : review.comments.filter((comment) => comment.file === candidate.id)))
+  return { ...review, comments, updatedAt: now }
 }

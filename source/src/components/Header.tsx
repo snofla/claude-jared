@@ -1,7 +1,7 @@
 import { COPY } from '../lib/copy'
 import { sendLabel, statusOf, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
-import type { Review, SourceFile } from '../types'
+import type { AnyReview, SourceFile } from '../types'
 import { THEMES, type Theme } from '../lib/theme'
 import { Badge, Button, IconBrand, IconDownload, IconFile, IconMessage, IconMore, IconPanel, IconSend, IconUpload, IconX, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
 import { Version } from './Version'
@@ -11,9 +11,14 @@ const STATUS_TONE = { ok: 'ok', warn: 'warn', muted: 'neutral' } as const
 
 interface Props {
   file: SourceFile
-  review: Review
+  review: AnyReview
   panelOpen: boolean
   onTogglePanel: () => void
+  /**
+   * The files of a diff of two files or more, or a set of files: their number, the lines added and removed (`null` for a set of files that is not a diff),
+   * the lines in all, and whether the list is shown. `null` when there is no list.
+   */
+  files: { count: number; added: number | null; deleted: number | null; lines: number; open: boolean; onToggle: () => void } | null
   onHome: () => void
   onOpen: () => void
   onLanguage: (language: string) => void
@@ -37,7 +42,7 @@ interface Props {
   onTheme: (theme: Theme) => void
 }
 
-export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, onCancel, onSkip, delivery, handedOver, sentAt, theme, onTheme }: Props) {
+export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, onCancel, onSkip, delivery, handedOver, sentAt, theme, onTheme }: Props) {
   const state = statusOf(review, handedOver, sentAt)
   const label = sendLabel(delivery, changes)
   const count = review.comments.length
@@ -53,16 +58,24 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
         <span className="file-name" title={file.name}>
           {file.name}
         </span>
-        <span className="muted file-lines">{file.lines.length.toLocaleString()} lines</span>
+        {files && files.added !== null && files.deleted !== null ? (
+          <span className="muted file-lines" role="img" aria-label={COPY.filesChipName(files.count, files.added, files.deleted)} title={COPY.filesChipName(files.count, files.added, files.deleted)}>
+            {COPY.filesChip(files.count, files.added, files.deleted)}
+          </span>
+        ) : (
+          <span className="muted file-lines">{(files ? files.lines : file.lines.length).toLocaleString()} lines</span>
+        )}
       </div>
 
-      <Select label="Language" labelHidden className="lang-select" value={file.language} onChange={(e) => onLanguage(e.target.value)}>
-        {LANGUAGE_OPTIONS.map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.name}
-          </option>
-        ))}
-      </Select>
+      {review.version === 1 && (
+        <Select label="Language" labelHidden className="lang-select" value={file.language} onChange={(e) => onLanguage(e.target.value)}>
+          {LANGUAGE_OPTIONS.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </Select>
+      )}
 
       <span className="spacer" />
 
@@ -70,6 +83,11 @@ export function Header({ file, review, panelOpen, onTogglePanel, onHome, onOpen,
         {state.text}
       </Badge>
 
+      {files && (
+        <Button className="files-toggle" icon={<IconPanel />} pressed={files.open} onClick={files.onToggle} title={COPY.filesToggle} aria-label={COPY.files}>
+          <span className="files-toggle-label">{COPY.files}</span>
+        </Button>
+      )}
       <Button icon={<IconPanel />} pressed={panelOpen} onClick={onTogglePanel} title="Toggle comment list">
         <Badge variant="count">{count}</Badge>
       </Button>

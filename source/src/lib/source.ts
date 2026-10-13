@@ -11,6 +11,12 @@ import { formatBytes } from './util.ts'
  */
 export const MAX_BYTES = 512 * 1024
 
+/**
+ * The most text that a review of several files holds, in all: the limit of one file. Measured in a production build: what costs is the bytes and
+ * not the number of files, so 100 files of 5 KB settle as fast as one file of 500 KB.
+ */
+export const MAX_SET_BYTES = MAX_BYTES
+
 export type OpenResult = { ok: true; file: SourceFile } | { ok: false; error: string }
 
 /** Strip BOM, unify line endings, drop a single trailing newline (editors don't show an extra line). */

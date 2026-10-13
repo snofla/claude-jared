@@ -31,6 +31,8 @@ export interface ReviewComment {
   suggestion: string | null
   /** Only on a comment on a diff. Absent on every comment of a file, and on one that was made before diffs were shown as such. */
   place?: DiffPlace
+  /** Only in a review of several files (version 2): the id of the file of `files` that the lines are lines of. */
+  file?: string
   createdAt: string
   updatedAt: string
 }
@@ -52,6 +54,33 @@ export interface Review {
   updatedAt: string
   submittedAt: string | null
 }
+
+/** One file of a review of several files: what version 1 has in `file`, with an id that a comment names. */
+export interface ReviewFile {
+  /** "f" and the file's position when the set was opened, from 1; it never changes for that review. */
+  id: string
+  name: string
+  language: string
+  lineCount: number
+  hash: string
+}
+
+/**
+ * The review of two or more files (version 2). A review of one file, plain or a diff, stays version 1. Each comment names its file in
+ * `file`, and its lines are lines of that file's text; a file whose language is `diff` is a unified diff, and its comments carry `place`.
+ */
+export interface SetReview {
+  version: 2
+  files: ReviewFile[]
+  summary: string
+  comments: ReviewComment[]
+  createdAt: string
+  updatedAt: string
+  submittedAt: string | null
+}
+
+/** A review of one file (version 1) or of several (version 2): what the page holds, and what is exported and sent. */
+export type AnyReview = Review | SetReview
 
 export interface SourceFile {
   name: string

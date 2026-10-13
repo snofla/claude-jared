@@ -1,4 +1,6 @@
+import { MAX_SET_FILES } from '../lib/set-pick'
 import { MAX_BYTES } from '../lib/source'
+import { COPY } from '../lib/copy'
 import type { RecentEntry } from '../lib/storage'
 import type { Theme } from '../lib/theme'
 import { formatBytes } from '../lib/util'
@@ -35,8 +37,8 @@ export function Landing({ recent, onPick, onSample, onSampleDiff, onOpenRecent, 
 
         <button type="button" className="dropzone" onClick={onPick}>
           <IconUpload size={28} />
-          <span className="dropzone-title">Drop a file here, or click to choose one</span>
-          <span className="muted">Any text-based language, or a unified diff · up to {formatBytes(MAX_BYTES)}</span>
+          <span className="dropzone-title">Drop files or a folder here, or click to choose files</span>
+          <span className="muted">Any text-based language, or a unified diff · up to {MAX_SET_FILES} files and {formatBytes(MAX_BYTES)} in all</span>
         </button>
 
         <p className="landing-alt">
@@ -54,15 +56,16 @@ export function Landing({ recent, onPick, onSample, onSampleDiff, onOpenRecent, 
                 <li key={r.hash}>
                   <button type="button" className="recent-open" onClick={() => onOpenRecent(r.hash)}>
                     <IconFile />
-                    <span className="recent-name">{r.name}</span>
+                    <span className="recent-name">{r.files === undefined ? r.name : COPY.fileCount(r.files)}</span>
                     <span className="muted">
+                      {r.files !== undefined && r.names ? `${COPY.recentFiles(r.files, r.names)} · ` : ''}
                       {r.comments} comment{r.comments === 1 ? '' : 's'}
                       {r.submittedAt ? ' · exported' : ''}
                     </span>
                   </button>
                   <IconButton
-                    label={`Forget ${r.name}`}
-                    title="Forget this file and its review"
+                    label={`Forget ${r.files === undefined ? r.name : COPY.recentFiles(r.files, r.names ?? [])}`}
+                    title={r.files === undefined ? 'Forget this file and its review' : COPY.forgetSet}
                     icon={<IconX />}
                     onClick={() => onForget(r.hash)}
                   />
