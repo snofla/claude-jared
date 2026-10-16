@@ -1,7 +1,7 @@
 import { StrictMode, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as ui from './ui'
-import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption } from './ui'
+import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption, VisuallyHidden } from './ui'
 import './styles.css'
 import './gallery.css'
 
@@ -167,6 +167,18 @@ function PrimitiveStates() {
       <Group title="A choice of two, and a choice of three with one long word in it (use the arrow keys: the radio inside is hidden and the ring shows on the word)">
         <SegmentedControl label="Format" options={FORMATS} value={format} onChange={setFormat} />
         <SegmentedControl label="Size" options={SIZES} value={size} onChange={setSize} />
+      </Group>
+
+      <h3 className="gallery-component">VisuallyHidden</h3>
+      <Group title="A link whose words for a screen reader say that it opens in a new tab: the page does not draw them, so the link looks as it does without them">
+        <span>
+          See{' '}
+          <a href="https://example.com" target="_blank" rel="noopener noreferrer">
+            the docs
+            <VisuallyHidden>, opens in a new tab</VisuallyHidden>
+          </a>{' '}
+          here.
+        </span>
       </Group>
     </>
   )

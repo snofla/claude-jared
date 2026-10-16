@@ -1,5 +1,6 @@
 import { COPY } from './copy'
 import { MAX_SCANNED, pathOfEntry, skippedInFolder, usableBytes, type ReadFile, type ReadMany } from './set-pick'
+import type { TextEdit } from './indent'
 import { MAX_BYTES, MAX_SET_BYTES, prepareSource, tooBig, type OpenResult } from './source'
 import { themeAttribute, type Theme } from './theme'
 
@@ -145,3 +146,16 @@ export function applyTheme(theme: Theme): void {
   else document.documentElement.dataset.theme = attribute
 }
 
+
+/**
+ * Puts an edit into a text area as a typed change, so that the browser's own undo takes it back in one step, and then selects what the edit says. When the
+ * browser will not insert text that way, the range is replaced directly and an `input` event tells the page.
+ */
+export function editField(field: HTMLTextAreaElement, edit: TextEdit): void {
+  field.setSelectionRange(edit.from, edit.to)
+  if (!document.execCommand('insertText', false, edit.insert)) {
+    field.setRangeText(edit.insert, edit.from, edit.to, 'end')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  field.setSelectionRange(edit.start, edit.end)
+}

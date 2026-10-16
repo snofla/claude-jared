@@ -2,6 +2,17 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.16.0 — 2026-10-16
+
+- **A comment is drawn as Markdown.** In its card a comment shows paragraphs, bold, italic, code spans, links, bullet and numbered lists, quotes and fenced code, which is coloured as code. Raw HTML, images and headings are not drawn: a `#` line stays text. What you typed is what is kept.
+  - A link opens in a new tab, shows its address when you rest on it, and tells a screen reader that it opens in a new tab.
+  - The list of comments shows each comment's words in one line, without the marks.
+- **Writing aids in the comment field.** `⌘B`, `⌘I` and `⌘K` (`Ctrl` with the same letters on other computers) make the selected words bold or italic, or a link; a second press takes the marks off, and with nothing selected the marks go in with the cursor between them. `Enter` at the end of a list item starts the next item, and on an empty item ends the list.
+  - **Write** and **Preview** over the field show the Markdown as typed, or the comment as it will look, with each link's address after it.
+- **Tab indents in the suggestion field.** `Tab` indents the selected lines, or adds one level at the cursor, and `Shift+Tab` takes one level off, by the file's own unit of indentation; the browser's undo takes each press back. To leave the field with the keyboard, press `Esc` and then `Tab`; a second `Esc` cancels the comment, as before.
+- **The exported Markdown cannot be broken by a comment's words.** A comment or the summary can no longer turn into a heading of the document, and a code fence or raw HTML that it leaves open (an HTML comment with no `-->`, a `<script>`, `<style>`, `<pre>` or `<textarea>` with no end tag) is closed at the end of the words, so that the comments after it are no longer swallowed or hidden in a Markdown viewer. The JSON is unchanged.
+- The README of the plugin has new pictures, each in the light and the dark scheme: Jared in the browser pane of the Claude app, beside the conversation, then a file and a diff as Jared draws them now.
+
 ## 0.15.1 — 2026-10-13
 
 - **Your saved reviews stay after the service stops.** Jared now opens at the same place in your session's browser each time the small service starts, so your saved reviews, the sets of files you kept and your **Viewed** marks are still under **Continue reviewing** after the service has been stopped, has ended by itself after half an hour, or has been replaced by an update of the plugin.

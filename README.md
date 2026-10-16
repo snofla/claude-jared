@@ -8,18 +8,25 @@ A Claude Code plugin. It opens a source file, several files, a diff or a commit 
 
 ## What it looks like
 
-A file in Jared, with two comments. The first has a suggested change.
+In the Claude app, Jared opens in the session's browser pane, beside the conversation: you review there, press **Submit review**, and the review goes to the session.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/app-dark.png">
+  <img alt="The Claude app with a session on the left and Jared in its browser pane on the right, showing retry.ts with two comments and the Submit review button." src="screenshots/app-light.png">
+</picture>
+
+A file in Jared, with two comments written in Markdown. The first has a suggested change.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="screenshots/review-dark.png">
-  <img alt="Jared showing retry.ts, a short TypeScript file, with two comments, each under the lines that it is about, the first with a suggested change, and a list of the comments on the right." src="screenshots/review-light.png">
+  <img alt="Jared showing retry.ts, a short TypeScript file, with two comments drawn as Markdown, each under the lines that it is about, the first with a suggested change, and a list of the comments on the right." src="screenshots/review-light.png">
 </picture>
 
 A diff is shown as changes. A comment on it says which file it is about, and which lines of the old and the new version. A diff of several files has a list of its files beside the code, where you can mark each file as viewed.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="screenshots/diff-dark.png">
-  <img alt="Jared showing a diff of src/retry.ts, with the removed lines in red, the added lines in green and two comments." src="screenshots/diff-light.png">
+  <img alt="Jared showing a diff of src/retry.ts, with the removed lines in red, the added lines in green and two comments, one with a block of code." src="screenshots/diff-light.png">
 </picture>
 
 ## Requirements

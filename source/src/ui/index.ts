@@ -52,3 +52,4 @@ export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl.
 export { Select } from './Select.tsx'
 export { TextField } from './TextField.tsx'
 export type { TextFieldProps } from './TextField.tsx'
+export { VisuallyHidden } from './VisuallyHidden.tsx'

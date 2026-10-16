@@ -1,4 +1,5 @@
 import type { Review, SetReview, SourceFile } from '../types.ts'
+import type { TextEdit } from './indent.ts'
 import type { ReadMany } from './set-pick.ts'
 import type { OpenResult } from './source.ts'
 import type { RecentEntry } from './storage.ts'
@@ -73,6 +74,10 @@ export interface Platform {
     capture(drop: unknown): Picked
     /** Read what was picked or dropped when it may be several files or a folder: each file with its name, size and text (not read when over the size). */
     readMany(picked: Picked): Promise<ReadMany>
+  }
+  /** Changing the text of a field the way typing does, so that the browser's own undo takes the change back in one step. `field` is the page's text area: only its platform knows what it is. */
+  fields: {
+    edit(field: unknown, edit: TextEdit): void
   }
   /** Getting a review out, as a file or as text on the clipboard; `copy` says whether it worked. */
   submit: {

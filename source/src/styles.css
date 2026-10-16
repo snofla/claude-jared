@@ -22,6 +22,9 @@
   /* The text of a hunk header: --accent is 4.18:1 in dark on the hunk tint with the reviewed mark, so this is a little lighter there. */
   --hunk-fg: light-dark(#4f46e5, #9591ff);
   --del-line: light-dark(#f6cfd1, rgba(248, 81, 73, 0.3));
+  /* The tints behind code in the words of a comment: in a line, and a fenced block. */
+  --md-code-bg: light-dark(rgba(110, 118, 129, 0.14), rgba(110, 118, 129, 0.3));
+  --md-pre-bg: light-dark(#f6f8fa, rgba(110, 118, 129, 0.14));
   --gutter-w: 76px;
   --row-h: 20px;
 }
@@ -519,12 +522,108 @@ pre {
   margin: 0 var(--space-12);
 }
 
+/* The two views of the comment field, Write and Preview, and the quiet word at their right. */
+.composer-views {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0 var(--space-12) var(--space-6);
+}
+
+.composer-markdown {
+  font-size: var(--font-size-xs);
+}
+
+/* The preview takes the place of the field: the same border and corners, and the words drawn as the card draws them. */
+.composer-preview {
+  margin: 0 var(--space-12);
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.composer-caption {
+  margin: var(--space-6) var(--space-12) 0;
+  font-size: var(--font-size-xs);
+}
+
 .composer-notice {
   margin: 0 var(--space-12) var(--space-12);
 }
 
 .hint-keys {
   font-size: var(--font-size-xs);
+}
+
+/* ---------- the words of a comment, drawn as Markdown ---------- */
+
+.md > * {
+  margin: 0 0 var(--space-8);
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md strong {
+  font-weight: 600;
+}
+
+.md code {
+  padding: 1px var(--space-4); /* raw: one pixel above and below keeps a code span inside the line's height */
+  border-radius: var(--radius-xs);
+  background: var(--md-code-bg);
+  font: 0.9em var(--mono);
+}
+
+.md a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The address after a link, in the preview. */
+.md-url {
+  margin-left: var(--space-4);
+  font: var(--font-size-xs) var(--mono);
+  color: var(--muted);
+}
+
+.md ul,
+.md ol {
+  padding-left: var(--space-20);
+}
+
+.md li + li {
+  margin-top: var(--space-2);
+}
+
+.md blockquote {
+  padding: 1px 0 1px var(--space-12); /* raw: one pixel above and below lines the quote's rule up with its text */
+  border-left: 3px solid var(--border-strong);
+  color: var(--muted);
+}
+
+/* A fenced block scrolls inside the card and never makes it wider. */
+.md pre {
+  overflow-x: auto;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--md-pre-bg);
+  font: 12.5px/1.5 var(--mono);
+}
+
+.md pre code {
+  padding: 0;
+  background: none;
+  font: inherit;
+}
+
+.md pre span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
 }
 
 /* diff of original vs suggested lines */

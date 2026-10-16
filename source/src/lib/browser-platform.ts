@@ -1,5 +1,5 @@
 import type { Platform } from './platform.ts'
-import { applyTheme, captureDrop, copyText, downloadText, readMany, readPickedFile, type Capture } from './browser-io.ts'
+import { applyTheme, captureDrop, copyText, downloadText, editField, readMany, readPickedFile, type Capture } from './browser-io.ts'
 import {
   forget,
   listRecent,
@@ -54,6 +54,7 @@ export const browserPlatform: Platform = {
     capture: (drop) => captureDrop(drop as DataTransfer),
     readMany: (picked) => readMany(picked as File[] | Capture),
   },
+  fields: { edit: (field, edit) => editField(field as HTMLTextAreaElement, edit) },
   submit: { download: downloadText, copy: copyText },
   prompts: { confirm: (message) => window.confirm(message) },
   environment: { now: nowIso, uid },

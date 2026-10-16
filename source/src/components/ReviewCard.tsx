@@ -8,6 +8,7 @@ import type { Action } from '../state/reducer'
 import type { ReviewComment } from '../types'
 import { Badge, Button, Card, CardBody, CardHead, IconButton, IconPencil, IconTrash } from '../ui'
 import { DiffBlock } from './DiffBlock'
+import { Markdown } from './Markdown'
 
 interface Props {
   comment: ReviewComment
@@ -68,7 +69,11 @@ export function ReviewCard({ comment, language, fileTokens, onHover, flash, disp
           )}
         </CardHead>
 
-        {comment.comment && <CardBody>{comment.comment}</CardBody>}
+        {comment.comment && (
+          <CardBody as="div" className="md">
+            <Markdown text={comment.comment} />
+          </CardBody>
+        )}
 
         {comment.suggestion !== null && (
           <div className="suggest">

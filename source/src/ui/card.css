@@ -25,6 +25,11 @@
   overflow-wrap: anywhere;
 }
 
+/* Blocks that are laid out already keep their own line breaks. */
+div.jared-card-body {
+  white-space: normal;
+}
+
 .jared-card-foot {
   display: flex;
   align-items: center;

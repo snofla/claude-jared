@@ -11,6 +11,13 @@ export interface MemoryPicked {
   text: string
 }
 
+/** What `fields.edit` takes as a field: its text and selection, which an edit changes. */
+export interface MemoryField {
+  value: string
+  selectionStart: number
+  selectionEnd: number
+}
+
 /** What it takes as a pick of several files, or a drop of them: the files, and how many more were seen and not read. */
 export interface MemoryPickedMany {
   files: MemoryPicked[]
@@ -168,6 +175,14 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
       readMany: async (picked) => {
         const { files, unread, unreadFolders } = picked as MemoryPickedMany
         return { unread: unread ?? 0, files: files.map(({ name, text }) => ({ name, text, size: new TextEncoder().encode(text).length })), ...(unreadFolders?.length ? { unreadFolders } : {}) }
+      },
+    },
+    fields: {
+      edit: (field, edit) => {
+        const f = field as MemoryField
+        f.value = f.value.slice(0, edit.from) + edit.insert + f.value.slice(edit.to)
+        f.selectionStart = edit.start
+        f.selectionEnd = edit.end
       },
     },
     submit: {

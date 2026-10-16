@@ -95,3 +95,8 @@ export function detectLanguage(fileName: string, firstLine = ''): string {
   }
   return PLAIN_TEXT
 }
+
+/** The language of a fenced block, from the word after its fence (`ts`, `python`, `sh`), read as the extension of a file is; plain text with no word, or a word that is no language. */
+export function languageOfFence(word: string | null): string {
+  return word ? detectLanguage(`code.${word}`) : PLAIN_TEXT
+}

@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { COPY } from '../lib/copy'
 import type { Mark } from '../lib/changes'
 import { fileAt, type FileEntry } from '../lib/files'
+import { plainExcerpt } from '../lib/markdown'
 import { commentLabel } from '../lib/review'
 import type { ReviewComment } from '../types'
 import { Badge, IconButton, IconMessage, IconX, Kbd } from '../ui'
@@ -69,7 +70,7 @@ export function ReviewPanel({ comments, marks, hoveredId, onHover, onJump, onClo
                   {c.suggestion !== null && <Badge tone="ok">± suggestion</Badge>}
                   {marks.has(c.id) && <Badge tone="accent">{marks.get(c.id) === 'new' ? COPY.markNew : COPY.markEdited}</Badge>}
                 </span>
-                <span className="side-item-text">{c.comment || 'Suggested change'}</span>
+                <span className="side-item-text">{plainExcerpt(c.comment) || 'Suggested change'}</span>
               </button>
               </li>
             </Fragment>

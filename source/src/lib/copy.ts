@@ -247,6 +247,26 @@ export const COPY = {
   serviceTooBig: 'This review is more than 4 MB, which is too much to hand over.',
   serviceNotSaved: 'The review could not be saved on this computer.',
   serviceRefused: (message: string): string => `The service refused the review: ${/[.!?]$/.test(message) ? message : `${message}.`}`,
+  /** Inside a link of a comment, read by a screen reader and not drawn: what the link does that its words do not say. */
+  opensInNewTab: ', opens in a new tab',
+  /** The two views of the comment field, and the name of the pair for a screen reader. */
+  commentWrite: 'Write',
+  commentPreview: 'Preview',
+  commentViews: 'Write or preview the comment',
+  /** Quiet, at the right of the two views: what the comment is written in. */
+  commentMarkdown: 'Markdown',
+  /** Under the field on the Write view. */
+  writeCaption: 'The comment is shown formatted.',
+  /** After it, where there is a keyboard: the shortcuts, with the key that goes with each (`⌘` on Apple's computers, `Ctrl+` elsewhere) as a variable. */
+  writeKeys: (mod: string): string => `${mod}B bold · ${mod}I italic · ${mod}K link`,
+  /** Under the preview. */
+  previewCaption: 'This is how the comment will look. Links open in a new tab.',
+  /** The preview of a comment with no words yet. */
+  previewEmpty: 'Nothing to preview yet.',
+  /** After the label of the suggestion field: what a suggestion does. */
+  suggestionReplaces: 'replaces the selected lines',
+  /** After the line above, with a "·" between, where there is a keyboard: what Tab and Escape do in the suggestion field. The keys are variables, so that they can change. */
+  suggestionKeys: (tab: string, esc: string): string => `${tab} indents, ${esc} then ${tab} leaves the field`,
   /**
    * The composer, when the suggestion being written overlaps the suggestion of another comment: `range` is the other's lines, or
    * a list of them built with `Intl.ListFormat`, in lower case after "on" ("lines 5–10 and line 9"). It does not say what a reader will do.

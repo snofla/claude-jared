@@ -30,9 +30,13 @@ export function CardHead({ className, ...rest }: Part<'header'>) {
   return <header {...rest} className={['jared-card-head', className].filter(Boolean).join(' ')} />
 }
 
-/** The words of a card: a paragraph that keeps the line breaks of what was written and breaks a word that is longer than the card. */
-export function CardBody({ className, ...rest }: Part<'p'>) {
-  return <p {...rest} className={['jared-card-body', className].filter(Boolean).join(' ')} />
+/**
+ * The words of a card: a paragraph that keeps the line breaks of what was written and breaks a word that is longer than the card. A `div` (`as="div"`) when the
+ * words are blocks that are laid out already, such as paragraphs and lists drawn from Markdown: it keeps no line breaks of its own then, the blocks have them.
+ */
+export function CardBody({ as = 'p', className, ...rest }: Part<'p'> & { as?: 'p' | 'div' }) {
+  const classes = ['jared-card-body', className].filter(Boolean).join(' ')
+  return as === 'div' ? <div {...(rest as ComponentPropsWithoutRef<'div'>)} className={classes} /> : <p {...rest} className={classes} />
 }
 
 /** The bottom of a card: a row of buttons. What it does when the room is short is the caller's, as a layout class. */
