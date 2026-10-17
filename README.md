@@ -66,7 +66,7 @@ You can also ask in words: "review `path/to/file.ts` in Jared" or "review commit
 
 To see which version of the plugin you have, run `/jared:version`.
 
-Jared opens with your file, in your session's browser if it has one (the browser pane of the Claude app, or Claude in Chrome), and otherwise in your own browser. Write your comments there. How the review comes back depends on which of the two it is.
+Jared opens with your file, or your files, in your session's browser if it has one (the browser pane of the Claude app, or Claude in Chrome), and otherwise in your own browser. Write your comments there. How the review comes back depends on which of the two it is.
 
 ### In your session's browser
 

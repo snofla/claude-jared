@@ -22,6 +22,9 @@
   --accent: light-dark(#4f46e5, #8b87ff);
   --accent-ink: light-dark(#ffffff, #0b0d12);
   --accent-soft: light-dark(rgba(79, 70, 229, 0.1), rgba(139, 135, 255, 0.14));
+  --code-selection: light-dark(rgba(79, 70, 229, 0.22), rgba(139, 135, 255, 0.32));
+  --code-mark: light-dark(rgba(79, 70, 229, 0.12), rgba(139, 135, 255, 0.18));
+  --code-mark-edge: light-dark(rgba(79, 70, 229, 0.55), rgba(139, 135, 255, 0.6));
   --danger: light-dark(#cf222e, #ff7b72);
   /* The label on --danger: 5.36:1 in light and 7.71:1 in dark (white on the dark red is 2.52:1). */
   --danger-fg: light-dark(#ffffff, #0b0d12);

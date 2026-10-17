@@ -457,6 +457,7 @@ export function CodeViewer({
                     <ReviewComposer
                       draft={draft}
                       lines={file.lines}
+                      language={layout ? languageAt(layout, draft.range.start) : file.language}
                       label={layout ? setRangeLabel(layout, draft.range.start, draft.range.end) : labelOfRange(diff, draft.range.start, draft.range.end)}
                       canSuggest={!diff && !(layout && languageAt(layout, draft.range.start) === 'diff')}
                       warning={suggestionWarning(comments, draft)}

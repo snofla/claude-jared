@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type KeyboardEvent } from 'react'
+import { drawnLines } from '../lib/code-drawing'
+import { matchingBracket, overlayRows } from '../lib/code-field'
 import { COPY } from '../lib/copy'
 import { indentUnit } from '../lib/indent'
 import { isApple } from '../lib/markdown-keys'
@@ -7,14 +9,17 @@ import { usePlatform } from '../hooks/usePlatform'
 import { useMarkdownKeys } from '../hooks/useMarkdownKeys'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useTabIndent } from '../hooks/useTabIndent'
+import { useLastColoured } from '../hooks/useTokens'
 import type { Action } from '../state/reducer'
 import type { Draft } from '../types'
-import { Badge, Button, Card, CardFoot, CardHead, LiveStatus, Notice, SegmentedControl, TextField } from '../ui'
+import { Badge, Button, Card, CardFoot, CardHead, CodeField, LiveStatus, Notice, SegmentedControl, TextField } from '../ui'
 import { Markdown } from './Markdown'
 
 interface Props {
   draft: Draft
   lines: string[]
+  /** The language of the file that the selected lines are in, for the keys of the suggestion field. */
+  language: string
   /** What the selected lines are called: their numbers, or the file and lines they are in a diff. */
   label: string
   /** Whether a suggestion can be started: not on a diff, where there is no file to replace lines of. */
@@ -27,15 +32,25 @@ interface Props {
 }
 
 /** Inline editor for a new or existing comment, shown under the last selected line. */
-export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash, dispatch }: Props) {
+export function ReviewComposer({ draft, lines, language, label, canSuggest, warning, flash, dispatch }: Props) {
   const { environment } = usePlatform()
   const rootRef = useRef<HTMLElement>(null)
   const commentRef = useRef<HTMLTextAreaElement>(null)
   const canSave = canSaveDraft(draft, lines)
   const suggestionRows = draft.suggestion === null ? 4 : Math.min(18, Math.max(4, draft.suggestion.split('\n').length + 1))
-  // Tab indents in the suggestion by the file's own unit, read from the lines that the suggestion replaces and then from the whole file.
+  // Tab and Enter indent in the suggestion by the file's own unit, read from the lines that the suggestion replaces and then from the whole file.
   const unit = useMemo(() => indentUnit(lines.slice(draft.range.start - 1, draft.range.end), lines), [lines, draft.range.start, draft.range.end])
-  const tabKeys = useTabIndent(unit)
+  const tabKeys = useTabIndent(unit, language)
+  // The suggestion is coloured as the file's language while it is typed: the last text that was coloured lends its colours to the lines that did not change,
+  // and the bracket that pairs with the one at the caret is marked while the caret is in the field and nothing is selected.
+  const coloured = useLastColoured(draft.suggestion, language)
+  const [caret, setCaret] = useState<number | null>(null)
+  const suggestionLines = useMemo(() => {
+    if (draft.suggestion === null) return []
+    const pair = caret === null ? null : matchingBracket(draft.suggestion, caret)
+    return drawnLines(overlayRows(draft.suggestion, coloured), pair ? [pair.at, pair.match] : [])
+  }, [draft.suggestion, coloured, caret])
+  const followCaret = (field: HTMLTextAreaElement) => setCaret(field.selectionStart === field.selectionEnd ? field.selectionStart : null)
   const markdownKeys = useMarkdownKeys()
   // No Tab on a touch screen: the keys are left out of the hint there.
   const touch = useMediaQuery('(pointer: coarse)')
@@ -122,19 +137,25 @@ export function ReviewComposer({ draft, lines, label, canSuggest, warning, flash
         )}
 
         {draft.suggestion !== null && (
-          <TextField
+          <CodeField
             className="suggest"
             label="Suggested implementation"
             hint={suggestionHint}
-            variant="code"
-            spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
             rows={suggestionRows}
+            lines={suggestionLines}
             onKeyDown={tabKeys.onKeyDown}
-            onBlur={tabKeys.onBlur}
+            onSelect={(e) => followCaret(e.currentTarget)}
+            onBlur={() => {
+              tabKeys.onBlur()
+              setCaret(null)
+            }}
             value={draft.suggestion}
-            onChange={(e) => dispatch({ type: 'patchDraft', patch: { suggestion: e.target.value } })}
+            onChange={(e) => {
+              dispatch({ type: 'patchDraft', patch: { suggestion: e.target.value } })
+              followCaret(e.target)
+            }}
           />
         )}
 

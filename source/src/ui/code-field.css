@@ -1,0 +1,74 @@
+/*
+  CodeField: the text area of a field for code over a drawing of its coloured lines. The drawing has the text area's border width, padding, font, line height
+  and tab size, so that each letter of the drawing is under the same letter of the text area; the text area's letters are transparent, its caret and its
+  selection are not.
+*/
+
+.jared-code-field {
+  position: relative;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.jared-field.jared-code-field-input {
+  position: relative;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+}
+
+.jared-code-field-input::selection {
+  background: var(--code-selection);
+  color: transparent;
+}
+
+.jared-code-field-drawing {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  padding: var(--space-8) var(--space-10);
+  pointer-events: none;
+}
+
+.jared-code-field-drawing pre {
+  margin: 0;
+  font: var(--font-size-sm) / 1.5 var(--mono);
+  tab-size: 4;
+  white-space: pre;
+  color: var(--text);
+}
+
+.jared-code-field-drawing span {
+  color: light-dark(var(--shiki-light, var(--text)), var(--shiki-dark, var(--text)));
+}
+
+/* The bracket that pairs with the one at the caret: a quiet box that takes no room, so that no letter moves. */
+.jared-code-field-drawing .jared-code-field-mark {
+  border-radius: 2px; /* raw: the box of one letter, which the smallest radius of the scale would round to a pill */
+  background: var(--code-mark);
+  box-shadow: inset 0 0 0 1px var(--code-mark-edge);
+}
+
+/* Unavailable: the drawing is faded as the text area is (`.jared-field:disabled`), or the colours would hide that the field is disabled. */
+.jared-code-field:has(.jared-code-field-input:disabled) .jared-code-field-drawing {
+  opacity: 0.45;
+}
+
+@media (pointer: coarse) {
+  .jared-code-field-drawing pre {
+    font-size: var(--font-size-lg);
+  }
+}
+
+/* In forced colours the system draws the field: the text area shows its own letters and the drawing is not shown. */
+@media (forced-colors: active) {
+  .jared-field.jared-code-field-input {
+    color: CanvasText;
+  }
+
+  .jared-code-field-drawing {
+    display: none;
+  }
+}

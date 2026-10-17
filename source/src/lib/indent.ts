@@ -1,5 +1,5 @@
 /**
- * Tab and Shift+Tab in a field of code: what the indentation of the text is, and the edit that a press of the key makes. The functions are pure: the
+ * Tab, Shift+Tab and Enter in a field of code: what the indentation of the text is, and the edit that a press of the key makes. The functions are pure: the
  * field reads its text and selection, asks for an edit, and applies it itself.
  */
 
@@ -112,4 +112,37 @@ export function outdentEdit(value: string, start: number, end: number, unit: str
   const insert = lines.map((line, i) => line.slice(taken[i])).join('\n')
   if (spansLines(value, start, end)) return { from: first, to: last, insert, start: first, end: first + insert.length }
   return { from: first, to: last, insert, start: Math.max(first, start - taken[0]), end: Math.max(first, end - taken[0]) }
+}
+
+/** The brackets after which a new line is indented by one more level, each with the one that closes it. */
+const PAIRS = new Map([
+  ['(', ')'],
+  ['[', ']'],
+  ['{', '}'],
+])
+
+/** The languages in which a line that ends with a colon opens a block. */
+const COLON_BLOCKS = new Set(['python', 'yaml'])
+
+/** How many spaces and tabs `text` starts with. */
+const blankStart = (text: string): number => /^[ \t]*/.exec(text)![0].length
+
+/**
+ * Enter: the selection is replaced by a new line, indented as the text before the caret on its line is. One `unit` more when that text ends with an opening bracket,
+ * or with a colon in a language that opens a block with one (Python, YAML); and when the caret is between an opening bracket and its closing one, with only spaces
+ * or tabs between them, the closing one goes to a line of its own at the first indentation, with the caret on the line between.
+ */
+export function newlineEdit(value: string, start: number, end: number, unit: string, language: string): TextEdit {
+  const before = value.slice(lineStart(value, start), start)
+  const indent = before.slice(0, blankStart(before))
+  const last = before.replace(/[ \t]+$/, '').slice(-1)
+  const opens = PAIRS.has(last) || (last === ':' && COLON_BLOCKS.has(language))
+  const inner = opens ? indent + unit : indent
+  const gap = blankStart(value.slice(end))
+  if (PAIRS.has(last) && value[end + gap] === PAIRS.get(last)) {
+    const caret = start + 1 + inner.length
+    return { from: start, to: end + gap, insert: `\n${inner}\n${indent}`, start: caret, end: caret }
+  }
+  const insert = `\n${inner}`
+  return { from: start, to: end, insert, start: start + insert.length, end: start + insert.length }
 }

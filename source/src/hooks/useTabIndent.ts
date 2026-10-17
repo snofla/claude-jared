@@ -1,5 +1,5 @@
 import { useCallback, useRef, type KeyboardEvent } from 'react'
-import { indentEdit, outdentEdit } from '../lib/indent'
+import { indentEdit, newlineEdit, outdentEdit } from '../lib/indent'
 import { usePlatform } from './usePlatform'
 
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])
@@ -7,9 +7,11 @@ const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])
 /**
  * Tab and Shift+Tab in a field of code: they indent and outdent the lines that the caret or the selection touches, by `unit`. A field that takes Tab has to give the key
  * back, so the first Escape in it is taken (the form around it does not hear it) and the next Tab, or Shift+Tab, moves on as it always does; any other key, or leaving the
- * field, takes the Escape back, and an Escape that comes after an Escape is not taken, so that it reaches the form as before.
+ * field, takes the Escape back, and an Escape that comes after an Escape is not taken, so that it reaches the form as before. Enter starts a new line at the indentation
+ * of the caret's line, or one level more after an opening bracket (or a colon in `language`, where that opens a block); Enter with Shift is the plain new line, and with
+ * ⌘ or Ctrl it is left to the form, which saves.
  */
-export function useTabIndent(unit: string) {
+export function useTabIndent(unit: string, language: string) {
   const { fields } = usePlatform()
   const leaving = useRef(false)
 
@@ -36,9 +38,14 @@ export function useTabIndent(unit: string) {
         if (edit) fields.edit(field, edit)
         return
       }
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault()
+        const field = e.currentTarget
+        fields.edit(field, newlineEdit(field.value, field.selectionStart, field.selectionEnd, unit, language))
+      }
       if (!MODIFIERS.has(e.key)) leaving.current = false
     },
-    [unit, fields],
+    [unit, language, fields],
   )
 
   const onBlur = useCallback(() => {

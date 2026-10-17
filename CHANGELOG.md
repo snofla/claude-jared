@@ -2,6 +2,15 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.16.5 — 2026-10-17
+
+- **The suggestion field is coloured as you type.** The field of a suggested implementation is now coloured as the file's language while you type. A line you change is plain for a moment, until its colours follow, and a language that Jared's page does not carry stays plain.
+  - The bracket that pairs with the one at the cursor is marked, with its partner, and a selection is a tint over the colours.
+  - A screen reader hears the field as before, and in forced colours the field shows its own letters.
+- **`Enter` keeps the indentation in the suggestion field.** A new line starts at the indentation of the line you are on, with one level more after an opening bracket just before the cursor, and after a colon in Python and YAML. Pressed between a bracket and its closing one, `Enter` puts the closing one on a line of its own, with the cursor on the line between.
+  - `Shift+Enter` is a plain new line, and the browser's undo takes each press back.
+- The README of the plugin says that Jared opens with your file, or your files.
+
 ## 0.16.0 — 2026-10-16
 
 - **A comment is drawn as Markdown.** In its card a comment shows paragraphs, bold, italic, code spans, links, bullet and numbered lists, quotes and fenced code, which is coloured as code. Raw HTML, images and headings are not drawn: a `#` line stays text. What you typed is what is kept.

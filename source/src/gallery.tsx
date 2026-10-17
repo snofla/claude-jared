@@ -1,7 +1,7 @@
 import { StrictMode, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as ui from './ui'
-import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption, VisuallyHidden } from './ui'
+import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, CodeField, type CodePart, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption, VisuallyHidden } from './ui'
 import './styles.css'
 import './gallery.css'
 
@@ -10,6 +10,21 @@ import './gallery.css'
  * a component is seen in all of them at once. A page of the dev server (`gallery.html`; the production build does not include it), which imports the library and the stylesheet and nothing
  * else of the app. Hover, focus and press are live: use the mouse and Tab. Every string here is this page's own: the library holds no English.
  */
+
+
+const GALLERY_CODE = 'function add(a, b) {\n  return a + b\n}'
+const keyword = { '--shiki-light': '#c32836', '--shiki-dark': '#f97583' } as CodePart['style']
+const name = { '--shiki-light': '#6f42c1', '--shiki-dark': '#b392f0' } as CodePart['style']
+
+/** The lines of the gallery's code field, coloured as Shiki colours them, with the `{` of the first line and the `}` of the last marked; or plain. */
+function galleryLines(coloured: boolean): CodePart[][] {
+  if (!coloured) return GALLERY_CODE.split('\n').map((text) => [{ text }])
+  return [
+    [{ text: 'function', style: keyword }, { text: ' ' }, { text: 'add', style: name }, { text: '(a, b) ' }, { text: '{', mark: true }],
+    [{ text: '  ' }, { text: 'return', style: keyword }, { text: ' a ' }, { text: '+', style: keyword }, { text: ' b' }],
+    [{ text: '}', mark: true }],
+  ]
+}
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -144,6 +159,13 @@ function PrimitiveStates() {
       </Group>
       <Group title="With the plain label of a dialog: bold words in the text colour, and the hint at the end of the row">
         <TextField className="gallery-wide" label="Overall summary" labelStyle="plain" hint="optional" rows={2} placeholder="Say what you think of the whole change…" />
+      </Group>
+
+      <h3 className="gallery-component">CodeField</h3>
+      <Group title="Coloured as its lines are drawn, with a pair of brackets marked; drawn plain, as before its colours come or in a language with none; and disabled">
+        <CodeField className="gallery-wide" label="Suggested implementation" hint="replaces the selected lines" rows={4} defaultValue={GALLERY_CODE} lines={galleryLines(true)} />
+        <CodeField className="gallery-wide" label="Plain" hint="with no colours" rows={4} defaultValue={GALLERY_CODE} lines={galleryLines(false)} />
+        <CodeField className="gallery-wide" label="Disabled" rows={4} defaultValue={GALLERY_CODE} lines={galleryLines(true)} disabled />
       </Group>
 
       <h3 className="gallery-component">Select</h3>
