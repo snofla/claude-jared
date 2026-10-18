@@ -267,6 +267,14 @@ export const COPY = {
   suggestionReplaces: 'replaces the selected lines',
   /** After the line above, with a "·" between, where there is a keyboard: what Tab and Escape do in the suggestion field. The keys are variables, so that they can change. */
   suggestionKeys: (tab: string, esc: string): string => `${tab} indents, ${esc} then ${tab} leaves the field`,
+  /** The folded row of a suggestion's diff in its card: how many unchanged lines it hides. */
+  unchangedLines: (count: number): string => (count === 1 ? '1 unchanged line' : `${count} unchanged lines`),
+  /** The accessible name of that row, a button that opens the run: the words it shows, after what it does. */
+  showUnchanged: (count: number): string => `Show ${COPY.unchangedLines(count)}`,
+  /** Read before the code of a removed line of that diff, and not drawn: the sign `−` is drawn and not read. */
+  diffRemoved: 'removed, ',
+  /** The same, before the code of an added line, for the sign `+`. */
+  diffAdded: 'added, ',
   /**
    * The composer, when the suggestion being written overlaps the suggestion of another comment: `range` is the other's lines, or
    * a list of them built with `Intl.ListFormat`, in lower case after "on" ("lines 5–10 and line 9"). It does not say what a reader will do.

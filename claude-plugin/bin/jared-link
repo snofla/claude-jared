@@ -936,6 +936,7 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
   set +f
   bad=$(perl -MJSON::PP -e '
     my ($now, $out, $label, $closes, $message, $banner, $name, @files) = @ARGV;
+    utf8::decode($name); # the bytes of the name as the characters that they spell, as for the names of a set
     my $read = sub {
       my ($path) = @_;
       open(my $in, "<:raw", $path) or exit 1;
@@ -1025,6 +1026,7 @@ fi
 # The whole request, as JSON, as base64url: perl does the JSON, which sh cannot do for any text.
 link=$(perl -MJSON::PP -MMIME::Base64 -e '
   my ($file, $name, $now, $base) = @ARGV;
+  utf8::decode($name); # the bytes of the name as the characters that they spell, as for the names of a set
   open(my $in, "<:raw", $file) or exit 1;
   local $/;
   my $text = <$in>;

@@ -2,6 +2,13 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.16.6 — 2026-10-18
+
+- **A saved suggestion is shown as a diff of the lines that change.** In its card, the lines that a suggestion keeps are drawn once, plain, and only the lines that differ are red or green, with the words that changed in a stronger tint. A long run of unchanged lines is folded into one line that says how many there are, and opens when you click it.
+  - A screen reader hears whether a line is removed or added, and a long diff can be scrolled from the keyboard.
+- **The page no longer stops on a long text.** Opening a long file, or typing or saving a long suggestion, no longer holds the page for a moment: a long text is coloured a part at a time, and the page answers in between. The colours still come all at once, a moment after the text.
+- **A file name with accented or non-Latin letters stays as it is.** A file such as `é.ts` or `日本語.ts`, opened alone, now keeps its name in the tab's title, the header and the exported review, where it was garbled before (`Ã©.ts`). Several files opened together kept their names already.
+
 ## 0.16.5 — 2026-10-17
 
 - **The suggestion field is coloured as you type.** The field of a suggested implementation is now coloured as the file's language while you type. A line you change is plain for a moment, until its colours follow, and a language that Jared's page does not carry stays plain.

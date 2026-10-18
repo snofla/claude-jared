@@ -1,4 +1,4 @@
-import type { BundledLanguage, SpecialLanguage, ThemedToken } from 'shiki'
+import type { BundledLanguage, GrammarState, SpecialLanguage, ThemedToken } from 'shiki'
 import { highlightJobs, tokensByRow, type ParsedDiff } from './diff.ts'
 
 export type LineTokens = ThemedToken[]
@@ -35,8 +35,53 @@ const CACHE_SIZE = 12
 const cache = new Map<string, Promise<LineTokens[] | null>>()
 
 /**
+ * A text of more lines than this is coloured in slices of this many lines, with the page given a turn between them: Shiki colours a whole text in one task, which took
+ * about 340 ms for 2,000 lines in a production build (measured on 2026-10-17) and froze the page that long, when a file was opened, a suggestion was typed or a
+ * comment with a long suggestion was saved. A slice of 100 lines takes under 30 ms there. The colours are the same as those of one pass.
+ */
+export const COLOUR_SLICE_LINES = 100
+
+/** Gives the page a turn (its input, its drawing) before the next slice is coloured. */
+const yieldToPage = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+
+/**
+ * The colours of `code`, one array per line, made in slices of `sliceLines` lines, each starting with the state that the grammar was left in by the one before, so
+ * that a comment or a string over several lines goes on across the edge of a slice; and what one pass over the whole text gives, offsets included. Shiki is loaded on
+ * the first call. Throws what Shiki throws for a language that it does not know.
+ */
+export async function colourInSlices(code: string, lang: string, sliceLines: number): Promise<LineTokens[]> {
+  // Loaded on demand so the grammar engine and language chunks stay out of the first paint.
+  const { codeToTokens } = await import('shiki')
+  const options = {
+    lang: lang as BundledLanguage | SpecialLanguage,
+    themes: THEMES,
+    colorReplacements: COLOR_REPLACEMENTS,
+    defaultColor: false,
+    tokenizeMaxLineLength: MAX_HIGHLIGHT_LINE_LENGTH,
+  } as const
+  const lines = code.split('\n')
+  if (lines.length <= sliceLines) return (await codeToTokens(code, options)).tokens
+  const colours: LineTokens[] = []
+  let state: GrammarState | undefined
+  let offset = 0
+  for (let at = 0; at < lines.length; at += sliceLines) {
+    if (at > 0) await yieldToPage()
+    const slice = lines.slice(at, at + sliceLines).join('\n')
+    const result = await codeToTokens(slice, state ? { ...options, grammarState: state } : options)
+    for (const line of result.tokens) {
+      for (const token of line) token.offset += offset
+      colours.push(line)
+    }
+    state = result.grammarState
+    offset += slice.length + 1
+  }
+  return colours
+}
+
+/**
  * Tokenise `code` into one token array per line. Each token carries both theme colours as CSS
- * variables (`--shiki-light` / `--shiki-dark`), so light/dark switching is pure CSS.
+ * variables (`--shiki-light` / `--shiki-dark`), so light/dark switching is pure CSS. A long text is coloured in slices (`COLOUR_SLICE_LINES`) so that
+ * the page is not stopped while it is.
  * Resolves to `null` if highlighting fails; callers then show plain text.
  */
 export function tokenize(code: string, lang: string): Promise<LineTokens[] | null> {
@@ -46,16 +91,7 @@ export function tokenize(code: string, lang: string): Promise<LineTokens[] | nul
 
   const pending = (async () => {
     try {
-      // Loaded on demand so the grammar engine and language chunks stay out of the first paint.
-      const { codeToTokens } = await import('shiki')
-      const { tokens } = await codeToTokens(code, {
-        lang: lang as BundledLanguage | SpecialLanguage,
-        themes: THEMES,
-        colorReplacements: COLOR_REPLACEMENTS,
-        defaultColor: false,
-        tokenizeMaxLineLength: MAX_HIGHLIGHT_LINE_LENGTH,
-      })
-      return tokens
+      return await colourInSlices(code, lang, COLOUR_SLICE_LINES)
     } catch {
       cache.delete(key)
       return null

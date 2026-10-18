@@ -22,6 +22,9 @@
   /* The text of a hunk header: --accent is 4.18:1 in dark on the hunk tint with the reviewed mark, so this is a little lighter there. */
   --hunk-fg: light-dark(#4f46e5, #9591ff);
   --del-line: light-dark(#f6cfd1, rgba(248, 81, 73, 0.3));
+  /* The words that changed in a pair of a removed and an added line: a stronger tint of the row's own. */
+  --del-word: light-dark(rgba(207, 34, 46, 0.16), rgba(248, 81, 73, 0.3));
+  --add-word: light-dark(rgba(26, 127, 55, 0.18), rgba(46, 160, 67, 0.36));
   /* The tints behind code in the words of a comment: in a line, and a fenced block. */
   --md-code-bg: light-dark(rgba(110, 118, 129, 0.14), rgba(110, 118, 129, 0.3));
   --md-pre-bg: light-dark(#f6f8fa, rgba(110, 118, 129, 0.14));
@@ -626,32 +629,38 @@ pre {
   color: light-dark(var(--shiki-light), var(--shiki-dark));
 }
 
-/* diff of original vs suggested lines */
+/* a suggestion against the lines it replaces, as a diff of the lines that change: one block, one scroll */
 .diff {
+  max-height: 360px;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  overflow: hidden;
   font: 13px/20px var(--mono);
 }
 
-.diff-block {
-  max-height: 240px;
-  overflow: auto;
+.diff:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
-.diff-block.del {
-  background: var(--del-bg);
-  border-bottom: 1px solid var(--del-line);
-}
-
-.diff-block.add {
-  background: var(--add-bg);
+/* as wide as the longest line, so that each row's tint runs to the end when the block scrolls sideways */
+.diff-rows {
+  width: max-content;
+  min-width: 100%;
 }
 
 .diff-line {
   display: flex;
-  min-width: max-content;
+  min-height: var(--row-h); /* a kept blank line has no sign and no text, and still takes its row */
   white-space: pre;
+}
+
+.diff-line.del {
+  background: var(--del-bg);
+}
+
+.diff-line.add {
+  background: var(--add-bg);
 }
 
 .diff-sign {
@@ -660,16 +669,50 @@ pre {
   user-select: none;
 }
 
-.del .diff-sign {
+.diff-line.del .diff-sign {
   color: var(--del-fg);
 }
 
-.add .diff-sign {
+.diff-line.add .diff-sign {
   color: var(--add-fg);
 }
 
 .diff-code {
   padding-right: var(--space-12);
+}
+
+/* the words that changed in a pair of a removed and an added line */
+.diff-line.del .diff-word {
+  border-radius: 3px; /* raw: the box of a word in a line of code, which the smallest radius of the scale would round too much */
+  background: var(--del-word);
+}
+
+.diff-line.add .diff-word {
+  border-radius: 3px; /* raw: as the removed word's */
+  background: var(--add-word);
+}
+
+/* a run of unchanged lines, folded: one quiet row that opens it */
+.diff-fold {
+  display: block;
+  width: 100%;
+  padding: 1px 0 1px 28px; /* raw: the row's text starts where the code of a row does, after the 28 px of its sign */
+  border: 0;
+  border-block: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font: var(--font-size-xs) / 18px var(--sans); /* raw: a little lower than a row of code, so that the fold reads as a gap */
+  text-align: left;
+  cursor: pointer;
+}
+
+.diff-fold:hover {
+  color: var(--text);
+}
+
+.diff-fold:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* ---------- floating selection bar ---------- */
