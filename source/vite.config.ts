@@ -12,6 +12,8 @@ export default defineConfig(({ command }) => ({
   define: { __JARED_VERSION__: JSON.stringify(command === 'build' ? version : 'dev') },
   plugins: [react()],
   test: {
+    // Half of the cores run the tests: a full run takes as long as with all but one of them (57 s against 61 s on a machine of 12 cores), with 16 to 40% less memory and about 8% less CPU, and it leaves the rest of the machine to other work.
+    maxWorkers: '50%',
     coverage: {
       provider: 'v8',
       // Business logic: the folders that hold no UI, and this coverage tool itself.

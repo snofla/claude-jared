@@ -1,7 +1,7 @@
 {
   "name": "jared",
   "private": true,
-  "version": "0.16.6",
+  "version": "0.16.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,7 +22,7 @@
     "shiki": "^4.5.0"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",

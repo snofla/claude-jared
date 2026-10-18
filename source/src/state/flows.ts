@@ -7,7 +7,7 @@ import { draftHasText, planOpen } from '../lib/review'
 import { MAX_BYTES, MAX_SET_BYTES, buildSource, prepareSource, tooBig } from '../lib/source'
 import { MAX_SCANNED, MAX_SET_FILES, planPicked, type SetPlan } from '../lib/set-pick'
 import { formatBytes } from '../lib/util'
-import type { Action } from './reducer'
+import type { Action, AppState } from './reducer'
 
 /**
  * What the interface does with the places it runs in: open a file and ask about replacing a review, go back to a kept one,
@@ -39,6 +39,39 @@ export interface OpenSession {
 export function keepOpen(platform: Platform, file: SourceFile): void {
   platform.reviews.saveSource(file)
   platform.reviews.setLast(file.hash)
+}
+
+/** What is open, as far as keeping its review goes: the file (for a set, the one that stands for it), its review, and the files of a set. */
+export type KeptOpen = Pick<AppState, 'file' | 'review' | 'set'>
+
+/**
+ * Keep the review of what is open, as the page does once it has drawn a change: a review of one file as it is, and a set whole the first time, with its
+ * files, and then its review alone. `keptSet` is the hash of the set that is kept whole already, and what comes back is the hash of the one that is kept
+ * whole now; with nothing open, nothing is kept and none is.
+ */
+export function keepReview(platform: Platform, open: KeptOpen, keptSet: string | null): string | null {
+  const { file, review, set } = open
+  if (!review || !file) return null
+  if (review.version === 1) platform.reviews.saveReview(review)
+  else if (set) {
+    if (keptSet === file.hash) platform.reviews.saveSetReview(review)
+    else {
+      platform.reviews.saveSet(set.files, review)
+      platform.reviews.setLast(file.hash)
+      return file.hash
+    }
+  }
+  return keptSet
+}
+
+/**
+ * Keep the review that a request takes the page away from, before the page adopts what comes next. The page keeps a review once it has drawn a change,
+ * and a script can send a change and a `close`, or an `open` of another file, at once: the two are drawn together, after the file is left, and the change
+ * would never be kept. `next` is the file that the request leaves open; when it is the one that is open, nothing is left and nothing is kept here.
+ * `keptSet` as for `keepReview`.
+ */
+export function keepBeforeLeaving(platform: Platform, left: KeptOpen, next: SourceFile | null, keptSet: string | null): string | null {
+  return next?.hash === left.file?.hash ? keptSet : keepReview(platform, left, keptSet)
 }
 
 /** Remember that no file is open. */

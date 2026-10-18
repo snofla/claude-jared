@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type KeyboardEvent } from 'react'
 import { drawnLines } from '../lib/code-drawing'
-import { matchingBracket, overlayRows } from '../lib/code-field'
+import { fieldRows, matchingBracket, overlayRows } from '../lib/code-field'
 import { COPY } from '../lib/copy'
 import { indentUnit } from '../lib/indent'
 import { isApple } from '../lib/markdown-keys'
@@ -37,7 +37,7 @@ export function ReviewComposer({ draft, lines, language, label, canSuggest, warn
   const rootRef = useRef<HTMLElement>(null)
   const commentRef = useRef<HTMLTextAreaElement>(null)
   const canSave = canSaveDraft(draft, lines)
-  const suggestionRows = draft.suggestion === null ? 4 : Math.min(18, Math.max(4, draft.suggestion.split('\n').length + 1))
+  const suggestionRows = fieldRows(draft.suggestion)
   // Tab and Enter indent in the suggestion by the file's own unit, read from the lines that the suggestion replaces and then from the whole file.
   const unit = useMemo(() => indentUnit(lines.slice(draft.range.start - 1, draft.range.end), lines), [lines, draft.range.start, draft.range.end])
   const tabKeys = useTabIndent(unit, language)

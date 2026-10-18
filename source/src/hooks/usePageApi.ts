@@ -32,7 +32,7 @@ declare global {
  * Offer the protocol to scripts on the page (a browser tool, a test, the console) as `window.jared`. All the rules are in
  * `handleAppMessage`; this keeps a copy of the page's state that a call replaces at once, so that two calls in one script
  * see each other, and gives what a call changes to the page. `onAdopted` says what the page also does for a file that a
- * request has opened or closed: the file, or `null`, whether it is another file than before, and whether it is a set of files (then the file is the one that stands for them). `onDeclined` is given the words for
+ * request has opened or closed: the file, or `null`, whether it is another file than before, whether it is a set of files (then the file is the one that stands for them), and the state that the request found, whose review is to be kept when the request leaves its file. `onDeclined` is given the words for
  * the reviewer when a script's `open` or `close` through `window.jared.handleMessage` is declined: the script gets the reply, and the
  * reviewer would be told nothing. A request that the page's own code applies is not told this way, as that code asks the reviewer itself.
  *
@@ -42,7 +42,7 @@ declare global {
 export function usePageApi(
   state: AppState,
   dispatch: Dispatch<Action>,
-  onAdopted: (file: SourceFile | null, another: boolean, isSet: boolean) => void,
+  onAdopted: (file: SourceFile | null, another: boolean, isSet: boolean, left: AppState) => void,
   outbox: Outbox<Event>,
   onDeclined: (text: string) => void,
 ): (value: unknown, discard?: boolean) => Reply[] {
@@ -60,10 +60,11 @@ export function usePageApi(
       const outcome = handleAppMessage(session, value, reviews.review, reviews.setReview)
       if (outcome.adopt) {
         const action: Action = { type: 'adopt', ...outcome.adopt }
-        const another = outcome.adopt.file?.hash !== mirror.current.file?.hash
-        mirror.current = reducer(mirror.current, action)
+        const left = mirror.current
+        const another = outcome.adopt.file?.hash !== left.file?.hash
+        mirror.current = reducer(left, action)
         dispatch(action)
-        adopted.current(outcome.adopt.file, another, outcome.adopt.set !== null)
+        adopted.current(outcome.adopt.file, another, outcome.adopt.set !== null, left)
       }
       return outcome.replies
     },

@@ -2,6 +2,13 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.16.7 — 2026-10-18
+
+- **A change that Claude makes just before it leaves a file is now kept.** A change that a script makes in an open review through the page, such as Claude through its browser tool (a comment deleted, a summary written, the review marked as having left Jared), and that it follows at once by closing the file or opening another, is now kept in the browser.
+  - Before, the page answered that it was done but kept the old review, so a deleted comment came back when the file was opened again. Nothing changes for a person working in the page.
+- The page does a little less work while you review: finding the folded runs of a suggestion's diff, reading the list of recent reviews, and sizing the suggestion field as you type each cost less.
+- The packages that build the page are updated within their ranges, React and Vite among them, and the notices name the new versions of React.
+
 ## 0.16.6 — 2026-10-18
 
 - **A saved suggestion is shown as a diff of the lines that change.** In its card, the lines that a suggestion keeps are drawn once, plain, and only the lines that differ are red or green, with the words that changed in a stronger tint. A long run of unchanged lines is folded into one line that says how many there are, and opens when you click it.

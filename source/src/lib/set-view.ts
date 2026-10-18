@@ -68,11 +68,6 @@ export function rowOfLine(layout: SetLayout, file: number, line: number): number
   return header + line
 }
 
-/** The file that a row is in, and the line of it that the row is; `null` for a row that is not in the set. The line is `null` on a file's header. */
-export function placeOfRow(layout: SetLayout, row: number): SetRow | null {
-  return layout.rows[row - 1] ?? null
-}
-
 /** The first and the last row of the file that `row` is in, its header included. */
 export function fileBounds(layout: SetLayout, row: number): LineRange {
   const place = layout.rows[row - 1]

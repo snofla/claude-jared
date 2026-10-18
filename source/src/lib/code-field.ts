@@ -1,8 +1,8 @@
 import { isTooLongToHighlight, type LineTokens } from './highlight.ts'
 
 /**
- * What a field for code is drawn from, as pure functions of text: the rows of the colours that are drawn under the text area while the code is typed, and the
- * bracket that pairs with the one at the caret. The text area keeps the text and the caret; nothing here touches the page.
+ * What a field for code is drawn from, as pure functions of text: the rows of the colours that are drawn under the text area while the code is typed, the
+ * bracket that pairs with the one at the caret, and how many rows tall the field is. The text area keeps the text and the caret; nothing here touches the page.
  */
 
 /** One line of the drawing under the field: its text, and its colours, or null when the line is drawn plain. */
@@ -121,4 +121,20 @@ function partnerOf(text: string, at: number): number | null {
       start = end === 0 ? 0 : text.lastIndexOf('\n', end - 1) + 1
     }
   }
+}
+
+/** The fewest and the most rows that the suggestion field is tall. */
+export const FIELD_MIN_ROWS = 4
+export const FIELD_MAX_ROWS = 18
+
+/**
+ * How many rows tall the suggestion field is: one more than its lines, never under `FIELD_MIN_ROWS` and never over `FIELD_MAX_ROWS`, and 4 with no suggestion.
+ * The field asks for it at every key, so the newlines are counted only as far as the most that matters, and the text is not split: a long suggestion costs no
+ * more than a short one.
+ */
+export function fieldRows(text: string | null): number {
+  if (text === null) return FIELD_MIN_ROWS
+  let rows = 2 // one line and the extra row, with no newline
+  for (let at = text.indexOf('\n'); at !== -1 && rows < FIELD_MAX_ROWS; at = text.indexOf('\n', at + 1)) rows++
+  return Math.max(FIELD_MIN_ROWS, rows)
 }

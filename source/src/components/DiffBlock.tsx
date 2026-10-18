@@ -41,7 +41,8 @@ export function DiffBlock(props: {
   addedTokens: Array<LineTokens | null> | null
 }) {
   const diff = useMemo(() => lineDiff(props.removed.split('\n'), props.added.split('\n')), [props.removed, props.added])
-  const folds = useMemo(() => foldRanges(diff.rows), [diff])
+  // The folds by the row that each starts at, so that a row finds its fold at once and not by looking through all of them.
+  const folds = useMemo(() => new Map(foldRanges(diff.rows).map((fold) => [fold.from, fold])), [diff])
   const [opened, setOpened] = useState<readonly number[]>([])
   const group = useRef<HTMLDivElement>(null)
 
@@ -50,8 +51,8 @@ export function DiffBlock(props: {
 
   const out: ReactNode[] = []
   for (let i = 0; i < diff.rows.length; i++) {
-    const fold = folds.find((f) => f.from === i && !opened.includes(f.from))
-    if (fold) {
+    const fold = folds.get(i)
+    if (fold && !opened.includes(i)) {
       const hidden = fold.to - fold.from
       out.push(
         <button

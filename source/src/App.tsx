@@ -32,7 +32,7 @@ import { draftHasText } from './lib/review'
 import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/sample'
 import { buildSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
-import { cancelReview, closeFile, keepOpen, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
+import { cancelReview, closeFile, keepBeforeLeaving, keepOpen, keepReview, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
 import { expiredNotice } from './state/expired'
 import { emptyState, reducer, type AppState } from './state/reducer'
 import type { ReviewComment } from './types'
@@ -119,7 +119,7 @@ export default function App() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [scrollRequest, setScrollRequest] = useState<{ line: number; nonce: number; comment?: string; block?: 'start' | 'center' } | null>(null)
-  const [, refreshRecent] = useReducer((n: number) => n + 1, 0) // re-read the recent list after forgetting a file
+  const [recentRead, refreshRecent] = useReducer((n: number) => n + 1, 0) // read the recent list again after forgetting a file
 
   const inputRef = useRef<HTMLInputElement>(null)
   const flashTimer = useRef<number>(0)
@@ -278,31 +278,26 @@ export default function App() {
   }
   const unsaved = useSyncExternalStore(services.reviews.subscribe, services.reviews.failed)
   const banner = notice ?? (unsaved ? STORAGE_WARNING : null)
-  const recent = file ? [] : services.reviews.recent()
+  // The stored list is read and parsed when the start page is reached or a file is forgotten, and not at every draw of the page.
+  const recent = useMemo(() => {
+    void recentRead // the key: forgetting a file counts it up, and the list is read again
+    return file ? [] : services.reviews.recent()
+  }, [file, recentRead, services.reviews])
 
-  // Every change to the review is persisted immediately. A set of files is kept whole the first time, with its texts, and then its review alone.
+  // Every change to the review is kept once it is drawn, and a set of files is kept whole the first time, with its texts, and then its review alone. A
+  // request through the page that leaves the file keeps the review it leaves before the next is adopted (`keepBeforeLeaving`), since a change and a leave
+  // that a script sends at once are drawn together, with no file left for this effect to keep.
   const keptSet = useRef<string | null>(null)
   useEffect(() => {
-    if (!review || !file) {
-      keptSet.current = null
-    } else if (review.version === 1) {
-      services.reviews.saveReview(review)
-    } else if (state.set) {
-      if (keptSet.current === file.hash) {
-        services.reviews.saveSetReview(review)
-      } else {
-        services.reviews.saveSet(state.set.files, review)
-        services.reviews.setLast(file.hash)
-        keptSet.current = file.hash
-      }
-    }
+    keptSet.current = keepReview(services, { file, review, set: state.set }, keptSet.current)
   }, [review, file, state.set, services])
 
   // The protocol of the engine, for a script on the page: `window.jared.handleMessage(request)`.
   const applyRequest = usePageApi(
     state,
     dispatch,
-    (adoptedFile, another, isSet) => {
+    (adoptedFile, another, isSet, left) => {
+      keptSet.current = keepBeforeLeaving(services, left, adoptedFile, keptSet.current)
       if (!adoptedFile) {
         closeFile(services)
         setSubmitOpen(false)

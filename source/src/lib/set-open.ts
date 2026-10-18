@@ -11,8 +11,6 @@ export interface OpenSet {
   layout: SetLayout
 }
 
-export const isSetReview = (review: { version: number } | null | undefined): review is SetReview => review?.version === 2
-
 /**
  * The page's view of a set that the engine holds. Besides the files and their layout it gives one `file` that stands for the whole, so that everything
  * on the page that treats what is open as a file keeps working: its name says how many files there are, its lines are the rows of the layout, and its
