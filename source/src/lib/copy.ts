@@ -95,6 +95,8 @@ export const COPY = {
   /** How many of the files the reviewer has marked, and how many files the diff has. English-only plurals: localisation replaces them with `Intl.PluralRules`. */
   filesViewed: (viewed: number, total: number): string => `${viewed} of ${total} viewed`,
   fileCount: (count: number): string => (count === 1 ? '1 file' : `${count} files`),
+  /** The lines of the open file, or of a set, in the header: "1 line", and a number with its thousands for more. */
+  lineCount: (count: number): string => (count === 1 ? '1 line' : `${count.toLocaleString()} lines`),
   /** What a kept review of several files shows in the list on the start page, after its number of files: the names of the first, and how many more. English-only plural, like the ones above. */
   recentFiles: (count: number, names: readonly string[]): string => listed(count > names.length ? [...names, `${count - names.length} more`] : names),
   /** The title of the button that forgets a kept review of several files, on the start page. */
@@ -136,29 +138,41 @@ export const COPY = {
   colourScheme: 'Colour scheme',
   /** The names of its three choices. */
   themeChoice: { system: 'System', light: 'Light', dark: 'Dark' },
-  /** The button that gives a review up, and the danger button of its question. */
-  discardReview: 'Discard review',
-  /** The safe button of that question: nothing is discarded and nobody is told. */
+  /** The safe button of the question of stopping a review: nothing is stopped and nobody is told. */
   keepReviewing: 'Keep reviewing',
-  cancelTitle: 'Discard this review?',
-  /** What giving a review up discards: the comments saved on the open file. */
-  cancelDiscards: (count: number, name: string): string => `${COPY.commentCount(count)} on ${name} will be discarded.`,
-  /** What giving a review up discards when a comment is being written. */
-  cancelDiscardsDraft: 'The comment you are writing will be discarded.',
-  /** What giving a review up discards when it has an overall summary, whether or not it has comments. */
-  cancelDiscardsSummary: 'The overall summary will be discarded.',
-  /** The button that skips a review: it leaves the file without reviewing it now, keeps the review and tells the program that waits. */
-  skipReview: 'Skip review',
-  /** The question of Back to start when a program waits for the review: who waits, by the caller's name for them or as the program that opened Jared. */
-  skipTitle: (target: string | null): string => (target === null ? 'The program that opened Jared is waiting for this review.' : `${target} is waiting for this review.`),
-  /** What skipping does, under that question: the review is kept for later. */
-  skipKept: 'Skipping leaves this file for now. Your review is kept, and you can go on with it from the start page.',
-  /** The banner on the start page after a skip of a review that a script started: the script does not hear of it until the reviewer says so. */
-  skipTellProgram: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you skipped the review.' : `Tell ${target} that you skipped the review.`),
+  /** The button that stops a review while a program waits for it, and the one that closes the files when nobody does; the first item of the menu of more actions in a narrow window. */
+  stopReviewing: 'Stop reviewing',
+  closeFile: (files: number): string => (files === 1 ? 'Close file' : 'Close files'),
+  /** Their tooltips: a phrase, no full stop, as the header's others are. */
+  stopReviewingTip: (target: string | null): string => (target === null ? 'Stop reviewing, and let the program that opened Jared know' : `Stop reviewing, and let ${target} know`),
+  closeFileTip: (files: number): string => (files === 1 ? 'Close this file and go back to the start page' : 'Close these files and go back to the start page'),
+  /** The title of the question of stopping: while a program waits, and when nobody does. The name is the file's, or the set's ("3 files"). */
+  stopTitle: (name: string): string => `Stop reviewing ${name}?`,
+  closeTitleOf: (name: string): string => `Close ${name}?`,
+  /** Under that title, only while a program waits: who waits and what it is told. */
+  stopWaits: (target: string | null): string =>
+    target === null ? 'The program that opened Jared is waiting for this review. It will be told that you stopped.' : `${target} is waiting for this review. It will be told that you stopped.`,
+  /** What happens to the review, asked when it has comments or an overall summary, which is what Keep comments keeps. */
+  stopAskComments: (comments: number): string => (comments === 1 ? 'What should happen to your comment?' : `What should happen to your ${comments} comments?`),
+  stopAskSummary: 'What should happen to your overall summary?',
+  stopSummaryGoesWith: (comments: number): string => (comments === 1 ? 'Your overall summary is kept or discarded with it.' : 'Your overall summary is kept or discarded with them.'),
+  stopKeptLater: 'Kept, the review stays on the start page, and you can go on with it later.',
+  /** In every state, when a comment is being written: neither choice keeps it. */
+  stopDraftLost: 'The comment you are writing will be discarded.',
+  /** In the question of Close file, when a program has taken an earlier version of the review: only discarding tells it. */
+  closeTellsOfDiscard: (target: string | null): string =>
+    target === null
+      ? 'The program that opened Jared has taken an earlier version of this review, and will be told if you discard it.'
+      : `${target} has taken an earlier version of this review, and will be told if you discard it.`,
+  /** The buttons of that question; with no comments but a summary the pair names the summary. */
+  keepComments: (comments: number): string => (comments === 1 ? 'Keep comment' : 'Keep comments'),
+  discardComments: (comments: number): string => (comments === 1 ? 'Discard comment' : 'Discard comments'),
+  keepSummary: 'Keep summary',
+  discardSummary: 'Discard summary',
+  /** The banner on the start page after the reviewer stopped a review that a script started and kept it: the script does not hear of it until the reviewer says so. */
+  skipTellProgram: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you stopped reviewing.' : `Tell ${target} that you stopped reviewing.`),
   /** The banner on the start page after a discard of a review that a script started, for the same reason as the one after a skip. */
   discardTellProgram: (target: string | null): string => (target === null ? 'Tell the program that opened Jared that you discarded the review.' : `Tell ${target} that you discarded the review.`),
-  /** What giving a review up tells whoever waits for it: the caller's name for them, or the program that opened Jared when there is none. */
-  cancelTells: (target: string | null): string => (target === null ? 'The program that opened Jared will be told that you discarded the review.' : `${target} will be told that you discarded the review.`),
   /**
    * What the banner says when a program asked, through the page's own interface, to open another file and the page kept the open review
    * (`kept` is the name of that file): who asked (the caller's name for itself, or a program when it gave none) and the file it asked for.

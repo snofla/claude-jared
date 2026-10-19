@@ -112,13 +112,26 @@ export const takenAsItIs = (review: AnyReview, sentAt: string | null): boolean =
 export const toldOfCancel = (delivery: Delivery | null, review: AnyReview, sentAt: string | null): string | null | undefined =>
   delivery === null || takenAsItIs(review, sentAt) ? undefined : delivery.target
 
+/** `toldOfCancel` as the question of stopping takes it: `{ target }` for a program that is told of a discard (its name, or `null` when it gave none), and `null` when nobody is. */
+export const tellsOfDiscard = (told: string | null | undefined): { target: string | null } | null => (told === undefined ? null : { target: told })
+
 /**
- * Whether a program waits for the review: it started the review and has taken nothing yet (`sentAt` is `null`). Skip review is offered then, and Back
- * to start asks first, because the program would otherwise go on waiting for a review that the reviewer has left. After a take, edited since or not, the
- * program's turn has ended and it looks again only when the reviewer says that they sent changes, so it is not waiting: nothing is offered and Back to
- * start goes back at once (the review is kept in any case).
+ * Whether a program waits for the review: it started the review and has taken nothing yet (`sentAt` is `null`). The button that stops the review then reads
+ * Stop reviewing, and Back to start asks first, because the program would otherwise go on waiting for a review that the reviewer has left. After a take, edited
+ * since or not, the program's turn has ended and it looks again only when the reviewer says that they sent changes, so it is not waiting: the button reads
+ * Close file, and Back to start goes back at once (the review is kept in any case).
  */
 export const programWaits = (delivery: Delivery | null, sentAt: string | null): boolean => delivery !== null && sentAt === null
+
+/**
+ * The words of the button that stops a review, by one rule for the header, its menu, the foot of the send window and the strip: while a program waits for the
+ * review it stops the review and tells the program, whose name is in the tooltip; when nobody waits it closes the file, or the files of a set, and the review is kept.
+ */
+export const stopWords = (delivery: Delivery | null, sentAt: string | null, review: AnyReview): { label: string; tip: string } => {
+  if (programWaits(delivery, sentAt)) return { label: COPY.stopReviewing, tip: COPY.stopReviewingTip(delivery!.target) }
+  const files = review.version === 2 ? review.files.length : 1
+  return { label: COPY.closeFile(files), tip: COPY.closeFileTip(files) }
+}
 
 /**
  * Whether the reviewer has to tell the program that they left the review, by skipping it or by discarding it: a script that drives the page looks at the

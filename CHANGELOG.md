@@ -2,6 +2,14 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.17.0 — 2026-10-19
+
+- **Stop a review from the header.** One button, left of the button that sends, ends a review: **Stop reviewing** while Claude waits for it, and **Close file** when nobody does. It replaces **Skip review** and **Discard review** of the **⋯** menu, and on a narrow window it is the first item of that menu.
+  - When the review has comments, it asks what should happen to them: **Keep comments** keeps the review on the start page, where you can go on with it, and **Discard comments** forgets it. A comment that you are writing is kept by neither, and the question says so.
+  - Claude, while it waits, is told that you stopped, or that you discarded the review. **Back to start** asks the same question while Claude waits.
+  - The same button is in the foot of the window that sends the review, and in the strip under the header while Claude has not taken the review.
+- The header says "1 line" for a file of one line, where it said "1 lines".
+
 ## 0.16.9 — 2026-10-19
 
 - Nothing changes in what Jared does or how it looks.

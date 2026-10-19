@@ -64,9 +64,9 @@ export function useHandover({ services, state, stateRef, dispatch, addresses, de
   const tellOnClose = useRef(false)
   // The red banner of a send that failed after its dialog was closed: the next send takes it away, so that it is never beside the message that says it was sent.
   const failedSend = useRef<Notice | null>(null)
-  // The reviewer gave the review up (Discard review) or skipped it (Skip review): the send that was waiting is dropped with it, and that is not told as a failure.
+  // The reviewer stopped the review, and kept it or discarded it: the send that was waiting is dropped with it, and that is not told as a failure.
   const givenUp = useRef(false)
-  // The warning that a script's request was declined. Discard review takes it away with the review that it says was kept.
+  // The warning that a script's request was declined. Discarding the review takes it away with the review that it says was kept.
   const declinedNote = useRef<Notice | null>(null)
   const sentTimer = useRef(0)
   const submitOpenRef = useLatest(submitOpen)
@@ -197,7 +197,7 @@ export function useHandover({ services, state, stateRef, dispatch, addresses, de
     },
     [setNotice],
   )
-  // Discard review takes the warning that a request was declined away with the review that it says was kept.
+  // Discarding the review takes the warning that a request was declined away with the review that it says was kept.
   const dropDeclined = () => {
     const stale = declinedNote.current
     declinedNote.current = null

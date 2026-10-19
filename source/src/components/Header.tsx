@@ -1,10 +1,13 @@
 import { COPY } from '../lib/copy'
-import { sendLabel, statusOf, type Delivery } from '../lib/delivery'
+import { sendLabel, statusOf, stopWords, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
 import type { AnyReview, SourceFile } from '../types'
 import { THEMES, type Theme } from '../lib/theme'
-import { Badge, Button, IconBrand, IconDownload, IconFile, IconMessage, IconMore, IconPanel, IconSend, IconUpload, IconX, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
+import { Badge, Button, IconBrand, IconDownload, IconFile, IconMessage, IconMore, IconPanel, IconSend, IconUpload, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
 import { Version } from './Version'
+
+/** The width below which the button that stops a review is the first item of the menu of more actions, and not a button of the bar: the bar wraps and has no room for it. */
+export const STOP_IN_MENU_QUERY = '(max-width: 599px)'
 
 /** The tone of a status, as `statusOf` names it, in the words of `Badge`. */
 const STATUS_TONE = { ok: 'ok', warn: 'warn', muted: 'neutral' } as const
@@ -28,10 +31,6 @@ interface Props {
   changes: number | null
   /** Opens the dialog of the summary and the preview, once the button sends at once; `null` when the button opens it itself. */
   onReviewWindow: (() => void) | null
-  /** Called when the reviewer presses Discard review; the page asks first when there is something to lose. */
-  onCancel: () => void
-  /** Called when the reviewer presses Skip review, which is offered only while a program waits for the review: the review is kept. `null` when it is not offered. */
-  onSkip: (() => void) | null
   delivery: Delivery | null
   /** The review is with a script that drives the page, which has not taken it yet. */
   handedOver: boolean
@@ -40,12 +39,18 @@ interface Props {
   theme: Theme
   /** Called when the reviewer chooses a colour scheme in the menu. */
   onTheme: (theme: Theme) => void
+  /**
+   * The button that stops the review, left of the one that sends: "Stop reviewing" while a program waits for the review, "Close file" when nobody does. `inMenu` puts it
+   * in the menu of more actions instead, as its first item (a narrow window, `STOP_IN_MENU_QUERY`). Left out, or `null`, the header has no such button.
+   */
+  stop?: { inMenu: boolean; onStop: () => void } | null
 }
 
-export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, onCancel, onSkip, delivery, handedOver, sentAt, theme, onTheme }: Props) {
+export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, delivery, handedOver, sentAt, theme, onTheme, stop }: Props) {
   const state = statusOf(review, handedOver, sentAt)
   const label = sendLabel(delivery, changes)
   const count = review.comments.length
+  const stopText = stopWords(delivery, sentAt, review)
 
   return (
     <header className="header">
@@ -63,7 +68,7 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
             {COPY.filesChip(files.count, files.added, files.deleted)}
           </span>
         ) : (
-          <span className="muted file-lines">{(files ? files.lines : file.lines.length).toLocaleString()} lines</span>
+          <span className="muted file-lines">{COPY.lineCount(files ? files.lines : file.lines.length)}</span>
         )}
       </div>
 
@@ -92,6 +97,12 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
         <Badge variant="count">{count}</Badge>
       </Button>
       <Menu label={COPY.moreActions} icon={<IconMore />}>
+        {stop?.inMenu && (
+          <>
+            <MenuItem onSelect={stop.onStop}>{stopText.label}</MenuItem>
+            <MenuSeparator />
+          </>
+        )}
         {onReviewWindow && (
           <MenuItem icon={<IconMessage />} onSelect={onReviewWindow}>
             {COPY.reviewWindow}
@@ -108,16 +119,12 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
             </MenuRadioItem>
           ))}
         </MenuGroup>
-        <MenuSeparator />
-        {onSkip && (
-          <MenuItem icon={<IconFile />} onSelect={onSkip}>
-            {COPY.skipReview}
-          </MenuItem>
-        )}
-        <MenuItem icon={<IconX />} onSelect={onCancel}>
-          {COPY.discardReview}
-        </MenuItem>
       </Menu>
+      {stop && !stop.inMenu && (
+        <Button onClick={stop.onStop} title={stopText.tip}>
+          {stopText.label}
+        </Button>
+      )}
       <Button variant={changes === 0 ? 'default' : 'primary'} icon={delivery ? <IconSend /> : <IconDownload />} onClick={onSubmit} title={label} aria-label={label}>
         <span className="submit-label">{label}</span>
       </Button>

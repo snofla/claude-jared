@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent } from 'react'
 import { CodeViewer } from './components/CodeViewer'
-import { CancelDialog } from './components/CancelDialog'
-import { SkipDialog } from './components/SkipDialog'
 import { DeliveryStrip } from './components/DeliveryStrip'
 import { FilesPane } from './components/FilesPane'
-import { Header } from './components/Header'
+import { Header, STOP_IN_MENU_QUERY } from './components/Header'
 import { Alert, IconCheck } from './ui'
 import { Landing } from './components/Landing'
 import { ReviewPanel } from './components/ReviewPanel'
+import { StopDialog } from './components/StopDialog'
 import { SubmitDialog } from './components/SubmitDialog'
 import { fetchSource } from './engine/receiver-client'
 import { useMediaQuery } from './hooks/useMediaQuery'
@@ -16,7 +15,7 @@ import { useHandover, type Notice } from './hooks/useHandover'
 import { usePageApi } from './hooks/usePageApi'
 import { useDiffTokens, useLatest, useSetTokens, useTokens } from './hooks/useTokens'
 import { COPY } from './lib/copy'
-import { afterSentSettings, closesAtPress, deliveryOf, mustTellProgram, programWaits, takenAsItIs, toldOfCancel, waitingWords } from './lib/delivery'
+import { afterSentSettings, closesAtPress, deliveryOf, mustTellProgram, programWaits, stopWords, takenAsItIs, tellsOfDiscard, toldOfCancel, waitingWords } from './lib/delivery'
 import { diffOf } from './lib/diff'
 import { setEntries, viewComments } from './lib/set-view'
 import { autoFilesMode, commentCounts, fileEntries, hasFileList, stepFile, toggled, totals, type FilesMode } from './lib/files'
@@ -60,10 +59,10 @@ export default function App() {
   const [panelChoice, setPanelChoice] = useState<boolean | null>(null)
   const panelOpen = panelChoice ?? wide
   const [submitOpen, setSubmitOpen] = useState(false)
-  // The question before a review is given up.
-  const [cancelOpen, setCancelOpen] = useState(false)
-  // The question of Back to start while a program waits for the review.
-  const [skipOpen, setSkipOpen] = useState(false)
+  // The one question of stopping a review: asked while a program waits for it, and when something would be lost.
+  const [stopOpen, setStopOpen] = useState(false)
+  // The button that stops the review is in the header's menu when the bar has no room for it.
+  const stopInMenu = useMediaQuery(STOP_IN_MENU_QUERY)
   // The colour scheme: the choice is kept, and applied to the page as an attribute that the CSS selects on (`index.html` has
   // already applied the kept one before the first paint).
   const [theme, setTheme] = useState<Theme>(services.theme.load)
@@ -300,9 +299,9 @@ export default function App() {
   }, [openSetRef, services, submitOpenRef])
 
   const goHome = () => {
-    // A program that waits for the review is not left waiting in silence: the question comes first, and Skip review is its way out.
+    // A program that waits for the review is not left waiting in silence: the question of stopping comes first.
     const { review: current, sentAt } = stateRef.current
-    if (current && programWaits(delivery, sentAt)) return setSkipOpen(true)
+    if (current && programWaits(delivery, sentAt)) return setStopOpen(true)
     if (!mayDiscard(services, draftRef.current)) return
     closeFile(services)
     setSubmitOpen(false)
@@ -311,16 +310,17 @@ export default function App() {
     dispatch({ type: 'close' })
   }
 
-  // Skip the review of the open file: the program that waits for it is told, the review is kept as Back to start keeps it, and the page goes back to the start. A script that
-  // drives the page does not look at the page until it is asked, so the start page tells the reviewer to tell it; a receiver is told at once.
-  const skipCurrent = () => {
-    if (!file || !mayDiscard(services, draftRef.current)) return
+  // Stop the review of the open file and keep it: the program that waits for it is told, the review is kept as Back to start keeps it, and the page goes back to the start. A script that
+  // drives the page does not look at the page until it is asked, so the start page tells the reviewer to tell it; a receiver is told at once. The comment being written is not kept,
+  // and the question has said so: no question of the browser's follows.
+  const stopCurrent = () => {
+    if (!file) return
     const { review: current, sentAt } = stateRef.current
     const told = current !== null && programWaits(delivery, sentAt)
     if (told) handover.tellOfSkip()
     handover.giveUp()
     closeFile(services)
-    setSkipOpen(false)
+    setStopOpen(false)
     setSubmitOpen(false)
     clearSent()
     forgetPresses()
@@ -338,7 +338,7 @@ export default function App() {
     handover.giveUp()
     cancelReview(services, file.hash)
     handover.dropDeclined()
-    setCancelOpen(false)
+    setStopOpen(false)
     setSubmitOpen(false)
     clearSent()
     forgetPresses()
@@ -347,10 +347,9 @@ export default function App() {
     if (told && mustTellProgram(delivery)) setNotice({ kind: 'warn', text: COPY.discardTellProgram(delivery?.target ?? null) })
   }
 
-  // Asked for from the header and from the submit dialog: a question first when there is something to lose, and nothing to ask otherwise.
-  const askToCancel = () => (mustAskBeforeCancel(stateRef.current) ? setCancelOpen(true) : cancelCurrent())
-  // Skip review is offered while a program waits for the review: in the header's menu and the foot of the window.
-  const onSkip = review && programWaits(delivery, state.sentAt) ? skipCurrent : null
+  // Asked for from the header, the foot of the send window and the strip: the question while a program waits for the review or something would be lost, and nothing to ask
+  // otherwise: the file closes at once, with its review kept.
+  const askToStop = () => (programWaits(delivery, stateRef.current.sentAt) || mustAskBeforeCancel(stateRef.current) ? setStopOpen(true) : stopCurrent())
 
   const openKept = (hash: string) => applyOutcome(openRecent(services, hash))
   const openSample = (name: string, text: string) => applyOutcome(openFile(services, stateRef.current, buildSource(name, text)))
@@ -416,19 +415,20 @@ export default function App() {
             onSubmit={press}
             changes={changes}
             onReviewWindow={changes === null ? null : () => setSubmitOpen(true)}
-            onCancel={askToCancel}
-            onSkip={onSkip}
             delivery={delivery}
             handedOver={waitingSince !== null}
             sentAt={state.sentAt}
             theme={theme}
             onTheme={setTheme}
+            stop={{ inMenu: stopInMenu, onStop: askToStop }}
           />
           {banner && <Banner notice={banner} onDismiss={() => setNotice(null)} />}
           <DeliveryStrip
             words={waitingWords(waitingSince !== null, late, delivery?.target ?? null, changedSincePress, update)}
             late={late}
-            onCancel={takenAsItIs(review, state.sentAt) ? null : askToCancel}
+            onStop={takenAsItIs(review, state.sentAt) ? null : askToStop}
+            stopLabel={stopWords(delivery, state.sentAt, review).label}
+            stopTip={stopWords(delivery, state.sentAt, review).tip}
             onOtherWays={() => setSubmitOpen(true)}
           />
           <SentBanner message={sentText} drawn={afterSentSettings(state.submitOptions).banner} onDismiss={clearSent} />
@@ -501,20 +501,21 @@ export default function App() {
               linkTarget={state.submitTarget}
               onClose={() => setSubmitOpen(false)}
               onSentClosed={handover.onSentClosed}
-              onCancel={askToCancel}
-              onSkip={onSkip}
+              onStop={askToStop}
             />
           )}
-          {skipOpen && <SkipDialog target={delivery?.target ?? null} onKeep={() => setSkipOpen(false)} onSkip={skipCurrent} />}
-          {cancelOpen && (
-            <CancelDialog
+          {stopOpen && (
+            <StopDialog
+              name={file.name}
+              files={review.version === 2 ? review.files.length : 1}
+              waiting={programWaits(delivery, state.sentAt) ? { target: delivery?.target ?? null } : null}
+              discardTells={tellsOfDiscard(toldOfCancel(delivery, review, state.sentAt))}
               comments={review.comments.length}
               summary={review.summary.trim() !== ''}
               writing={draftHasText(draft)}
-              tells={toldOfCancel(delivery, review, state.sentAt)}
-              fileName={file.name}
-              onKeep={() => setCancelOpen(false)}
-              onCancel={cancelCurrent}
+              onKeep={() => setStopOpen(false)}
+              onStop={stopCurrent}
+              onDiscard={cancelCurrent}
             />
           )}
         </>

@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef } from 'react'
 import { usePlatform } from '../hooks/usePlatform'
 import { useLatest } from '../hooks/useTokens'
 import { COPY } from '../lib/copy'
-import { buttonLabel, destinationLine, emptyReviewNotice, lastDelivery, sendLabel, takenAsItIs, waitingWords, type Delivery } from '../lib/delivery'
+import { buttonLabel, destinationLine, emptyReviewNotice, lastDelivery, sendLabel, stopWords, takenAsItIs, waitingWords, type Delivery } from '../lib/delivery'
 import { reviewFileName, toJson, toMarkdown } from '../lib/export'
 import {
   busy,
@@ -66,10 +66,8 @@ interface Props {
   onClose: () => void
   /** The dialog closed by itself, because the review was taken and nothing was changed: the page tells the reviewer, once the dialog is gone. */
   onSentClosed: () => void
-  /** Called when the reviewer presses Discard review in the foot. The question comes over the dialog, and the dialog is still there when the reviewer keeps the review. */
-  onCancel: () => void
-  /** Called when the reviewer presses Skip review in the foot, which is offered only while a program waits for the review: the review is kept. `null` when it is not offered. */
-  onSkip: (() => void) | null
+  /** Called when the reviewer presses the button that stops the review in the foot. The question of stopping comes over the dialog, and the dialog is still there when the reviewer keeps reviewing. */
+  onStop: () => void
 }
 
 const FORMATS: readonly SegmentedOption<Format>[] = [
@@ -77,7 +75,7 @@ const FORMATS: readonly SegmentedOption<Format>[] = [
   { value: 'json', label: 'JSON' },
 ]
 
-export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, late, changedSincePress, changes, update, onNothingNew, closesAtPress, sentAt, forClaude, linkTarget, onClose, onSentClosed, onCancel, onSkip }: Props) {
+export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, late, changedSincePress, changes, update, onNothingNew, closesAtPress, sentAt, forClaude, linkTarget, onClose, onSentClosed, onStop }: Props) {
   const { submit } = usePlatform()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [state, dispatch] = useReducer(submitReducer, initialSubmitState)
@@ -100,6 +98,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
   const count = review.comments.length
   const empty = emptyReviewNotice(count, review.summary, delivery)
   const label = buttonLabel(delivery)
+  const stopText = stopWords(delivery, sentAt, review)
   const waiting = waitingSince !== null
   const taken = takenAsItIs(review, sentAt)
   const last = lastDelivery(review, delivery, sentAt)
@@ -202,16 +201,9 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
 
       <DialogFoot>
         {canCancel(state, waiting, taken) && (
-          <>
-            {onSkip && (
-              <Button variant="ghost" onClick={onSkip}>
-                {COPY.skipReview}
-              </Button>
-            )}
-            <Button variant="ghost" onClick={onCancel}>
-              {COPY.discardReview}
-            </Button>
-          </>
+          <Button variant="ghost" onClick={onStop} title={stopText.tip}>
+            {stopText.label}
+          </Button>
         )}
         <span className={state.failed ? 'status status-error dialog-status' : 'status muted dialog-status'} role="status" aria-live="polite">
           {line && (
