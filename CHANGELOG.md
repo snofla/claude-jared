@@ -2,6 +2,13 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.16.8 — 2026-10-19
+
+- Nothing changes in what Jared does or how it looks. This release changes how its page is put together and tested.
+- In the source of the page, the code that hands a review over, to Claude or to another program, is now apart from the page's main component, in a reducer and a hook of its own. It behaves as before.
+- The gallery of the components, a page for development that the plugin does not carry, can now draw one group of components at a time, and write the computed styles of every group into the page, for tests that check how the components look.
+- `package.json` names four packages that tests use to draw the page and act on it without a browser: three of Testing Library, and happy-dom. None of them is in the page.
+
 ## 0.16.7 — 2026-10-18
 
 - **A change that Claude makes just before it leaves a file is now kept.** A change that a script makes in an open review through the page, such as Claude through its browser tool (a comment deleted, a summary written, the review marked as having left Jared), and that it follows at once by closing the file or opening another, is now kept in the browser.

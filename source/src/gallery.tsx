@@ -4,6 +4,7 @@ import * as ui from './ui'
 import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, CodeField, type CodePart, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption, VisuallyHidden } from './ui'
 import './styles.css'
 import './gallery.css'
+import { applySnapshotView } from './gallery-snapshot'
 
 /**
  * The gallery of the component library: every component in every state, the light scheme and the dark one side by side, so that a change to
@@ -540,3 +541,6 @@ createRoot(document.getElementById('root')!).render(
     <Gallery />
   </StrictMode>,
 )
+
+// `?only=<group>` and `?snapshot=styles`: the views that the tests of the interface read (gallery-snapshot.ts).
+void applySnapshotView(document)

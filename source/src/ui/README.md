@@ -50,7 +50,7 @@ Four lint rules keep the folder apart from the app (`.oxlintrc.json`; `npm run l
 3. Export it, and its prop types, from `src/ui/index.ts`.
 4. Add every state to `src/gallery.tsx` (see *States in the gallery*).
 5. A test, `src/ui/<Name>.test.ts`, if the component has logic (a guard, a choice of class, a rule about its props). `Button.test.ts` calls the component as a function and reads the props of the element it returns; no browser is needed.
-6. Move the uses of the old class family to the component (`git grep` for the class), taking the computed-style snapshot before and after (see *Seeing and checking it*).
+6. Move the uses of the old class family to the component (`git grep` for the class), with the tests of the look before and after (see *Seeing and checking it*): the styles of a group of the gallery change only where the move means them to, and the pictures show what differs.
 7. If the structure changed (a layer, a boundary, a folder), update the description of how the app is put together, and record the change where the project records its work.
 
 ## What a component's interface is
@@ -124,14 +124,15 @@ The sizes that a component draws with are design tokens too, in `tokens.css`. Us
 - **A breaking change** is one that makes a caller change what it writes (a prop renamed or removed, a variant, a changed default) or that changes how an existing use looks beyond what the change set out to do.
 - **Who agrees:** whoever maintains the repository decides. A change is designed, its code is reviewed before it is merged, and it is recorded where the project records its work.
 - **Find the users:** `git grep -n "<Button" -- src` for a component, `git grep -n "jared-btn" -- src` for its class.
-- **Record it** where the project records its work, with the snapshot (below) and its expected differences.
+- **Record it** where the project records its work, with what the tests of the look show (below) and the differences that were expected.
 
 ## Seeing and checking it
 
 - **The gallery:** `npm run dev`, then `http://localhost:5173/gallery.html`.
 - **The lint boundary:** `npm run lint`.
 - **The tests:** `npm test` runs `src/ui/*.test.ts` and `scripts/theme.test.ts`.
-- **By hand, until components have tests:** a **computed-style snapshot** of every instance of a moved class (colour, background, border, radius, size, padding, font), taken in the browser before the move and after it, in both schemes and at 375 px, on `npm run dev` and on `npm run build` with `vite preview`, whose difference is empty or explained where the change is recorded. It was done for `Button`, and for the dialog when it moved to the library (every state of it, both schemes, 800 px and 375 px: the only difference is the cross, 44 px under a finger as every icon button is, which makes the dialog 16 px taller on touch). And the tab order and the accessible names, read from the page.
+- **The look, at every change of code:** the tests of the interface (`./task ui-tests`, which the checks before a merge also run for every change of code) read the computed styles of every element of each group of the gallery (its size, colour, background, border, radius, padding, font, shadow and opacity), in both schemes at 1280 px, with Google Chrome, and compares them with the group's file in `ui-tests/__styles__`. A change that was meant is accepted with `-u`, and the files that change say what changed. When asked for, `./task ui-tests --pictures` draws each group, both schemes side by side, at 1280 and 375 px, and four screens of the page in both schemes, from the trunk, or from the commit given with `--pictures=<commit>`, and from the change, on the same computer in the same run, and shows the pictures that differ in a report, with their difference. It takes the lock of the checks and waits for a quiet machine first, as the checks do. The sizes in the styles follow the fonts of the computer, as the pictures do, so both hold on the computer that made them only. Both read the dev server, which leaves `light-dark()` as it is: a change to the production build's rewrite of it is still looked at with `npm run build` and `vite preview`.
+- **By hand, before those tests:** a computed-style snapshot of the same kind was taken by hand in the browser for `Button`, and for the dialog when it moved to the library (every state of it, both schemes, 800 px and 375 px: the only difference is the cross, 44 px under a finger as every icon button is, which makes the dialog 16 px taller on touch). And the tab order and the accessible names, read from the page.
 
 ## Known not to work
 

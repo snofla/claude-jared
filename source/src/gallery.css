@@ -6,6 +6,11 @@
   min-height: 100dvh;
 }
 
+/* The snapshot view (gallery-snapshot.ts): the page is as tall as what it draws, so that a picture of one group ends where the group does. */
+[data-snapshot] .gallery {
+  min-height: 0;
+}
+
 .gallery-head {
   grid-column: 1 / -1;
   padding: 20px 20px 0;
