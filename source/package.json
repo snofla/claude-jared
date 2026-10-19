@@ -1,21 +1,14 @@
 {
   "name": "jared",
   "private": true,
-  "version": "0.16.8",
+  "version": "0.16.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:single": "tsc -b && node scripts/single/build-single.ts",
-    "build:plugin": "tsc -b && node scripts/publish/build-plugin.ts",
-    "release:branch": "node scripts/publish/release-branch.ts",
     "lint": "oxlint",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "coverage": "node scripts/coverage/cli.ts --floor all=100",
-    "checks": "node scripts/checks/cli.ts",
-    "task": "node scripts/task.ts"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.8",

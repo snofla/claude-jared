@@ -1,7 +1,8 @@
 /**
- * The gallery's snapshot view, for the tests of the interface that run on request. `gallery.html?only=<group>` draws one group of the gallery, in both
- * schemes, for its picture; `gallery.html?snapshot=styles` writes the computed styles of every element of every group that is drawn into the page, as JSON,
- * where a headless browser reads them (`--dump-dom`). A group is named by its component and the first words of its title, as `button-variants`.
+ * The gallery's snapshot view, for the tests of the interface. `gallery.html?only=<group>` draws one group of the gallery, in both schemes, for its
+ * picture, which those tests draw when asked for; `gallery.html?snapshot=styles` writes the computed styles of every element of every group that is drawn
+ * into the page, as JSON, where a headless browser reads them (`--dump-dom`), and the checks before a merge compare them at every change of code. A group
+ * is named by its component and the first words of its title, as `button-variants`.
  *
  * Each element is one line: its place in the group, its tag and classes and its own words, and what it looks like (its size, colour, background, border,
  * radius, padding, font, shadow and opacity). A value that is the property's initial one is left out, and so are the colour and the font when they are

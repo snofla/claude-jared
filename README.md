@@ -157,7 +157,7 @@ shasum -a 256 dist-single/jared.html ../claude-plugin/app/jared.html
 
 The last command prints one checksum for each file, and the two should be the same. (On Linux, `sha256sum` does the same as `shasum -a 256`.)
 
-Only `npm run build:single` works in `source/`: the tests and the other scripts of `package.json` are not in this repository.
+In `source/`, `npm run` takes five scripts: `build:single` makes the page as above, `build` makes it as separate files in `dist/`, `dev` serves it while you change it, `preview` serves what `build` made, and `lint` runs oxlint with its default rules. The tests are not in this repository.
 
 GitHub makes the same comparison on every push to `main`, and shows the result:
 

@@ -2,6 +2,12 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.16.9 — 2026-10-19
+
+- Nothing changes in what Jared does or how it looks.
+- In `source/`, `package.json` names only the scripts that work there: `dev`, `build`, `build:single`, `lint` and `preview`. The others named files or tests that `source/` does not hold. The README's *Source* section says what each of the five does.
+- A comment in the source of the page, in `src/gallery-snapshot.ts`, no longer says that the tests of the components' look run only when asked for: they run at every change of the code, and only their pictures are drawn when asked for.
+
 ## 0.16.8 — 2026-10-19
 
 - Nothing changes in what Jared does or how it looks. This release changes how its page is put together and tested.
