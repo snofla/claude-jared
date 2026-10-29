@@ -74,6 +74,15 @@ const AUTOSCROLL_EDGE = 40
 /** The language of the file that row `row` of a set is in. */
 const languageAt = (layout: SetLayout, row: number): string => layout.texts[layout.rows[row - 1]?.file ?? 0]?.language ?? 'text'
 
+/**
+ * Where the header of a file sits in the flow, as the position to scroll the scroller to: the bottom of the row before it, or the top for the first file.
+ * A header is sticky, so one that the view has passed stays stuck at the top, and asking the browser to scroll it into view finds it in place and does nothing.
+ */
+function headerPlace(scroller: HTMLElement, header: Element): number {
+  const before = header.previousElementSibling
+  return before ? scroller.scrollTop + before.getBoundingClientRect().bottom - scroller.getBoundingClientRect().top : 0
+}
+
 function lineOfNode(node: Node | null): number | null {
   const el = node instanceof Element ? node : (node?.parentElement ?? null)
   const row = el?.closest<HTMLElement>('[data-line]')
@@ -327,7 +336,9 @@ export function CodeViewer({
     const scroller = scrollerRef.current
     const card = scrollRequest.comment ? scroller?.querySelector(`[data-comment="${CSS.escape(scrollRequest.comment)}"]`) : null
     const target = card ?? scroller?.querySelector(`[data-line="${scrollRequest.line}"]`)
-    target?.scrollIntoView({ block: scrollRequest.block ?? 'center', behavior: 'smooth' })
+    if (!scroller || !target) return
+    if (target.classList.contains('is-file')) scroller.scrollTo({ top: headerPlace(scroller, target), behavior: 'smooth' })
+    else target.scrollIntoView({ block: scrollRequest.block ?? 'center', behavior: 'smooth' })
   }, [scrollRequest])
 
   // The file at the top of the view, below the header that stays there, for the list of files: looked at once a frame while the page scrolls.

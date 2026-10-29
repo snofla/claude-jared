@@ -2,6 +2,10 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.17.1 — 2026-10-29
+
+- **In a review of several files, a jump up to a file now moves the view to it.** A click on a file in the list of files, or the key `[`, now goes to that file when it is above the one in view. Before, the list marked the file as the current one and the view stayed where it was. A jump down to a file, and a jump to a comment, are as they were.
+
 ## 0.17.0 — 2026-10-19
 
 - **Stop a review from the header.** One button, left of the button that sends, ends a review: **Stop reviewing** while Claude waits for it, and **Close file** when nobody does. It replaces **Skip review** and **Discard review** of the **⋯** menu, and on a narrow window it is the first item of that menu.
