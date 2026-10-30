@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type CSSProperties } from 'react'
 import { CodeViewer } from './components/CodeViewer'
 import { DeliveryStrip } from './components/DeliveryStrip'
 import { FilesPane } from './components/FilesPane'
 import { Header, STOP_IN_MENU_QUERY } from './components/Header'
-import { Alert, IconCheck } from './ui'
+import { Alert, IconCheck, Splitter } from './ui'
 import { Landing } from './components/Landing'
 import { ReviewPanel } from './components/ReviewPanel'
 import { StopDialog } from './components/StopDialog'
 import { SubmitDialog } from './components/SubmitDialog'
 import { fetchSource } from './engine/receiver-client'
 import { useMediaQuery } from './hooks/useMediaQuery'
+import { useWindowWidth } from './hooks/useWindowWidth'
 import { usePlatform } from './hooks/usePlatform'
 import { useHandover, type Notice } from './hooks/useHandover'
 import { usePageApi } from './hooks/usePageApi'
@@ -23,8 +24,11 @@ import { BOOT_EXPIRED_KEY, BOOT_KEY, bootExpired, readBoot, readFragment } from 
 import { SERVICE_KEY, hostFromSearch, serviceAddress } from './lib/host-link'
 import type { Platform, Picked } from './lib/platform'
 import { PLAIN_TEXT } from './lib/language'
+import { CODE_ROOM, commentsLetGo, filesLetGo, heldWidth, RAIL_WIDTH, shownWidths } from './lib/panels'
 import { draftHasText } from './lib/review'
 import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/sample'
+import { COMMENTS_WIDTH, FILES_WIDTH } from './lib/settings'
+import type { LayoutChange } from './lib/settings-service'
 import { buildSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
 import { cancelReview, closeFile, keepBeforeLeaving, keepOpen, keepReview, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
@@ -54,10 +58,20 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, services, init)
   const { file, review, selection, draft } = state
 
-  // The comments panel follows the window width until the reviewer opens or closes it by hand.
+  // The layout that the reviewer kept, for a wide window: the widths of the two panels beside the code, the list's mode and whether the comments panel is open, each
+  // `null` when it was never chosen, so that the window decides. It is written only by what the reviewer does, and a layout that the place which keeps it for every
+  // window gives later is taken as it comes.
+  const [kept, setKept] = useState(services.layout.load)
+  useEffect(() => services.layout.subscribe(setKept), [services])
+  const keepLayout = (change: LayoutChange) => {
+    services.layout.save(change)
+    setKept(services.layout.load())
+  }
+  // The comments panel follows the window width until the reviewer opens or closes it by hand; below the wide width it is a drawer that starts closed, and its
+  // opening and closing there are not kept.
   const wide = useMediaQuery(WIDE_QUERY)
-  const [panelChoice, setPanelChoice] = useState<boolean | null>(null)
-  const panelOpen = panelChoice ?? wide
+  const [panelDrawer, setPanelDrawer] = useState(false)
+  const panelOpen = wide ? (kept.comments.open ?? true) : panelDrawer
   const [submitOpen, setSubmitOpen] = useState(false)
   // The one question of stopping a review: asked while a program waits for it, and when something would be lost.
   const [stopOpen, setStopOpen] = useState(false)
@@ -70,6 +84,8 @@ export default function App() {
     services.theme.apply(theme)
     services.theme.save(theme)
   }, [theme, services])
+  // The scheme that the place which keeps the settings for every window gives after the page is drawn, when it is not the one the page has.
+  useEffect(() => services.theme.subscribe(setTheme), [services])
   const [linked, setLinked] = useState(false) // opened by a link that carries requests: the review can go to the clipboard
   // Opened from a link that a Claude session printed: the file comes from the receiver at this address, and the
   // review can be sent back to it. Only an address on this computer is ever used (see `receiverAddress`).
@@ -106,12 +122,19 @@ export default function App() {
   const hasList = hasFileList(entries)
   const fileTotals = useMemo(() => totals(entries), [entries])
   const roomToOpen = useMediaQuery(OPEN_FILES_QUERY)
-  const [filesChoice, setFilesChoice] = useState<FilesMode | null>(null)
   const [filesDrawer, setFilesDrawer] = useState(false)
-  const filesMode = filesChoice ?? autoFilesMode(roomToOpen, wide)
+  const filesMode: FilesMode = kept.files.mode ?? autoFilesMode(roomToOpen, wide)
   const [fileInView, setFileInView] = useState(0)
   const [viewedState, setViewedState] = useState<{ hash: string; ids: ReadonlySet<string> } | null>(null)
   const hash = file?.hash ?? ''
+  // What the reviewer has typed in the filter of the list: kept by the review's hash, and forgotten when the hash changes, whether another file or set is opened
+  // or the file is closed, so that a file that comes back starts with a full list; a script that opens the same file again changes nothing. It is the page's, and
+  // not the list's, so that it outlives the rail, the closed list and the drawer.
+  const [filesFilter, setFilesFilter] = useState({ hash: '', text: '' })
+  const filesQuery = filesFilter.hash === hash ? filesFilter.text : ''
+  useEffect(() => {
+    setFilesFilter((kept) => (kept.hash === hash ? kept : { hash: '', text: '' }))
+  }, [hash])
   const viewed = useMemo(
     () => (viewedState && viewedState.hash === hash ? viewedState.ids : new Set(file ? services.reviews.viewed(hash) : [])),
     [viewedState, hash, file, services],
@@ -372,11 +395,38 @@ export default function App() {
   const onFileKey = (key: 'next' | 'previous' | 'viewed') =>
     key === 'viewed' ? toggleViewed(fileInView) : goToFile(stepFile(entries.length, fileInView, key === 'next' ? 1 : -1))
   const toggleFiles = () => {
-    if (wide) return setFilesChoice(filesMode === 'closed' ? 'open' : 'closed')
+    if (wide) return keepLayout({ files: { mode: filesMode === 'closed' ? 'open' : 'closed' } })
     setFilesDrawer(!filesDrawer)
-    if (!filesDrawer) setPanelChoice(false)
+    if (!filesDrawer) setPanelDrawer(false)
   }
   const filesShown = wide ? filesMode !== 'closed' : filesDrawer
+  const togglePanel = () => {
+    if (wide) return keepLayout({ comments: { open: !panelOpen } })
+    if (!panelOpen) setFilesDrawer(false)
+    setPanelDrawer(!panelOpen)
+  }
+
+  // The widths that the page draws in a wide window, worked out at each draw from the kept widths and the window, so that the code keeps its room and a window that
+  // grows back shows the kept widths again. An edge that is held shows the width that its drag asks for, with the other panel as it was; it is let go into a snap.
+  const room = useWindowWidth()
+  const [held, setHeld] = useState<{ files?: number; comments?: number }>({})
+  const fromKept = shownWidths(room, {
+    files: { mode: hasList && filesShown ? filesMode : 'closed', width: kept.files.width },
+    comments: { open: panelOpen, width: kept.comments.width },
+  })
+  const shown = {
+    files: held.files === undefined ? fromKept.files : Math.min(held.files, Math.max(0, room - CODE_ROOM - fromKept.comments)),
+    comments: held.comments === undefined ? fromKept.comments : Math.min(held.comments, Math.max(0, room - CODE_ROOM - fromKept.files)),
+  }
+  // A drag that Escape ends asks for the width at the press again and lets nothing go: that width is the kept one, so the edge holds nothing any more.
+  const holdFiles = (width: number) => setHeld(Math.round(width) === fromKept.files ? {} : { files: heldWidth(width, FILES_WIDTH) })
+  const holdComments = (width: number) => setHeld(Math.round(width) === fromKept.comments ? {} : { comments: heldWidth(width, COMMENTS_WIDTH) })
+  const panelWidths = wide ? ({ '--files-w': `${shown.files}px`, '--comments-w': `${shown.comments}px` } as CSSProperties) : undefined
+  const resetLayout = () => {
+    services.layout.clear()
+    setKept(services.layout.load())
+    setHeld({})
+  }
 
   const jumpTo = (comment: ReviewComment, toCard = false) => {
     setScrollRequest({ line: comment.startLine, nonce: Date.now(), ...(toCard ? { comment: comment.id } : {}) })
@@ -393,10 +443,7 @@ export default function App() {
             file={file}
             review={review}
             panelOpen={panelOpen}
-            onTogglePanel={() => {
-              if (!wide && !panelOpen) setFilesDrawer(false)
-              setPanelChoice(!panelOpen)
-            }}
+            onTogglePanel={togglePanel}
             files={
               hasList
                 ? {
@@ -421,6 +468,7 @@ export default function App() {
             theme={theme}
             onTheme={setTheme}
             stop={{ inMenu: stopInMenu, onStop: askToStop }}
+            onResetLayout={resetLayout}
           />
           {banner && <Banner notice={banner} onDismiss={() => setNotice(null)} />}
           <DeliveryStrip
@@ -432,7 +480,7 @@ export default function App() {
             onOtherWays={() => setSubmitOpen(true)}
           />
           <SentBanner message={sentText} drawn={afterSentSettings(state.submitOptions).banner} onDismiss={clearSent} />
-          <div className="main">
+          <div className={held.files === undefined && held.comments === undefined ? 'main' : 'main is-resizing'} style={panelWidths}>
             {hasList && filesShown && (
               <FilesPane
                 entries={entries}
@@ -441,10 +489,30 @@ export default function App() {
                 current={Math.min(fileInView, entries.length - 1)}
                 rail={wide && filesMode === 'rail'}
                 drawer={!wide}
+                query={filesQuery}
+                onQuery={(text) => setFilesFilter({ hash, text })}
                 onPick={goToFile}
                 onToggleViewed={toggleViewed}
-                onRail={() => setFilesChoice(filesMode === 'rail' ? 'open' : 'rail')}
+                onRail={() => keepLayout({ files: { mode: filesMode === 'rail' ? 'open' : 'rail' } })}
                 onClose={() => setFilesDrawer(false)}
+              />
+            )}
+            {wide && hasList && filesShown && (
+              <Splitter
+                label={COPY.filesEdge}
+                title={COPY.filesEdgeTip}
+                width={shown.files}
+                min={filesMode === 'rail' ? RAIL_WIDTH : FILES_WIDTH.min} // the rail's own width is its least, so that the edge's value is never below it
+                max={FILES_WIDTH.max}
+                side="left"
+                onResize={holdFiles}
+                onRelease={(width) => {
+                  // A release that leaves the list as it is shown keeps only its width, so that a mode that the window chose stays the window's.
+                  const next = filesLetGo(width)
+                  setHeld({})
+                  keepLayout({ files: next.mode !== filesMode ? next : next.mode === 'open' ? { width: next.width } : {} })
+                }}
+                onReset={() => keepLayout({ files: { width: FILES_WIDTH.usual } })}
               />
             )}
             <CodeViewer
@@ -469,6 +537,23 @@ export default function App() {
               }}
               dispatch={dispatch}
             />
+            {wide && panelOpen && (
+              <Splitter
+                label={COPY.commentsEdge}
+                title={COPY.commentsEdgeTip}
+                width={shown.comments}
+                min={COMMENTS_WIDTH.min}
+                max={COMMENTS_WIDTH.max}
+                side="right"
+                onResize={holdComments}
+                onRelease={(width) => {
+                  const next = commentsLetGo(width)
+                  setHeld({})
+                  keepLayout({ comments: next.open ? { width: next.width } : next })
+                }}
+                onReset={() => keepLayout({ comments: { width: COMMENTS_WIDTH.usual } })}
+              />
+            )}
             {panelOpen && (
               <ReviewPanel
                 comments={comments}
@@ -477,7 +562,7 @@ export default function App() {
                 onHover={setHoveredId}
                 onJump={jumpTo}
                 files={hasList ? entries : undefined}
-                onClose={() => setPanelChoice(false)}
+                onClose={() => (wide ? keepLayout({ comments: { open: false } }) : setPanelDrawer(false))}
               />
             )}
           </div>

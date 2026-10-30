@@ -2,6 +2,14 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.18.0 — 2026-10-30
+
+- **You can resize the list of files and the comments panel.** From 900 px, each has an edge that you drag, or move with the arrow keys (`Shift` for a bigger step, `Home` and `End`): the list from 200 to 520 px wide, the panel from 260 to 560. Let go of an edge very narrow and the panel folds away: the list to its rail or closed, the comments panel closed. A double-click on an edge gives the usual width back.
+  - **Reset layout**, the last item of the **⋯** menu, gives both panels their usual widths again, and lets the window decide whether they are open. The colour scheme stays.
+  - The widths, whether you opened or closed each panel, and the colour scheme are kept for every review: by the Jared service, in a file of settings that an update of the plugin keeps, and in the browser.
+- **The list of files has a filter.** Type a part of a file's name or folder, and the list shows only the files whose path holds it, with how many of how many, such as "4 of 11"; `Esc` clears it.
+- A long folder in the list of files is cut in its middle, as `src/main/…/storage/`, with the whole folder in its tooltip, and a long file name no longer makes the list wider.
+
 ## 0.17.1 — 2026-10-29
 
 - **In a review of several files, a jump up to a file now moves the view to it.** A click on a file in the list of files, or the key `[`, now goes to that file when it is above the one in view. Before, the list marked the file as the current one and the view stayed where it was. A jump down to a file, and a jump to a comment, are as they were.

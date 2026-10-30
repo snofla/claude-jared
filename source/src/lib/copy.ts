@@ -92,9 +92,24 @@ export const COPY = {
   filesExpand: 'Expand the file list',
   /** The button that closes the list when it is a drawer (below the width of the comments drawer): the same noun as the two above. */
   filesClose: 'Close the file list',
+  /** The edge after the list of files, from 900 px, in the open list and the rail: its name for a screen reader, and its tooltip. */
+  filesEdge: 'Width of the file list',
+  filesEdgeTip: 'Drag or use the arrow keys to resize the file list; double-click for the usual width',
+  /** The edge before the comments panel, from 900 px: the same. */
+  commentsEdge: 'Width of the comments panel',
+  commentsEdgeTip: 'Drag or use the arrow keys to resize the comments panel; double-click for the usual width',
   /** How many of the files the reviewer has marked, and how many files the diff has. English-only plurals: localisation replaces them with `Intl.PluralRules`. */
   filesViewed: (viewed: number, total: number): string => `${viewed} of ${total} viewed`,
   fileCount: (count: number): string => (count === 1 ? '1 file' : `${count} files`),
+  /** The filter of the list of files: its name for a screen reader, and the hint in the field. It narrows the list by a part of each file's path, so a folder's name finds its files too. */
+  filesFilterLabel: 'Filter files by name or folder',
+  filesFilterPlaceholder: 'Filter by name or folder',
+  /** Beside the field while it filters: how many files the list shows, and how many the review has. */
+  filesFilterCount: (shown: number, total: number): string => `${shown} of ${total}`,
+  /** The same, as a screen reader hears it when it changes. English-only plural: localisation replaces it with `Intl.PluralRules`. */
+  filesFilterSpoken: (shown: number, total: number): string => (shown === 0 ? 'No file matches' : `${shown} of ${total} files shown`),
+  /** In place of the files when none matches: what was typed, with the spaces around it left out. */
+  filesFilterNone: (query: string): string => `No file matches "${query}".`,
   /** The lines of the open file, or of a set, in the header: "1 line", and a number with its thousands for more. */
   lineCount: (count: number): string => (count === 1 ? '1 line' : `${count.toLocaleString()} lines`),
   /** What a kept review of several files shows in the list on the start page, after its number of files: the names of the first, and how many more. English-only plural, like the ones above. */
@@ -138,6 +153,8 @@ export const COPY = {
   colourScheme: 'Colour scheme',
   /** The names of its three choices. */
   themeChoice: { system: 'System', light: 'Light', dark: 'Dark' },
+  /** The last item of the menu of more actions: the panels' usual widths again, and the window decides whether they are open; the colour scheme stays. */
+  resetLayout: 'Reset layout',
   /** The safe button of the question of stopping a review: nothing is stopped and nobody is told. */
   keepReviewing: 'Keep reviewing',
   /** The button that stops a review while a program waits for it, and the one that closes the files when nobody does; the first item of the menu of more actions in a narrow window. */

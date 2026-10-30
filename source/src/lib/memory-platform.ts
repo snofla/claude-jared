@@ -2,6 +2,9 @@ import type { Review, SetReview, SourceFile } from '../types.ts'
 import { setHashOf } from './hash.ts'
 import type { Platform, KeptSession, KeptSet } from './platform.ts'
 import { buildSource, prepareSource } from './source.ts'
+import { usualLayout, type Layout } from './settings.ts'
+import { createSettingsService } from './settings-service.ts'
+import type { SettingsRemote } from './settings-remote.ts'
 import type { RecentEntry } from './storage.ts'
 import { parseTheme, type Theme } from './theme.ts'
 
@@ -35,6 +38,8 @@ export interface MemoryPlatformOptions {
   clipboard?: boolean
   /** The time at which the clock starts, as an ISO 8601 string. Each call of `now()` is one second later. */
   start?: string
+  /** The place that keeps the settings for every window, and the record that the page's script had of it, as a test makes them (a fake server); none by default. */
+  settings?: { remote?: SettingsRemote; boot?: unknown }
 }
 
 /** A platform that keeps everything in memory and records what it was asked, for tests: the same services as a browser tab, with no browser. */
@@ -55,7 +60,20 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
   const sets = new Map<string, SetReview>()
   let index: RecentEntry[] = []
   let last: string | null = null
-  let theme: Theme = 'system'
+  // The page's own copy of the settings, as `localStorage` holds it in a browser, behind the same service.
+  let kept: Theme = 'system'
+  let keptLayout: Layout = usualLayout()
+  const settings = createSettingsService({
+    local: {
+      loadTheme: () => kept,
+      saveTheme: (value) => void (kept = value),
+      loadLayout: () => structuredClone(keptLayout),
+      saveLayout: (layout) => void (keptLayout = structuredClone(layout)),
+      clearLayout: () => void (keptLayout = usualLayout()),
+    },
+    remote: options.settings?.remote ?? null,
+    boot: options.settings?.boot ?? null,
+  })
   let failed = false
   let ticks = 0
   let ids = 0
@@ -158,14 +176,14 @@ export function memoryPlatform(options: MemoryPlatformOptions = {}): MemoryPlatf
       },
     },
     theme: {
-      load: () => theme,
-      save: (value) => {
-        theme = parseTheme(value)
-      },
+      load: settings.theme.load,
+      save: (value) => settings.theme.save(parseTheme(value)),
       apply: (value) => {
         platform.applied.push(value)
       },
+      subscribe: settings.theme.subscribe,
     },
+    layout: settings.layout,
     input: {
       read: async (picked) => {
         const { name, text } = picked as MemoryPicked

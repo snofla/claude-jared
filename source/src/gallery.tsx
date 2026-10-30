@@ -1,7 +1,7 @@
 import { StrictMode, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as ui from './ui'
-import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, CodeField, type CodePart, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, TextField, type SegmentedOption, VisuallyHidden } from './ui'
+import { Alert, Badge, Button, Card, CardBody, CardFoot, CardHead, CodeField, type CodePart, Dialog, DialogFoot, Disclosure, FloatingToolbar, IconButton, IconMessage, IconMore, IconPencil, IconPlus, IconSend, IconTrash, IconUpload, IconX, Kbd, LinkButton, LiveStatus, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Notice, Select, SegmentedControl, Splitter, TextField, type SegmentedOption, VisuallyHidden } from './ui'
 import './styles.css'
 import './gallery.css'
 import { applySnapshotView } from './gallery-snapshot'
@@ -192,6 +192,11 @@ function PrimitiveStates() {
         <SegmentedControl label="Size" options={SIZES} value={size} onChange={setSize} />
       </Group>
 
+      <h3 className="gallery-component">Splitter</h3>
+      <Group title="Between three panels, an edge on each side of the middle one (drag an edge, or Tab to it and use the arrow keys, with Shift for a larger step, and Home and End; Escape during a drag puts the edge back; a double-click gives the usual width back; its line shows under the pointer, while it is dragged, and when the keys have it)">
+        <SplitterStates />
+      </Group>
+
       <h3 className="gallery-component">VisuallyHidden</h3>
       <Group title="A link whose words for a screen reader say that it opens in a new tab: the page does not draw them, so the link looks as it does without them">
         <span>
@@ -204,6 +209,46 @@ function PrimitiveStates() {
         </span>
       </Group>
     </>
+  )
+}
+
+/** Two edges between three panels, as the page has them: the panel on the left grows as its edge moves right, and the one on the right as its edge moves left. The page clamps what an edge asks for, as here. */
+function SplitterStates() {
+  const [left, setLeft] = useState(96)
+  const [right, setRight] = useState(80)
+  const clamp = (width: number, min: number, max: number) => Math.min(Math.max(width, min), max)
+  return (
+    <div className="gallery-panels">
+      <div className="gallery-panel" style={{ width: left }}>
+        On the left, {left} px
+      </div>
+      <Splitter
+        label="Width of the panel on the left"
+        title="Drag, or use the arrow keys; double-click for the usual width"
+        width={left}
+        min={64}
+        max={160}
+        side="left"
+        onResize={(width) => setLeft(clamp(width, 64, 160))}
+        onRelease={(width) => setLeft(clamp(width, 64, 160))}
+        onReset={() => setLeft(96)}
+      />
+      <div className="gallery-panel gallery-panel-middle">Between them</div>
+      <Splitter
+        label="Width of the panel on the right"
+        title="Drag, or use the arrow keys; double-click for the usual width"
+        width={right}
+        min={56}
+        max={140}
+        side="right"
+        onResize={(width) => setRight(clamp(width, 56, 140))}
+        onRelease={(width) => setRight(clamp(width, 56, 140))}
+        onReset={() => setRight(80)}
+      />
+      <div className="gallery-panel" style={{ width: right }}>
+        On the right, {right} px
+      </div>
+    </div>
   )
 }
 

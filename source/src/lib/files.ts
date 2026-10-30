@@ -63,6 +63,23 @@ export function toggled(set: ReadonlySet<string>, id: string): Set<string> {
 /** How many of the entries are marked: marks for files that are no longer in the list (a diff that changed under the mark) are not counted. */
 export const viewedCount = (viewed: ReadonlySet<string>, entries: readonly FileEntry[]): number => entries.filter((e) => viewed.has(e.id)).length
 
+/** The places in the list of the entries whose path holds `query`, without regard to case and with the spaces around it left out; every place for an empty query. They are places, so that the rest of the page keeps its own: the counts, the marks and the file in view are by place. */
+export function matchingFiles(entries: readonly FileEntry[], query: string): number[] {
+  const wanted = query.trim().toLowerCase()
+  return entries.flatMap((entry, i) => (entry.path.toLowerCase().includes(wanted) ? [i] : []))
+}
+
+/** A folder is cut in its middle when it is longer than this many characters and has more than `FOLDERS_UNCUT` folders. */
+const LONG_FOLDER = 22
+const FOLDERS_UNCUT = 3
+
+/** A folder as the list shows it: a long one keeps its first two folders and its last, with an ellipsis for the rest (`src/main/…/storage/`); a leading slash stays. */
+export function cutFolder(folder: string): string {
+  const names = folder.split('/').filter(Boolean)
+  if (folder.length <= LONG_FOLDER || names.length <= FOLDERS_UNCUT) return folder
+  return `${folder.startsWith('/') ? '/' : ''}${names[0]}/${names[1]}/…/${names[names.length - 1]}/`
+}
+
 /** How the list is shown when the reviewer has not chosen: open when the window is wide enough for three columns of a useful width, a rail when it is not, and closed below the width at which the comments panel is a drawer too. */
 export type FilesMode = 'open' | 'rail' | 'closed'
 

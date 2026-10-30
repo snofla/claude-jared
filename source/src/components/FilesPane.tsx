@@ -1,6 +1,6 @@
 import { COPY } from '../lib/copy'
-import { viewedCount, type FileEntry } from '../lib/files'
-import { Badge, Button, IconCheck, IconX, Kbd } from '../ui'
+import { cutFolder, matchingFiles, viewedCount, type FileEntry } from '../lib/files'
+import { Badge, Button, IconCheck, IconX, Kbd, LiveStatus } from '../ui'
 
 interface Props {
   entries: readonly FileEntry[]
@@ -13,6 +13,9 @@ interface Props {
   rail: boolean
   /** Below the width at which the comments panel is a drawer, this is one too, and has a button that closes it. */
   drawer: boolean
+  /** What the reviewer has typed in the filter: the list shows the files whose path holds it. The page keeps it, so that it outlives the rail, the closed list and the drawer. */
+  query: string
+  onQuery: (query: string) => void
   onPick: (index: number) => void
   onToggleViewed: (index: number) => void
   onRail: () => void
@@ -58,13 +61,16 @@ function Tick({ on, label, onClick }: { on: boolean; label: string; onClick: () 
 
 /**
  * The files of a diff, beside the code: a row for each, with its mark for viewed, its status, its name and its comments. A press on a file goes to it in the
- * code, and the file that is in view is marked. Open it is a column; as a rail it keeps a mark, a status and a count for each file and the names go into
- * tooltips; below the width of a drawer it slides over the code.
+ * code, and the file that is in view is marked. Open it is a column, with a filter over the list; as a rail it keeps a mark, a status and a count for each file
+ * and the names go into tooltips, and it shows every file; below the width of a drawer it slides over the code.
  */
-export function FilesPane({ entries, counts, viewed, current, rail, drawer, onPick, onToggleViewed, onRail, onClose }: Props) {
+export function FilesPane({ entries, counts, viewed, current, rail, drawer, query, onQuery, onPick, onToggleViewed, onRail, onClose }: Props) {
   const done = viewedCount(viewed, entries)
   const classes = ['files', rail && !drawer ? 'is-rail' : null, drawer ? 'is-drawer' : null].filter(Boolean).join(' ')
   const narrow = rail && !drawer
+  const filtering = !narrow && query.trim() !== ''
+  // The places of the files that the list draws: all of them in the rail, and in the column those that the filter leaves.
+  const places = narrow ? entries.map((_, i) => i) : matchingFiles(entries, query)
 
   return (
     <aside className={classes} aria-label={COPY.files}>
@@ -94,12 +100,34 @@ export function FilesPane({ entries, counts, viewed, current, rail, drawer, onPi
           <div className="files-progress" aria-hidden="true">
             <span style={{ width: `${entries.length === 0 ? 0 : (done / entries.length) * 100}%` }} />
           </div>
+          <div className="files-filter-row">
+            <input
+              type="search"
+              className="files-filter"
+              placeholder={COPY.filesFilterPlaceholder}
+              aria-label={COPY.filesFilterLabel}
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && query !== '') onQuery('')
+              }}
+            />
+            {filtering && (
+              <span className="muted files-filter-count" aria-hidden="true">
+                {COPY.filesFilterCount(places.length, entries.length)}
+              </span>
+            )}
+            <LiveStatus className="sr-only">{filtering ? COPY.filesFilterSpoken(places.length, entries.length) : null}</LiveStatus>
+          </div>
         </>
       )}
 
       <ul className="files-list">
-        {entries.map((entry, i) => {
+        {filtering && places.length === 0 && <li className="muted files-none">{COPY.filesFilterNone(query.trim())}</li>}
+        {places.map((i) => {
+          const entry = entries[i]
           const { dir, name } = split(entry.path)
+          const cut = cutFolder(dir)
           const count = counts[i] ?? 0
           const on = viewed.has(entry.id)
           return (
@@ -128,7 +156,16 @@ export function FilesPane({ entries, counts, viewed, current, rail, drawer, onPi
                     <StatusBadge entry={entry} />
                     <span className="files-path">
                       <span className="files-name">{name}</span>
-                      <span className="files-dir">{dir}</span>
+                      <span className="files-dir">
+                        {cut === dir ? (
+                          dir
+                        ) : (
+                          <>
+                            <span aria-hidden="true">{cut}</span>
+                            <span className="sr-only">{dir}</span>
+                          </>
+                        )}
+                      </span>
                     </span>
                     {count > 0 && <CommentCount count={count} />}
                   </button>

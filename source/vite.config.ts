@@ -20,7 +20,7 @@ export default defineConfig(({ command }) => ({
       provider: 'v8',
       // Business logic: the folders that hold no UI, and this coverage tool itself.
       // What is left out of the report is decided in scripts/coverage-exclusions.md, run with `npm run coverage`.
-      include: ['src/lib/**/*.ts', 'src/state/**/*.ts', 'src/engine/**/*.ts', 'scripts/checks/**/*.ts', 'scripts/coverage/**/*.ts', 'scripts/engine/**/*.ts', 'scripts/single/**/*.ts', 'scripts/publish/**/*.ts', 'scripts/task/**/*.ts'],
+      include: ['src/lib/**/*.ts', 'src/state/**/*.ts', 'src/engine/**/*.ts', 'src/ui/**/*.ts', 'scripts/checks/**/*.ts', 'scripts/coverage/**/*.ts', 'scripts/engine/**/*.ts', 'scripts/single/**/*.ts', 'scripts/publish/**/*.ts', 'scripts/task/**/*.ts'],
       exclude: ['**/*.test.ts'],
       reporter: ['json'],
     },

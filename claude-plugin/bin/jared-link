@@ -29,8 +29,9 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       the most that all of them are together
 
   --file              open <file> in the one-file Jared (a page that opens from a path) instead of making a link. The helper makes
-                      a folder for this review in the cache ($JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared), puts the page
-                      and a script, jared-boot.js, that gives the page the file, in it, opens the page with open or xdg-open, and
+                      a folder for this review in the cache ($JARED_CACHE, or $XDG_CACHE_HOME/jared, or ~/.cache/jared), puts in it the
+                      page and a script, jared-boot.js, that gives the page the file and the reviewer's settings (the file settings.json
+                      in the cache folder, as window.__JARED_SETTINGS), opens the page with open or xdg-open, and
                       prints one sentence. The script is replaced after $JARED_BOOT_KEEP seconds (default 3600) by one that says that the review has expired, so that a page opened later can tell, and review folders
                       more than an hour old are removed the next time. The file may be as big as Jared opens.
   --page <path>       the one-file page (default: $JARED_PAGE; else app/jared.html in the plugin, which a published copy has;
@@ -41,8 +42,9 @@ The request also names Claude as the one to tell (submitTarget), which only chan
                       http://127.0.0.1:<port>/<secret>/<review folder>/jared.html on one line, for a browser tool to open. Give it 2 to 100 files, one after another, to review them together: each is read as UTF-8 text, no name may be given twice, and several files go with --serve only, not with --file, a link or --rev. The
                       service is one process that every review uses: it listens on 127.0.0.1 only, answers GET and HEAD for the
                       page and the script of a review folder, takes one POST for each review folder, at
-                      /<secret>/<review folder>/message, which writes the review in that folder as the file review.json, and
-                      nothing else, and ends by itself after $JARED_SERVICE_IDLE seconds (default 1800) without a request. Its port, secret, pid, the time of its start and the version of the plugin that started it are in the file "service" in the cache folder. A service that an earlier version of the plugin started, which an update leaves running, is stopped and replaced by one of this helper's version; a service of the same or a newer version is used as it is.
+                      /<secret>/<review folder>/message, which writes the review in that folder as the file review.json, and keeps the
+                      reviewer's settings in the file settings.json of the cache folder, which a page reads by GET and writes whole by
+                      PUT at /<secret>/settings; it answers nothing else, and ends by itself after $JARED_SERVICE_IDLE seconds (default 1800) without a request. Its port, secret, pid, the time of its start and the version of the plugin that started it are in the file "service" in the cache folder. A service that an earlier version of the plugin started, which an update leaves running, is stopped and replaced by one of this helper's version; a service of the same or a newer version is used as it is.
   --label <words>     the words on the button that hands the review to the caller (1 to 40 characters), so that the page has a
                       button and the caller can wait for the review with window.jared.waitForSubmit; for --serve only
   --closes, --message, --banner
@@ -268,6 +270,72 @@ cache_base() {
   fi
 }
 
+# The settings record of the file settings.json in the cache folder, as perl that both the service and the script of a review use, so that the one
+# check is the same for what is written and for what is read. settings_record gives the record made anew from the values that it checked, or undef
+# and one line that says what is wrong; settings_read gives the record of a file, or undef when there is none or it is not one. It needs JSON::PP and B.
+settings_check='
+  sub settings_record {
+    my ($d) = @_;
+    # A number that JSON::PP read is flagged as one, and a string of the same digits is not; the flags are read before anything makes a string of it.
+    my $number = sub { my $f = defined $_[0] && !ref $_[0] ? B::svref_2object(\$_[0])->FLAGS : 0; ($f & (B::SVp_IOK | B::SVp_NOK)) && !($f & B::SVp_POK) };
+    my $whole = sub { my ($v, $least, $most) = @_; $number->($v) && $v == int($v) && $v >= $least && $v <= $most };
+    my $one = sub { my ($v, @of) = @_; defined $v && !ref $v && grep { $v eq $_ } @of };
+    my $only = sub { my ($h, @names) = @_; my %named = map { $_ => 1 } @names; ref $h eq "HASH" && !grep { !$named{$_} } keys %$h };
+    $only->($d, qw(v theme layout)) or return (undef, "The settings are not an object of v, theme and layout.");
+    $number->($d->{v}) && $d->{v} == 1 or return (undef, "v is not 1.");
+    my %record = (v => 1);
+    if (exists $d->{theme}) {
+      $one->($d->{theme}, qw(system light dark)) or return (undef, "theme is not system, light or dark.");
+      $record{theme} = "$d->{theme}";
+    }
+    if (exists $d->{layout}) {
+      my $l = $d->{layout};
+      $only->($l, qw(files comments)) or return (undef, "layout is not an object of files and comments.");
+      my %layout;
+      if (exists $l->{files}) {
+        my $f = $l->{files};
+        $only->($f, qw(width mode)) or return (undef, "layout.files is not an object of width and mode.");
+        my %files;
+        if (exists $f->{width}) {
+          $whole->($f->{width}, 200, 520) or return (undef, "layout.files.width is not a whole number from 200 to 520.");
+          $files{width} = int($f->{width});
+        }
+        if (exists $f->{mode}) {
+          $one->($f->{mode}, qw(open rail closed)) or return (undef, "layout.files.mode is not open, rail or closed.");
+          $files{mode} = "$f->{mode}";
+        }
+        $layout{files} = \%files;
+      }
+      if (exists $l->{comments}) {
+        my $c = $l->{comments};
+        $only->($c, qw(width open)) or return (undef, "layout.comments is not an object of width and open.");
+        my %comments;
+        if (exists $c->{width}) {
+          $whole->($c->{width}, 260, 560) or return (undef, "layout.comments.width is not a whole number from 260 to 560.");
+          $comments{width} = int($c->{width});
+        }
+        if (exists $c->{open}) {
+          ref $c->{open} eq "JSON::PP::Boolean" or return (undef, "layout.comments.open is not true or false.");
+          $comments{open} = $c->{open} ? JSON::PP::true : JSON::PP::false;
+        }
+        $layout{comments} = \%comments;
+      }
+      $record{layout} = \%layout;
+    }
+    return (\%record, undef);
+  }
+  sub settings_read {
+    my ($file) = @_;
+    -f $file && !-l $file && (stat _)[7] <= 16384 && open(my $in, "<:raw", $file) or return undef;
+    local $/;
+    my $text = <$in>;
+    close $in;
+    my $data = eval { JSON::PP->new->utf8->decode($text) };
+    my ($record) = settings_record($data);
+    return $record;
+  }
+'
+
 # Whether the service that the file "service" tells of answers on its port with its own pid: service_alive <port> <secret> <pid>.
 # A pid that a file names is never trusted by itself.
 service_alive() {
@@ -366,7 +434,8 @@ service_started() {
     esac
     fallback=1
   fi
-  started=$(perl - "$base" "$idle" "$want" "$ownver" "$fallback" <<'PERL'
+  # The check of the settings record goes after the program, as named subs that it calls.
+  started=$({ cat; printf '%s\n' "$settings_check"; } <<'PERL' | perl - "$base" "$idle" "$want" "$ownver" "$fallback"
     use strict;
     use warnings;
     use IO::Socket::INET;
@@ -427,7 +496,8 @@ service_started() {
     }
     sub reply {
       my ($c, $code, $text, $type, $body, $head, $extra) = @_;
-      my $out = "HTTP/1.1 $code $text\r\nContent-Type: $type\r\nContent-Length: " . length($body) . "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n" . ($extra // "") . "\r\n";
+      # A 204 has no body, and so neither a type nor a length.
+      my $out = "HTTP/1.1 $code $text\r\n" . ($code == 204 ? "" : "Content-Type: $type\r\nContent-Length: " . length($body) . "\r\n") . "Cache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n" . ($extra // "") . "\r\n";
       $out .= $body unless $head;
       my $off = 0;
       while ($off < length $out) {
@@ -439,6 +509,17 @@ service_started() {
     sub say_json {
       my ($c, $code, $text, $data) = @_;
       reply($c, $code, $text, "application/json; charset=utf-8", JSON::PP->new->utf8->canonical->encode($data) . "\n");
+    }
+    # The body of a request, of the length that it says, from what came after its headers and what it sends after them; undef when it stops sending.
+    sub body_of {
+      my ($c, $sel, $rest, $length) = @_;
+      my $body = defined $rest ? $rest : "";
+      while (length($body) < $length) {
+        $sel->can_read(5) or return undef;
+        sysread($c, my $chunk, 65536) or return undef;
+        $body .= $chunk;
+      }
+      return substr($body, 0, $length);
     }
     # What a review folder takes from its page: one POST, at /<secret>/<review folder>/message, of the receiver's own submit, cancelled or skipped.
     # It is written as the file review.json of that folder, whole, by a temporary file and a rename, with its revision inside; the answer says the revision that the file holds.
@@ -459,13 +540,7 @@ service_started() {
       @lengths == 1 && $lengths[0] =~ /^[0-9]+$/ or return say_json($c, 411, "Length Required", { ok => JSON::PP::false, code => "length", message => "Send a Content-Length." });
       my $length = $lengths[0] + 0;
       $length <= 4194304 or return say_json($c, 413, "Payload Too Large", { ok => JSON::PP::false, code => "large", message => "Over 4 MB." });
-      my $body = defined $rest ? $rest : "";
-      while (length($body) < $length) {
-        $sel->can_read(5) or return;
-        sysread($c, my $chunk, 65536) or return;
-        $body .= $chunk;
-      }
-      $body = substr($body, 0, $length);
+      my $body = body_of($c, $sel, $rest, $length) // return;
       my $bad = sub { say_json($c, 400, "Bad Request", { ok => JSON::PP::false, code => "invalid", message => $_[0] }) };
       my $data = eval { JSON::PP->new->utf8->decode($body) };
       ref $data eq "HASH" or return $bad->("The message is not a JSON object.");
@@ -542,6 +617,41 @@ service_started() {
       rename($tmp, $file) or do { unlink $tmp; return $failed->() };
       say_json($c, 200, "OK", { ok => JSON::PP::true, revision => $new + 0 });
     }
+    # What the service keeps for the reviewer: the settings record, which a PUT at /<secret>/settings gives whole, checked as settings_record checks it.
+    # It is written as the file settings.json of the cache folder, by a temporary file and a rename: each write is whole, and the last one is what is there,
+    # since the page sends the whole record each time.
+    sub keep {
+      my ($c, $sel, $target, $headers, $rest) = @_;
+      my @h = @$headers;
+      my $say = sub { reply($c, $_[0], $_[1], "text/plain; charset=utf-8", "$_[2]\n") };
+      my ($origin) = map { /^origin:\s*(.*?)\s*$/i ? lc($1) : () } @h;
+      if (defined $origin) {
+        $origin eq "http://127.0.0.1:$port" || $origin eq "http://localhost:$port" or return $say->(403, "Forbidden", "Forbidden");
+      }
+      $target eq "/$token/settings" or return $say->(404, "Not Found", "Not found");
+      my ($type) = map { /^content-type:\s*(.*?)\s*$/i ? lc($1) : () } @h;
+      defined $type && $type =~ m{^application/json(?:\s*;\s*charset=utf-8)?$} or return $say->(415, "Unsupported Media Type", "Send application/json.");
+      my @lengths = map { /^content-length:\s*(.*?)\s*$/i ? $1 : () } @h;
+      @lengths <= 1 or return $say->(400, "Bad Request", "More than one Content-Length.");
+      @lengths == 1 && $lengths[0] =~ /^[0-9]+$/ or return $say->(411, "Length Required", "Send a Content-Length.");
+      my $length = $lengths[0] + 0;
+      $length <= 16384 or return $say->(413, "Payload Too Large", "Over 16 KB.");
+      my $body = body_of($c, $sel, $rest, $length) // return;
+      my $data = eval { JSON::PP->new->utf8->decode($body) };
+      length $@ and return $say->(400, "Bad Request", "The settings are not JSON.");
+      my ($record, $why) = settings_record($data);
+      defined $record or return $say->(400, "Bad Request", $why);
+      umask 077;
+      my $file = "$base/settings.json";
+      my $tmp = "$base/.settings.json.$$";
+      my $failed = sub { unlink $tmp; $say->(500, "Internal Server Error", "The settings could not be written.") };
+      open(my $o, ">", $tmp) or return $failed->();
+      binmode $o;
+      print $o JSON::PP->new->utf8->canonical->encode($record), "\n";
+      close($o) or return $failed->();
+      rename($tmp, $file) or return $failed->();
+      reply($c, 204, "No Content", "", "");
+    }
     sub answer {
       my $c = shift;
       my $sel = IO::Select->new($c);
@@ -556,12 +666,17 @@ service_started() {
       my ($line, @headers) = split /\r\n/, $top;
       defined $line && $line =~ m{^([A-Z]+) (\S+) HTTP/1\.[01]$} or return reply($c, 400, "Bad Request", "text/plain", "Bad request\n");
       my ($method, $target) = ($1, $2);
-      $method eq "GET" || $method eq "HEAD" || $method eq "POST" or return reply($c, 405, "Method Not Allowed", "text/plain", "Method not allowed\n", 0, "Allow: GET, HEAD, POST\r\n");
+      $method =~ /^(?:GET|HEAD|POST|PUT)$/ or return reply($c, 405, "Method Not Allowed", "text/plain", "Method not allowed\n", 0, "Allow: GET, HEAD, POST, PUT\r\n");
       my ($host) = map { /^host:\s*(.*?)\s*$/i ? lc($1) : () } @headers;
       defined $host && ($host eq "127.0.0.1:$port" || $host eq "localhost:$port") or return reply($c, 403, "Forbidden", "text/plain", "Forbidden\n");
       return take($c, $sel, $target, \@headers, $rest) if $method eq "POST";
+      return keep($c, $sel, $target, \@headers, $rest) if $method eq "PUT";
       my $head = $method eq "HEAD";
       return reply($c, 200, "OK", "text/plain; charset=utf-8", "jared-service $daemon\n", $head) if $target eq "/$token/health";
+      if ($target eq "/$token/settings") {
+        my $record = settings_read("$base/settings.json");
+        return defined $record ? reply($c, 200, "OK", "application/json; charset=utf-8", JSON::PP->new->utf8->canonical->encode($record) . "\n", $head) : reply($c, 204, "No Content", "", "", $head);
+      }
       return reply($c, 200, "OK", "application/json; charset=utf-8", "{\"pid\":$daemon,\"started\":$started,\"now\":" . time . ",\"previous\":$previous,\"idle\":$idle" . (length $version ? ",\"version\":\"$version\"" : "") . "}\n", $head) if $target eq "/$token/status";
       if ($target =~ m{^/$token/(review\.[A-Za-z0-9]{6})/(jared\.html|jared-boot\.js)$}) {
         my ($folder, $name) = ($1, $2);
@@ -992,11 +1107,24 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
   keep=${JARED_BOOT_KEEP:-3600}
   case $keep in *[!0-9]*) keep=3600 ;; esac
 
+  # The settings, after the request: the address that takes them ($1, or nothing for none) and the record of settings.json, or null when there is none or
+  # it is not a record, read now, so that the page draws with them at once.
+  boot_settings() {
+    perl -MJSON::PP -MB -e "$settings_check" -e '
+      my ($file, $url, $out) = @ARGV;
+      my $line = "window.__JARED_SETTINGS = " . JSON::PP->new->ascii->canonical->encode({ url => length $url ? $url : undef, record => settings_read($file) }) . "\n";
+      open(my $o, ">>", $out) or exit 7;
+      print $o $line;
+      close($o) or exit 7;
+    ' "$base/settings.json" "$1" "$dir/jared-boot.js" || { rm -rf "$dir"; fail "The script for the review cannot be written in \"$dir\"." 7; }
+  }
+
   if [ "$serve" = 1 ]; then
     service_started || {
       rm -rf "$dir"
       fail 'The Jared service could not be started (the port is in use, or sockets cannot be opened).' 8
     }
+    boot_settings "http://127.0.0.1:$svc_port/$svc_token/settings"
     # The address of the folder, for the page to send the review to: only characters of a port, a secret and the name of a folder that this helper made.
     if [ "$reviewfile" = 1 ]; then
       printf 'window.__JARED_SERVICE = "http://127.0.0.1:%s/%s/%s"\n' "$svc_port" "$svc_token" "$(basename "$dir")" >> "$dir/jared-boot.js" \
@@ -1010,6 +1138,7 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
     exit 0
   fi
 
+  boot_settings ''
   "$opener" "$dir/jared.html" || {
     rm -rf "$dir"
     fail "The page could not be opened with $opener." 5

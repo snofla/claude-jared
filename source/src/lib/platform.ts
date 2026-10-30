@@ -3,6 +3,8 @@ import type { TextEdit } from './indent.ts'
 import type { ReadMany } from './set-pick.ts'
 import type { OpenResult } from './source.ts'
 import type { RecentEntry } from './storage.ts'
+import type { Layout } from './settings.ts'
+import type { LayoutChange } from './settings-service.ts'
 import type { Theme } from './theme.ts'
 
 /**
@@ -66,6 +68,19 @@ export interface Platform {
     load(): Theme
     save(theme: Theme): void
     apply(theme: Theme): void
+    /** Tells when a scheme comes from the place that keeps the settings for every window and is not the one the page has; gives a way to stop listening. */
+    subscribe(listener: (theme: Theme) => void): () => void
+  }
+  /**
+   * The layout of the page, kept with the colour scheme in one record of settings: the widths of the list of files and of the comments panel, the list's mode and
+   * whether the panel is open, when the reviewer chose them. A load gives what the page has at once; a save is a change to one panel, merged into what is kept
+   * and not waited for (a failure is silent: the page keeps its state); `clear` is *Reset layout*; `subscribe` tells of a layout that comes later from the place that keeps it.
+   */
+  layout: {
+    load(): Layout
+    save(change: LayoutChange): void
+    clear(): void
+    subscribe(listener: (layout: Layout) => void): () => void
   }
   /** Getting a source file in: the platform reads what it picked, and gives its name and text, or why it cannot be opened. */
   input: {

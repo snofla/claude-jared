@@ -769,7 +769,7 @@ pre {
 /* ---------- side panel ---------- */
 
 .side {
-  flex: 0 0 320px;
+  flex: 0 0 var(--comments-w, 320px); /* the width that the page works out in a wide window (`.main` sets it), or the usual one */
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1244,9 +1244,10 @@ pre {
 /* ---------- the files of a diff, beside the code ---------- */
 
 .files {
-  flex: 0 0 252px;
+  flex: 0 0 var(--files-w, 252px); /* as the comments panel's */
   display: flex;
   flex-direction: column;
+  min-width: 0; /* a flex item is as wide as its content at the least: without this, a long name widens the list past its width */
   min-height: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -1254,7 +1255,12 @@ pre {
 }
 
 .files.is-rail {
-  flex-basis: 60px;
+  flex-basis: var(--files-w, 60px);
+}
+
+/* An edge that is held moves its panel with the pointer, without the ease of a snap. */
+.main.is-resizing .files {
+  transition: none;
 }
 
 .files-head {
@@ -1367,16 +1373,57 @@ button.files-tick {
 }
 
 .files-name {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-weight: 600;
+  text-overflow: ellipsis;
 }
 
+/* The folder takes what the name leaves and has no width of its own to give up, so a long path is cut at the folder first and at the name only once the folder is gone. */
 .files-dir {
-  flex: 0 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
   margin-left: var(--space-6);
   overflow: hidden;
   color: var(--muted);
   text-overflow: ellipsis;
+}
+
+.files-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-12) var(--space-8);
+}
+
+.files-filter {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.files-filter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.files-filter-count {
+  flex: none;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.files-none {
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--font-size-sm);
 }
 
 .files-keys {

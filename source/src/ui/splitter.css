@@ -1,0 +1,54 @@
+/*
+ * The edge between two panels. It takes no room in the row: its hit area (10 px, 24 px under a finger) and its line (3 px) are drawn over the panels' own
+ * borders, centred on the edge. At rest the edge is the panel's border; under the pointer, while dragged and when the keys have it, the line is the accent.
+ */
+.jared-splitter {
+  position: relative;
+  flex: 0 0 0;
+  align-self: stretch;
+  z-index: 6; /* over a scroller beside it, whose stuck rows (4) and bar of a selection (5) would take the pointer on its side of the edge, and under a menu's list (40) */
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.jared-splitter::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: -5px;
+  width: 10px;
+}
+
+.jared-splitter::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: -1.5px;
+  width: 3px;
+  background: transparent;
+  transition: background-color 120ms;
+}
+
+/* The line is the mark of the focus, in place of the page's ring, which would draw round an edge that has no width. */
+.jared-splitter:focus-visible {
+  outline: none;
+}
+
+.jared-splitter:hover::after,
+.jared-splitter[data-dragging]::after,
+.jared-splitter:focus-visible::after {
+  background: var(--accent);
+}
+
+@media (pointer: coarse) {
+  .jared-splitter::before {
+    left: -12px;
+    width: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jared-splitter::after {
+    transition: none;
+  }
+}

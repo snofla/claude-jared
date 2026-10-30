@@ -2,6 +2,7 @@ import type { Review, SetReview, SourceFile } from '../types'
 import { setHashOf } from './hash'
 import { parseSetReview } from './review'
 import { buildSource } from './source'
+import { layoutRecord, parseLayoutRecord, usualLayout, type Layout } from './settings'
 import { parseTheme, THEME_KEY, type Theme } from './theme'
 
 /**
@@ -15,6 +16,8 @@ import { parseTheme, THEME_KEY, type Theme } from './theme'
  *                        review is `jared:review:<hash>` as a version-2 review, and the text of each file is the `jared:src` of its own
  *                        hash, shared with any other review that has the same file
  *   jared:theme          'system' | 'light' | 'dark'   the colour scheme the reviewer chose
+ *   jared:layout         { v, files, comments }   the widths of the list of files and of the comments panel, and the list's mode and whether the
+ *                        panel is open, when the reviewer chose them: the page's own copy of what the service keeps for every window (`settings.ts`)
  *
  * Splitting source from review keeps the frequent writes tiny.
  */
@@ -213,6 +216,37 @@ export function saveTheme(theme: Theme): void {
     localStorage.setItem(THEME_KEY, theme)
   } catch {
     /* storage unavailable: the choice holds until the page is closed */
+  }
+}
+
+/** The key of the layout that the reviewer kept: `{ v, files, comments }`, the page's own copy. */
+export const LAYOUT_KEY = 'jared:layout'
+
+/** The layout that the reviewer kept, or the usual one when none is stored, it is not right or the storage cannot be read. */
+export function loadLayout(): Layout {
+  try {
+    const raw = localStorage.getItem(LAYOUT_KEY)
+    return raw === null ? usualLayout() : parseLayoutRecord(JSON.parse(raw))
+  } catch {
+    return usualLayout()
+  }
+}
+
+/** Keeps the layout: silent when the storage is blocked or full, since a layout that was not kept is no lost review, and it does not set the flag of a failure that the reviews do. */
+export function saveLayout(layout: Layout): void {
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRecord(layout)))
+  } catch {
+    /* storage unavailable: the layout holds until the page is closed */
+  }
+}
+
+/** Forgets the layout that was kept. The colour scheme is its own key and stays. */
+export function clearLayout(): void {
+  try {
+    localStorage.removeItem(LAYOUT_KEY)
+  } catch {
+    /* storage unavailable: nothing was kept */
   }
 }
 

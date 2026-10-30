@@ -44,9 +44,11 @@ interface Props {
    * in the menu of more actions instead, as its first item (a narrow window, `STOP_IN_MENU_QUERY`). Left out, or `null`, the header has no such button.
    */
   stop?: { inMenu: boolean; onStop: () => void } | null
+  /** *Reset layout*, the last item of the menu: the panels' usual widths again, and the window decides whether they are open. Left out, the menu has no such item. */
+  onResetLayout?: () => void
 }
 
-export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, delivery, handedOver, sentAt, theme, onTheme, stop }: Props) {
+export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, onOpen, onLanguage, onSubmit, changes, onReviewWindow, delivery, handedOver, sentAt, theme, onTheme, stop, onResetLayout }: Props) {
   const state = statusOf(review, handedOver, sentAt)
   const label = sendLabel(delivery, changes)
   const count = review.comments.length
@@ -119,6 +121,14 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
             </MenuRadioItem>
           ))}
         </MenuGroup>
+        {onResetLayout && (
+          <>
+            <MenuSeparator />
+            <MenuItem icon={<IconPanel />} onSelect={onResetLayout}>
+              {COPY.resetLayout}
+            </MenuItem>
+          </>
+        )}
       </Menu>
       {stop && !stop.inMenu && (
         <Button onClick={stop.onStop} title={stopText.tip}>

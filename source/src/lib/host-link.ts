@@ -62,3 +62,39 @@ export function serviceAddress(value: unknown, ownOrigin: string): string | null
   const path = /^\/([0-9a-f]{32})\/(review\.[A-Za-z0-9]{6})\/?$/.exec(url.pathname)
   return path ? `${url.origin}/${path[1]}/${path[2]}` : null
 }
+
+/**
+ * The name of the page's global that the script of every review sets, `window.__JARED_SETTINGS`: `{ url, record }`, the address of the settings that the service keeps
+ * (`null` for the one-file page opened from a path, which has no program to write to) and the record that the service had when it wrote the script (`null` for none).
+ * `settingsBoot` says what of it Jared may use.
+ */
+export const SETTINGS_KEY = '__JARED_SETTINGS'
+
+/**
+ * The address of the settings at the service that served the page: `http` on this computer, on the origin that served the page itself (`ownOrigin`), with a path
+ * of two parts, the secret (32 lower-case hexadecimal digits) and `settings`, and nothing else in it, so that a script that sets the global cannot send the settings
+ * to another program on this computer. Anything else gives `null`. Returns the address without a trailing `/`.
+ */
+export function settingsAddress(value: unknown, ownOrigin: string): string | null {
+  if (typeof value !== 'string') return null
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' || !LOOPBACK.includes(url.hostname) || url.origin !== ownOrigin) return null
+  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') return null
+  const path = /^\/([0-9a-f]{32})\/settings\/?$/.exec(url.pathname)
+  return path ? `${url.origin}/${path[1]}/settings` : null
+}
+
+/** The settings of a receiver that Jared may use (`receiverAddress` has said so): its address and `/settings`; none for no receiver. */
+export const receiverSettingsAddress = (receiver: string | null): string | null => (receiver === null ? null : `${receiver}/settings`)
+
+/** What the script of a review put in `window.__JARED_SETTINGS`, as Jared may use it: the address if it is one (`settingsAddress`), and the record as it came, which the reader checks. */
+export function settingsBoot(value: unknown, ownOrigin: string): { url: string | null; record: unknown } {
+  if (typeof value !== 'object' || value === null) return { url: null, record: null }
+  const { url, record } = value as { url?: unknown; record?: unknown }
+  return { url: settingsAddress(url, ownOrigin), record: record ?? null }
+}
