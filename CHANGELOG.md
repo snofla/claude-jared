@@ -2,6 +2,12 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.18.1 — 2026-11-02
+
+- **The next review opens its own file.** After a review with comments, the next review on a running Jared service could stay on the old file, even after a reload, and the button could send the old review to Claude as the review of the new file. Now the new file opens, and nothing is asked.
+  - The old review stays under **Continue reviewing**. When it has comments that were not sent, copied or downloaded, a banner names it.
+  - The button and **Stop reviewing** reach the Jared service only from the file that it opened Jared for. If you open another file on that page, its review stays in the browser, and you export it as usual.
+
 ## 0.18.0 — 2026-10-30
 
 - **You can resize the list of files and the comments panel.** From 900 px, each has an edge that you drag, or move with the arrow keys (`Shift` for a bigger step, `Home` and `End`): the list from 200 to 520 px wide, the panel from 260 to 560. Let go of an edge very narrow and the panel folds away: the list to its rail or closed, the comments panel closed. A double-click on an edge gives the usual width back.

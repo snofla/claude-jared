@@ -95,6 +95,19 @@ export function fromEngineState({ source, review, set }: EngineState): Adopted {
 /** Whether replacing the session would throw away a reviewer's work: a comment that is saved or one being written. */
 const hasWork = ({ review, draft }: PageSession): boolean => (review?.comments.length ?? 0) > 0 || draftHasText(draft)
 
+/** The hash of what an `open` request brings, a file or a set of files, as the page will know it once it is open; `null` for any other request, and for what cannot be opened. */
+export function openHash(value: unknown): string | null {
+  const parsed = parseRequest(value)
+  if (!parsed.ok || parsed.request.type !== 'open') return null
+  const { request } = parsed
+  if (request.files === undefined) {
+    const prepared = prepareSource(request.name, request.text)
+    return prepared.ok ? prepared.file.hash : null
+  }
+  const prepared = request.files.map((given) => prepareSource(given.name, given.text))
+  return prepared.every((file) => file.ok) ? setHashOf(prepared.map((file) => file.file)) : null
+}
+
 /**
  * Act on one message that arrived on the page. Pure: the page does the adopting. Never throws.
  *

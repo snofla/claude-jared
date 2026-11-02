@@ -149,6 +149,17 @@ export const COPY = {
   fileStatus: { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed' },
   /** The key hints at the foot of the list: each beside its key, so each is a whole message. */
   filesKeys: { next: 'next file', previous: 'previous file', viewed: 'viewed' },
+  /**
+   * The banner of a page that loaded to open a file when the last review, of another file, had comments that were not sent, copied or downloaded.
+   * The review was kept, so nothing needs doing now. `name` is the name of its file, or `fileCount` for a review of several files.
+   * `changedSince` says that it left the page once and was changed after: the page cannot say which comments went, so it counts none of them.
+   */
+  keptBehind: (name: string, comments: number, changedSince: boolean): string => {
+    if (changedSince) return `Your earlier review of ${name} has changes that were not sent. It is under "Continue reviewing" on the start page.`
+    return comments === 1
+      ? `The comment in your earlier review of ${name} was not sent. It is under "Continue reviewing" on the start page.`
+      : `The ${comments} comments in your earlier review of ${name} were not sent. They are under "Continue reviewing" on the start page.`
+  },
   /** The heading of the choice of colour scheme in that menu. */
   colourScheme: 'Colour scheme',
   /** The names of its three choices. */

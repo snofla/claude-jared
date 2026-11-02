@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type CSSProperties } from 'react'
 import { CodeViewer } from './components/CodeViewer'
 import { DeliveryStrip } from './components/DeliveryStrip'
 import { FilesPane } from './components/FilesPane'
@@ -8,6 +8,7 @@ import { Landing } from './components/Landing'
 import { ReviewPanel } from './components/ReviewPanel'
 import { StopDialog } from './components/StopDialog'
 import { SubmitDialog } from './components/SubmitDialog'
+import { openHash } from './engine/page-host'
 import { fetchSource } from './engine/receiver-client'
 import { useMediaQuery } from './hooks/useMediaQuery'
 import { useWindowWidth } from './hooks/useWindowWidth'
@@ -29,9 +30,9 @@ import { draftHasText } from './lib/review'
 import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/sample'
 import { COMMENTS_WIDTH, FILES_WIDTH } from './lib/settings'
 import type { LayoutChange } from './lib/settings-service'
-import { buildSource } from './lib/source'
+import { buildSource, prepareSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
-import { cancelReview, closeFile, keepBeforeLeaving, keepOpen, keepReview, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
+import { cancelReview, closeFile, keepBeforeLeaving, keepOpen, keepReview, leftBehind, loadOpensFile, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
 import { expiredNotice } from './state/expired'
 import { emptyState, reducer, type AppState } from './state/reducer'
 import type { ReviewComment } from './types'
@@ -47,15 +48,23 @@ const STORAGE_WARNING: Notice = {
   text: "This review can't be saved in your browser (storage is full or blocked). Export it before closing the tab so nothing is lost.",
 }
 
-function init(platform: Platform): AppState {
+function init({ platform, restore }: { platform: Platform; restore: boolean }): AppState {
   // What was open at the last visit, a file or a set of files, comes back through the engine, as it is opened.
-  const last = restoreLast(platform)
+  const last = restore ? restoreLast(platform) : null
   return last ? reducer(emptyState, last) : emptyState
+}
+
+/** What this page load brings, read once, before anything is drawn: whether it opens a file, what it leaves behind if so, and the file that the boot script is for. */
+function readLoad(platform: Platform) {
+  const boot = readBoot((window as unknown as Record<string, unknown>)[BOOT_KEY])
+  const opens = loadOpensFile(readFragment(window.location.hash), boot, hostFromSearch(window.location.search))
+  return { opens, behind: opens ? leftBehind(platform) : null, bootHash: boot?.ok ? openHash(boot.messages[0]) : null }
 }
 
 export default function App() {
   const services = usePlatform()
-  const [state, dispatch] = useReducer(reducer, services, init)
+  const [load] = useState(() => readLoad(services))
+  const [state, dispatch] = useReducer(reducer, { platform: services, restore: !load.opens }, init)
   const { file, review, selection, draft } = state
 
   // The layout that the reviewer kept, for a wide window: the widths of the two panels beside the code, the list's mode and whether the comments panel is open, each
@@ -89,10 +98,14 @@ export default function App() {
   const [linked, setLinked] = useState(false) // opened by a link that carries requests: the review can go to the clipboard
   // Opened from a link that a Claude session printed: the file comes from the receiver at this address, and the
   // review can be sent back to it. Only an address on this computer is ever used (see `receiverAddress`).
-  const [host] = useState(() => hostFromSearch(window.location.search))
+  const [givenHost] = useState(() => hostFromSearch(window.location.search))
+  const [hostHash, setHostHash] = useState<string | null>(null) // the hash of the file that the receiver holds, once it has been read
   // Served by the Jared service for a review that comes back as a file: the script of the review gave the address of the review's folder
   // (`window.__JARED_SERVICE`). Only a folder at the service that served this page is ever used (see `serviceAddress`).
-  const [service] = useState(() => serviceAddress((window as unknown as Record<string, unknown>)[SERVICE_KEY], window.location.origin))
+  const [givenService] = useState(() => serviceAddress((window as unknown as Record<string, unknown>)[SERVICE_KEY], window.location.origin))
+  // Each of the two is for one file, the one that the page was opened for: with any other file open, a press or a stop reaches neither, and the review stays on this page.
+  const host = file?.hash === hostHash ? givenHost : null
+  const service = file?.hash === load.bootHash ? givenService : null
   // Where a review goes besides a script on the page: the receiver of the link, or the service that served the page. Either answers.
   const sendTo = host ?? service
   // The review goes to the service, which keeps it as a file: "sent" is all that is known, so the message says what to do if the program has not answered.
@@ -215,31 +228,59 @@ export default function App() {
   )
   const openSetRef = useLatest(openPickedSet)
 
+  // A load that brings a file restored nothing; when the file does not open after all, the last review comes back, as it does on any other load.
+  const restoreSkipped = useRef(load.opens)
+  const restoreAfterFailure = useCallback(() => {
+    if (!restoreSkipped.current) return
+    restoreSkipped.current = false
+    if (stateRef.current.file) return // another file was opened meanwhile: it stays, with what is being written in it
+    const last = restoreLast(services)
+    if (last) dispatch(last)
+  }, [services, stateRef])
+  // Once the load's file is open: a review that it left behind with comments that have not left the page is told of, unless it is that file.
+  const tellLeftBehind = useCallback(
+    (opened: string | null) => {
+      restoreSkipped.current = false
+      if (load.behind && load.behind.hash !== opened) setNotice({ kind: 'warn', text: COPY.keptBehind(load.behind.name, load.behind.comments, load.behind.changedSince) })
+    },
+    [load],
+  )
+
   // Open the file that the receiver of the link holds, as a dropped file would be opened.
   useEffect(() => {
-    if (!host) return
+    if (!givenHost) return
     let cancelled = false
-    void fetchSource(host).then((result) => {
+    void fetchSource(givenHost).then((result) => {
       if (cancelled) return
-      if (!result.ok) return setNotice({ kind: 'error', text: result.error })
+      if (!result.ok) {
+        restoreAfterFailure()
+        return setNotice({ kind: 'error', text: result.error })
+      }
+      const prepared = prepareSource(result.name, result.text)
+      if (prepared.ok) setHostHash(prepared.file.hash)
       const outcome = openText(services, stateRef.current, result.name, result.text)
       const words = { type: 'setDelivery', submitLabel: result.submitLabel, submitTarget: result.submitTarget, submitOptions: result.submitOptions } as const
       // The same file again, as on a second round or a reload, is left as it is; but it is the receiver's file, so it brings its words.
       if (outcome.kind === 'same') return dispatch(words)
+      if (outcome.kind === 'refused') restoreAfterFailure()
       applyOutcome(outcome)
       // In the same batch as the file, so that the button never shows the default words first.
-      if (outcome.kind === 'opened') dispatch(words)
+      if (outcome.kind === 'opened') {
+        dispatch(words)
+        tellLeftBehind(prepared.ok ? prepared.file.hash : null)
+      }
     })
     return () => {
       cancelled = true
     }
-  }, [host, services, applyOutcome, stateRef])
+  }, [givenHost, services, applyOutcome, stateRef, restoreAfterFailure, tellLeftBehind])
 
   // Requests in the address, `#jared=...`, as a Claude session makes them: done in order, and the
   // fragment is taken out of the address, so that the file in it is not left in the history. A request that would throw away
   // work is put to the reviewer, who is here, as a dropped file is. A page that is a file opened from a path has no fragment to
-  // read: its requests are in `window.__JARED_BOOT`, put there by a script beside it, and taken once.
-  useEffect(() => {
+  // read: its requests are in `window.__JARED_BOOT`, put there by a script beside it, and taken once. All before the first paint, so
+  // that a link or a boot script that brings a file never shows the start page first.
+  useLayoutEffect(() => {
     const page = window as unknown as Record<string, unknown>
     const takeBoot = () => {
       const value = page[BOOT_KEY]
@@ -258,6 +299,7 @@ export default function App() {
         return
       }
       if (!link.ok) return setNotice({ kind: 'error', text: link.error })
+      const first = restoreSkipped.current // the link that the load brought: what the load left behind is told of once its file is open
       for (const message of link.messages) {
         let replies = applyRequest(message)
         const declined = replies.find((r) => r.type === 'error' && r.code === 'declined')
@@ -267,14 +309,19 @@ export default function App() {
           replies = applyRequest(message, true)
         }
         const failed = replies.find((r) => r.type === 'error')
-        if (failed) return setNotice({ kind: 'error', text: (failed as { message: string }).message })
+        if (failed) {
+          restoreAfterFailure()
+          return setNotice({ kind: 'error', text: (failed as { message: string }).message })
+        }
+        if (message.type === 'open') restoreSkipped.current = false // its file is open: a later request that fails leaves that file as it is
       }
       setLinked(true)
+      if (first) tellLeftBehind(openHash(link.messages[0]))
     }
     follow()
     window.addEventListener('hashchange', follow)
     return () => window.removeEventListener('hashchange', follow)
-  }, [applyRequest, stateRef, services])
+  }, [applyRequest, stateRef, services, restoreAfterFailure, tellLeftBehind])
 
   const onPickerChange = (e: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? [])

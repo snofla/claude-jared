@@ -3,7 +3,8 @@ import type { KeptSet } from '../lib/platform'
 import { COPY } from '../lib/copy'
 import { setHashOf } from '../lib/hash'
 import type { Platform, Picked } from '../lib/platform'
-import { draftHasText, planOpen } from '../lib/review'
+import type { FragmentRead } from '../lib/fragment-link'
+import { draftHasText, hasUnsubmittedChanges, identityOf, planOpen } from '../lib/review'
 import { MAX_BYTES, MAX_SET_BYTES, buildSource, prepareSource, tooBig } from '../lib/source'
 import { MAX_SCANNED, MAX_SET_FILES, planPicked, type SetPlan } from '../lib/set-pick'
 import { formatBytes } from '../lib/util'
@@ -82,6 +83,24 @@ export function closeFile(platform: Platform): void {
 /** Whether giving the review up needs a question first: there is something to lose: saved comments, an overall summary or a comment being written. An empty review is given up at once. */
 export function mustAskBeforeCancel(session: OpenSession): boolean {
   return (session.review?.comments.length ?? 0) > 0 || (session.review?.summary.trim() ?? '') !== '' || draftHasText(session.draft)
+}
+
+/**
+ * Whether this page load brings a file to open: the receiver of its address, or a link or a boot script whose first request is an `open`. Such a load restores
+ * nothing first: the last review was not on the screen, so it is not in the way of the file. Any other load restores it, since a link's other requests act on what is
+ * open, and a link that cannot be read leaves the reviewer where they were. The link in the address goes before the boot script, as the page follows them.
+ */
+export function loadOpensFile(fragment: FragmentRead | null, boot: FragmentRead | null, host: string | null): boolean {
+  if (host !== null) return true
+  const link = fragment ?? boot
+  return link !== null && link.ok && (link.messages[0] as { type?: unknown }).type === 'open'
+}
+
+/** What a load that opens a file leaves behind and has to tell of: the last review, when it has comments that have not left the page; `null` when there is none. */
+export function leftBehind(platform: Platform): { name: string; hash: string; comments: number; changedSince: boolean } | null {
+  const review = platform.reviews.last()?.review ?? platform.reviews.lastSet()?.review ?? null
+  if (!review || review.comments.length === 0 || !hasUnsubmittedChanges(review)) return null
+  return { ...identityOf(review), comments: review.comments.length, changedSince: review.submittedAt !== null }
 }
 
 /** Give a review up: forget the file and its review, as Forget does on the start page, and remember that no file is open. */
