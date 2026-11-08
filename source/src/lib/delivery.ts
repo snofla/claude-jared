@@ -127,8 +127,10 @@ export const programWaits = (delivery: Delivery | null, sentAt: string | null): 
  * The words of the button that stops a review, by one rule for the header, its menu, the foot of the send window and the strip: while a program waits for the
  * review it stops the review and tells the program, whose name is in the tooltip; when nobody waits it closes the file, or the files of a set, and the review is kept.
  */
-export const stopWords = (delivery: Delivery | null, sentAt: string | null, review: AnyReview): { label: string; tip: string } => {
+export const stopWords = (delivery: Delivery | null, sentAt: string | null, review: AnyReview, commits = false): { label: string; tip: string } => {
   if (programWaits(delivery, sentAt)) return { label: COPY.stopReviewing, tip: COPY.stopReviewingTip(delivery!.target) }
+  // The commits of a branch are closed as commits, and not as the files that hold them.
+  if (commits) return { label: COPY.closeCommits, tip: COPY.closeCommitsTip }
   const files = review.version === 2 ? review.files.length : 1
   return { label: COPY.closeFile(files), tip: COPY.closeFileTip(files) }
 }

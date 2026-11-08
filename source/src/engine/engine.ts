@@ -1,15 +1,18 @@
 import type { Review, SetReview } from '../types.ts'
 import { diffOf, inOneFile } from '../lib/diff.ts'
+import { commitHeads } from '../lib/commits.ts'
 import { reviewFileName, toJson, toMarkdown } from '../lib/export.ts'
 import { LANGUAGE_OPTIONS } from '../lib/language.ts'
-import { MAX_SET_FILES, newReview, newSetReview, upsertComment, upsertSetComment } from '../lib/review.ts'
+import { listKind } from '../lib/commits.ts'
+import { MAX_SET_COMMITS, MAX_SET_FILES, newReview, newSetReview, upsertComment, upsertSetComment } from '../lib/review.ts'
 import { ONLY_TEXT } from '../lib/review-files.ts'
-import { MAX_SET_BYTES, prepareSource } from '../lib/source.ts'
+import { MAX_COMMITS_BYTES, MAX_SET_BYTES, normalizeSource, prepareSource } from '../lib/source.ts'
 import { formatBytes } from '../lib/util.ts'
 import {
   errorReply,
   parseRequest,
   PROTOCOL_VERSION,
+  type BranchOf,
   type ErrorCode,
   type ExportRequest,
   type OpenOneRequest,
@@ -44,6 +47,8 @@ export interface SetState {
   submitLabel?: string
   submitTarget?: string
   submitOptions?: SubmitOptions
+  /** The branch that the files are the commits of, as the `open` request gave it. */
+  branch?: BranchOf
 }
 
 export const emptyEngineState: EngineState = { source: null, review: null }
@@ -83,6 +88,8 @@ function doExport(state: EngineState, request: ExportRequest): Outcome {
   const review = state.set?.review ?? state.review
   if (!review) return refuse(state, request, 'no-session', 'export: no file is open.')
   const markdown = request.format === 'markdown'
+  // The commits that the texts of a set are, when they all are: the Markdown of a review of a branch names each comment's commit.
+  const heads = state.set ? commitHeads(state.set.files.map((file) => ({ id: file.id, lines: file.content.split('\n') }))) : undefined
   return {
     state,
     replies: [
@@ -91,9 +98,9 @@ function doExport(state: EngineState, request: ExportRequest): Outcome {
         replyTo: request.id,
         type: 'exported',
         format: request.format,
-        fileName: reviewFileName(review, markdown ? 'md' : 'json'),
+        fileName: reviewFileName(review, markdown ? 'md' : 'json', heads),
         mime: markdown ? 'text/markdown' : 'application/json',
-        text: markdown ? toMarkdown(review) : toJson(review),
+        text: markdown ? toMarkdown(review, heads) : toJson(review),
       },
     ],
   }
@@ -126,8 +133,12 @@ function openOne(state: EngineState, request: OpenOneRequest): Outcome {
 }
 
 function openSet(state: EngineState, request: OpenSetRequest): Outcome {
-  if (request.files.length > MAX_SET_FILES) {
-    return refuse(state, request, 'too-big', `open: ${request.files.length} files are more than the ${MAX_SET_FILES} that one review holds.`)
+  // A set of commits, whose every text has a commit's head, holds more than a set of files: it is drawn one commit at a time. The kind is read from the texts as
+  // the page will have them, made ready, so that the engine and the page take a set for the same kind.
+  const commits = listKind(request.files.map((given) => ({ lines: normalizeSource(given.text).split('\n') }))) === 'commits'
+  const most = commits ? { count: MAX_SET_COMMITS, bytes: MAX_COMMITS_BYTES, what: 'commits' } : { count: MAX_SET_FILES, bytes: MAX_SET_BYTES, what: 'files' }
+  if (request.files.length > most.count) {
+    return refuse(state, request, 'too-big', `open: ${request.files.length} ${most.what} are more than the ${most.count} that one review holds.`)
   }
   // The files in the order they came in; each is checked as a file of its own, and the text of all of them together is held to one limit.
   let bytes = 0
@@ -136,8 +147,8 @@ function openSet(state: EngineState, request: OpenSetRequest): Outcome {
     const one = prepareSource(given.name, given.text)
     if (!one.ok) return refuse(state, request, 'file-rejected', one.error)
     bytes += new TextEncoder().encode(given.text).length
-    if (bytes > MAX_SET_BYTES) {
-      return refuse(state, request, 'too-big', `open: with "${given.name}" the files are ${formatBytes(bytes)}, and ${formatBytes(MAX_SET_BYTES)} is the most that one review holds.`)
+    if (bytes > most.bytes) {
+      return refuse(state, request, 'too-big', `open: with "${given.name}" the ${most.what} are ${formatBytes(bytes)}, and ${formatBytes(most.bytes)} is the most that one review holds.`)
     }
     prepared.push(one.file)
   }
@@ -156,7 +167,7 @@ function openSet(state: EngineState, request: OpenSetRequest): Outcome {
     review = newSetReview(prepared, request.now)
   }
   const files = review.files.map((entry, i) => ({ id: entry.id, name: entry.name, hash: entry.hash, content: ordered[i].content }))
-  return answer({ source: null, review: null, set: { files, review, ...deliveryOf(request) } }, request)
+  return answer({ source: null, review: null, set: { files, review, ...deliveryOf(request), ...(request.branch ? { branch: request.branch } : {}) } }, request)
 }
 
 /** Act on a request when several files are open. `open` and `close` replace what is open and are not here. */

@@ -6,6 +6,9 @@ import { setHashOf } from './hash.ts'
 /** The most files that a review of several files has: more are refused when a set is opened. */
 export const MAX_SET_FILES = 100
 
+/** The most commits that a review of the commits of a branch has: a set of commits is drawn one commit at a time, so it holds more texts than a set of files. */
+export const MAX_SET_COMMITS = 400
+
 export function newSetReview(files: readonly Pick<SourceFile, 'name' | 'language' | 'hash' | 'lines'>[], now: string): SetReview {
   return {
     version: 2,
@@ -150,6 +153,11 @@ export function draftHasText(draft: Draft | null): boolean {
   return !!draft && (draft.comment.trim() !== '' || draft.suggestion !== null)
 }
 
+/** How many comments are being written: the open draft, if it has words, and each draft put aside with another commit of a set that has them. */
+export function writingCount(draft: Draft | null, aside: Readonly<Record<string, Draft>> = {}): number {
+  return (draftHasText(draft) ? 1 : 0) + Object.values(aside).filter(draftHasText).length
+}
+
 /** What names a review among the others that are kept: the hash of its file, or of its set of files, and the name that the reviewer knows it by. */
 export function identityOf(review: AnyReview): { hash: string; name: string } {
   return review.version === 2 ? { hash: setHashOf(review.files), name: COPY.fileCount(review.files.length) } : { hash: review.file.hash, name: review.file.name }
@@ -162,13 +170,13 @@ export type OpenPlan = { kind: 'open' } | { kind: 'ignore' } | { kind: 'ask'; me
  * ignored. Otherwise the reviewer is asked only when something would be lost: saved comments (they stay on the
  * start page, under "Continue reviewing") or a draft in progress (it does not).
  */
-export function planOpen(review: AnyReview | null, draft: Draft | null, incoming: { name: string; hash: string }): OpenPlan {
+export function planOpen(review: AnyReview | null, draft: Draft | null, incoming: { name: string; hash: string }, aside: Readonly<Record<string, Draft>> = {}): OpenPlan {
   if (!review) return { kind: 'open' }
   const open = identityOf(review)
   if (open.hash === incoming.hash) return { kind: 'ignore' }
   const comments = review.comments.length
-  const writing = draftHasText(draft)
-  if (comments === 0 && !writing) return { kind: 'open' }
+  const writing = writingCount(draft, aside)
+  if (comments === 0 && writing === 0) return { kind: 'open' }
 
   const name = open.name
   const target = incoming.name === name ? 'a version of it that has different content' : `"${incoming.name}"`
@@ -177,7 +185,8 @@ export function planOpen(review: AnyReview | null, draft: Draft | null, incoming
     const count = comments === 1 ? '1 comment' : `${comments} comments`
     lines.push(`"${name}" has ${count}. They stay under "Continue reviewing" on the start page; open "${name}" again to get them back.`)
   }
-  if (writing) lines.push('The comment you are writing will be lost.')
+  if (writing === 1) lines.push('The comment you are writing will be lost.')
+  if (writing > 1) lines.push(`The ${writing} comments you are writing will be lost.`)
   return { kind: 'ask', message: lines.join('\n') }
 }
 
@@ -229,13 +238,15 @@ export function hasUnsubmittedChanges(review: AnyReview): boolean {
 const FILE_ID = /^f[1-9][0-9]*$/
 
 /**
- * Read a review of several files (version 2) that arrived from outside: two to `MAX_SET_FILES` files with ids of the form "f1", each with a name,
- * a language, a hash and a line count, none twice, and comments that each name one of the files and stay inside its lines.
+ * Read a review of several files (version 2) that arrived from outside: two to `MAX_SET_COMMITS` files, as many as the commits of a branch may be, since a
+ * review without its texts cannot tell its kind; with ids of the form "f1", each with a name, a language, a hash and a line count, none twice, and comments that
+ * each name one of the files and stay inside its lines.
  */
 export function parseSetReview(value: unknown): SetReview | null {
   if (!isRecord(value) || value.version !== 2) return null
   const files = value.files
-  if (!Array.isArray(files) || files.length < 2 || files.length > MAX_SET_FILES) return null
+  // A review does not hold its texts, so it cannot tell a set of commits from a set of files: it takes as many as a set of commits holds.
+  if (!Array.isArray(files) || files.length < 2 || files.length > MAX_SET_COMMITS) return null
   const lineCounts = new Map<string, number>()
   const names = new Set<string>()
   for (const file of files) {

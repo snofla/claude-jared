@@ -17,6 +17,15 @@ export const MAX_BYTES = 512 * 1024
  */
 export const MAX_SET_BYTES = MAX_BYTES
 
+/**
+ * The most text that a review of the commits of a branch holds, in all: four times the limit of one file, each commit keeping that limit. The page draws one commit
+ * at a time, so a press on a commit costs that commit's text and not the set's. Measured in a production build: 2 MB of 100 commits opens in about 125 ms, and a press
+ * on a commit draws in about 100 ms; 8 MB in about 230 ms and 110 ms. What stops the rise is the browser's storage, which keeps the text of every file of a set: its
+ * quota, about 5.2 million characters for an origin, is shared by every kept review, and a set that fills it pushes the texts of the others out. At 2 MB about 3 million
+ * characters stay for them.
+ */
+export const MAX_COMMITS_BYTES = 4 * MAX_BYTES
+
 export type OpenResult = { ok: true; file: SourceFile } | { ok: false; error: string }
 
 /** Strip BOM, unify line endings, drop a single trailing newline (editors don't show an extra line). */

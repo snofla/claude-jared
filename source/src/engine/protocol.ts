@@ -76,9 +76,25 @@ export interface OpenFile {
   text: string
 }
 
+/** The most characters that `branch` takes for a branch's name or for its base. */
+export const MAX_REF = 255
+
+/**
+ * The branch that a set of commits comes from, for the page to name: data and not words, which are the page's own. `name` is the branch's name,
+ * absent on a detached head. At most one of two says where its commits start: `base`, the name of the branch or the commit that it left, whose
+ * commits are not in the set; or `from`, the abbreviated hash of the commit that the set starts with, which is in it.
+ */
+export interface BranchOf {
+  name?: string
+  base?: string
+  from?: string
+}
+
 export interface OpenSetRequest extends OpenBase {
   files: OpenFile[]
   review: SetReview | null
+  /** The branch that the files are the commits of, when they are. The engine keeps it with the files; it is not in the review. */
+  branch?: BranchOf
   name?: undefined
   text?: undefined
 }
@@ -375,6 +391,39 @@ export function words(value: unknown, max: number = MAX_WORDS): string | undefin
   return characters.length <= max && seen && !characters.some(hidden) ? text : false
 }
 
+/** What `branchOf` found wrong: the field, as it is named in the message, and what it must be. */
+export type BranchOfResult = { ok: true; branch: BranchOf | undefined } | { ok: false; field: string; wanted: string }
+
+/**
+ * A name of a ref: 1 to `MAX_REF` characters, with no control character, space or invisible character in it. That is stricter than git on purpose. Git
+ * refuses ASCII control characters, an ASCII space, `~ ^ : ? * [ \`, `..`, `@{` and a few forms of a name (one that ends in `.lock`, say), and takes any other
+ * character and sets no length; but a name is drawn in the header, where a space, an invisible character or one that turns the text round could mislead the
+ * reviewer. The plugin's helper, `jared-link`, leaves out a name that git allows and this refuses, so that the review opens with no name.
+ */
+const isRef = (value: unknown): value is string => typeof value === 'string' && value.length >= 1 && value.length <= MAX_REF && !/[\p{Cc}\p{Cf}\p{Z}]/u.test(value)
+
+/** `branch` of an `open` with files: absent or null is none; otherwise a record of `name`, and of `base` or `from` but not both, each optional, and nothing else. */
+export function branchOf(value: unknown): BranchOfResult {
+  if (value === undefined || value === null) return { ok: true, branch: undefined }
+  const wanted = 'a record of "name", and of "base" or "from"'
+  if (!isRecord(value)) return { ok: false, field: 'branch', wanted }
+  const unknown = Object.keys(value).find((key) => key !== 'name' && key !== 'base' && key !== 'from')
+  if (unknown !== undefined) return { ok: false, field: 'branch', wanted: `${wanted}, and there is no "${unknown}"` }
+  if (value.base !== undefined && value.from !== undefined) return { ok: false, field: 'branch', wanted: `${wanted}: the commits start either since a base or from a commit, not both` }
+  const ref = `a string of 1 to ${MAX_REF} characters with no control characters, spaces or invisible characters`
+  if (value.name !== undefined && !isRef(value.name)) return { ok: false, field: 'branch.name', wanted: ref }
+  if (value.base !== undefined && !isRef(value.base)) return { ok: false, field: 'branch.base', wanted: ref }
+  if (value.from !== undefined && !(typeof value.from === 'string' && /^[0-9a-f]{7,40}$/.test(value.from))) {
+    return { ok: false, field: 'branch.from', wanted: 'the hash of a commit, 7 to 40 characters of 0 to 9 and a to f' }
+  }
+  const branch: BranchOf = {
+    ...(value.name === undefined ? {} : { name: value.name as string }),
+    ...(value.base === undefined ? {} : { base: value.base as string }),
+    ...(value.from === undefined ? {} : { from: value.from as string }),
+  }
+  return { ok: true, branch }
+}
+
 /** What `submitOptions` found wrong: the field, as it is named in the message, and what it must be. */
 export type SubmitOptionsResult = { ok: true; options: SubmitOptions | undefined } | { ok: false; field: string; wanted: string }
 
@@ -460,13 +509,16 @@ export function parseRequest(value: unknown): ParsedRequest {
       if (submitTarget === false) return bad('submitTarget', `a string of 1 to ${MAX_WORDS} characters with no control characters, line breaks or invisible characters`)
       const options = submitOptions(value.submitOptions)
       if (!options.ok) return bad(options.field, options.wanted)
+      const branch = branchOf(value.branch)
+      if (!branch.ok) return bad(branch.field, branch.wanted)
+      if (branch.branch && !files) return bad('branch', 'left out when one file is opened: it is for the commits of a branch, which are several files')
       const delivery = {
         now: value.now,
         ...(submitLabel === undefined ? {} : { submitLabel }),
         ...(submitTarget === undefined ? {} : { submitTarget }),
         ...(options.options === undefined ? {} : { submitOptions: options.options }),
       }
-      if (files) return ok({ ...base, type: 'open', files, review: review as SetReview | null, ...delivery })
+      if (files) return ok({ ...base, type: 'open', files, review: review as SetReview | null, ...delivery, ...(branch.branch ? { branch: branch.branch } : {}) })
       return ok({ ...base, type: 'open', name: value.name as string, text: value.text as string, review: review as Review | null, ...delivery })
     }
     case 'close':

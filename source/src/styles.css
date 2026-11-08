@@ -772,6 +772,7 @@ pre {
   flex: 0 0 var(--comments-w, 320px); /* the width that the page works out in a wide window (`.main` sets it), or the usual one */
   display: flex;
   flex-direction: column;
+  min-width: 0; /* what a heading or a comment holds is cut inside the panel, and does not make it wider than its width */
   min-height: 0;
   background: var(--surface);
   border-left: 1px solid var(--border);
@@ -1185,6 +1186,10 @@ pre {
   content-visibility: visible;
   /* A jump to a file puts its header at the very top, where it takes the place of the one before it; the margin of a row, which keeps a selection off the edge, would leave it below. */
   scroll-margin-block-start: 0;
+  /* It is as wide as the middle, and stays at its left edge while the code scrolls sideways, so that what is at its right end, the file's toggle, is always in reach; a row as wide as the
+     longest line put the toggle past the edge of a narrow window. */
+  left: 0;
+  width: 100cqw;
 }
 
 .sign {
@@ -1223,12 +1228,31 @@ pre {
 }
 
 .row.is-file .code {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
   font-family: var(--sans);
   font-weight: 600;
 }
 
 .row.is-file .code .file-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* A path too long for the room is cut at its start, so that the file's name stays in view. The text is isolated in a `bdi` that is left to right, which keeps a path in
+     its order: in a right-to-left line a neutral character at its start (a digit, a bracket or a dot) would move to its end, and a path that begins in a right-to-left
+     script would be laid out right to left. */
+  direction: rtl;
+  text-align: left;
+}
+
+.row.is-file .file-badge,
+.row.is-file .file-viewed {
+  flex: none;
 }
 
 .row.is-file .file-badge {
@@ -1240,6 +1264,40 @@ pre {
   vertical-align: middle;
 }
 
+/* The head of the commit that the code shows, above its rows: its short hash, the first line of its message, cut to fit before the button is pushed off, and its own
+   Viewed, which marks the commit. It scrolls away with the rows, while the headers of its files stay at the top; and, as they do, it stays at the left edge while the code
+   scrolls sideways, so that its Viewed is not carried off with it. */
+.commit-head {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  padding: var(--space-6) var(--space-12);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--sans);
+}
+
+.commit-head-hash {
+  flex: none;
+  color: var(--muted);
+}
+
+.commit-head-subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.commit-head .file-viewed {
+  flex: none;
+}
 
 /* ---------- the files of a diff, beside the code ---------- */
 
@@ -1467,6 +1525,117 @@ button.files-tick {
   cursor: pointer;
 }
 
+/* The list of commits: a commit is a row of the list of files with two lines of its own, and the files of the chosen one are under its row. */
+.commit-row {
+  align-items: flex-start;
+}
+
+.commit-row .files-tick {
+  margin-top: var(--space-6); /* the tick sits at the middle of the message's first line */
+}
+
+.commit-file {
+  align-items: flex-start;
+}
+
+.commit-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The message in up to two lines; a longer one is cut, and the whole of it is the row's tooltip. */
+.commit-subject {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The hash, the date and the author, in that order, so that a narrow list cuts the author and keeps the date. */
+.commit-meta {
+  display: flex;
+  gap: var(--space-6);
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.commit-meta > * + *::before {
+  content: '·';
+  margin-right: var(--space-6);
+}
+
+.commit-meta code {
+  font-family: var(--mono);
+  font-size: var(--font-size-xs);
+}
+
+.commit-author {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The mark of a comment being written, beside the count of the comments, as small as the count and in the accent. */
+.commit-writing {
+  flex: none;
+  color: var(--accent);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+}
+
+.commit-files {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-2) 0 var(--space-6);
+  padding: 0 0 0 30px; /* raw: under the message, past the round tick and its gap */
+  list-style: none;
+}
+
+.commit-file-row {
+  border-left: 2px solid var(--border); /* raw: a thin rule, two pixels by definition */
+}
+
+.commit-file-row.is-in-view {
+  border-left-color: var(--accent);
+}
+
+.commit-file-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-8);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: var(--font-size-sm) / 1.3 var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.commit-file-button:hover {
+  background: var(--accent-soft);
+}
+
+.commit-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-file-lines {
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
 /* Below 900 px the list is a drawer over the code, as the comments panel is. */
 @media (max-width: 899px) {
   .files.is-drawer {
@@ -1483,7 +1652,8 @@ button.files-tick {
 /* A finger needs 44 px: the rows are that tall, and the round tick has a hit area that size round it. */
 @media (pointer: coarse) {
   .files-file,
-  .files-rail-item {
+  .files-rail-item,
+  .commit-file-button {
     min-height: 44px; /* raw: the height of a finger */
   }
 
@@ -1518,6 +1688,12 @@ button.files-tick {
 
 .side-group .files-name {
   color: var(--text);
+}
+
+.side-group code {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--font-size-xs);
 }
 
 .header .files-toggle svg {

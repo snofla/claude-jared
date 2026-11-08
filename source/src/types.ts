@@ -101,4 +101,6 @@ export interface Draft {
   suggestion: string | null
   /** Whether the user has edited the suggestion (stops it being re-prefilled when the range changes). */
   suggestionDirty: boolean
+  /** Set on a draft that came back with its commit, until it is changed: the field does not take the focus when it appears, and the focus stays where the press was. */
+  returned?: true
 }

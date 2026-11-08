@@ -4,7 +4,7 @@ import { COPY } from '../lib/copy'
 import { setHashOf } from '../lib/hash'
 import type { Platform, Picked } from '../lib/platform'
 import type { FragmentRead } from '../lib/fragment-link'
-import { draftHasText, hasUnsubmittedChanges, identityOf, planOpen } from '../lib/review'
+import { hasUnsubmittedChanges, identityOf, planOpen, writingCount } from '../lib/review'
 import { MAX_BYTES, MAX_SET_BYTES, buildSource, prepareSource, tooBig } from '../lib/source'
 import { MAX_SCANNED, MAX_SET_FILES, planPicked, type SetPlan } from '../lib/set-pick'
 import { formatBytes } from '../lib/util'
@@ -34,6 +34,8 @@ export type OpenOutcome =
 export interface OpenSession {
   review: AnyReview | null
   draft: Draft | null
+  /** The comments being written in other commits of a set, put aside with them. */
+  aside?: Readonly<Record<string, Draft>>
 }
 
 /** Keep the file, so that it can be opened again after a visit, and remember that it is the one that is open. */
@@ -82,7 +84,7 @@ export function closeFile(platform: Platform): void {
 
 /** Whether giving the review up needs a question first: there is something to lose: saved comments, an overall summary or a comment being written. An empty review is given up at once. */
 export function mustAskBeforeCancel(session: OpenSession): boolean {
-  return (session.review?.comments.length ?? 0) > 0 || (session.review?.summary.trim() ?? '') !== '' || draftHasText(session.draft)
+  return (session.review?.comments.length ?? 0) > 0 || (session.review?.summary.trim() ?? '') !== '' || writingCount(session.draft, session.aside) > 0
 }
 
 /**
@@ -119,7 +121,7 @@ function open(platform: Platform, incoming: SourceFile): Extract<OpenOutcome, { 
 
 /** Open a file over what is open: nothing for the file that is open, and a question when something would be lost (saved comments, or a comment being written). */
 export function openFile(platform: Platform, session: OpenSession, incoming: SourceFile): OpenOutcome {
-  const plan = planOpen(session.review, session.draft, incoming)
+  const plan = planOpen(session.review, session.draft, incoming, session.aside)
   if (plan.kind === 'ignore') return { kind: 'same' }
   if (plan.kind === 'ask' && !platform.prompts.confirm(plan.message)) return { kind: 'declined' }
   return open(platform, incoming)
@@ -186,7 +188,7 @@ export async function openPickedMany(platform: Platform, session: OpenSession, p
   }
   // The set stands for its files in the one question and the one comparison that a file would: its name says how many there are, its hash is the set's.
   const incoming = { name: COPY.fileCount(plan.files.length), hash: setHashOf(plan.files.map((f) => buildSource(f.name, f.text))) }
-  const ask = planOpen(session.review, session.draft, incoming)
+  const ask = planOpen(session.review, session.draft, incoming, session.aside)
   if (ask.kind === 'ignore') return { kind: 'same' }
   if (ask.kind === 'ask' && !platform.prompts.confirm(ask.message)) return { kind: 'declined' }
   // The same files again bring back the review that was kept for them, as the same file does: the page keeps a set on its own, so nothing is saved here.
@@ -207,13 +209,14 @@ export function openRecent(platform: Platform, hash: string): OpenOutcome | { ki
 }
 
 /** Whether to go on with something that would throw away the comment being written: no question when there is no comment. */
-export function mayDiscard(platform: Platform, draft: Draft | null): boolean {
-  return !draftHasText(draft) || platform.prompts.confirm(COPY.discardComment)
+export function mayDiscard(platform: Platform, draft: Draft | null, aside: Readonly<Record<string, Draft>> = {}): boolean {
+  const writing = writingCount(draft, aside)
+  return writing === 0 || platform.prompts.confirm(writing === 1 ? COPY.discardComment : COPY.discardWritten(writing))
 }
 
 /** What to ask the reviewer when a link asks to replace the file and the page declined: what the replacing would lose, or the page's own words. */
 export function replaceQuestion(session: OpenSession, name: string, text: string, declined: string): string {
   const prepared = prepareSource(name, text)
-  const plan = prepared.ok ? planOpen(session.review, session.draft, prepared.file) : null
+  const plan = prepared.ok ? planOpen(session.review, session.draft, prepared.file, session.aside) : null
   return plan?.kind === 'ask' ? plan.message : declined
 }

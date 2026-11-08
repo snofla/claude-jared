@@ -17,8 +17,10 @@ interface Props {
   comments: number
   /** The review has an overall summary. */
   summary: boolean
-  /** A comment is being written, which neither choice keeps. */
-  writing: boolean
+  /** Whether the review is of the commits of a branch, so that the button says it closes commits, not files. */
+  commits?: boolean
+  /** How many comments are being written, open or put aside with another commit, which neither choice keeps. */
+  writing: number
   /** Keep reviewing: nothing is stopped and nobody is told. */
   onKeep: () => void
   /** Stop and keep what there is: the review is kept for later, and a program that waits is told that the review was skipped. */
@@ -33,7 +35,7 @@ interface Props {
  * button stops. When nobody waits but a program took an earlier version of the review, the question that asks says that it is told if the review is discarded. A comment that is being written is named in every case, since neither choice keeps it. Every way out but the buttons that stop keeps reviewing:
  * Escape, the cross and a press on the backdrop all end in `onKeep`, so that the key that closes things never leaves the review behind or discards a comment.
  */
-export function StopDialog({ name, files, waiting, discardTells, comments, summary, writing, onKeep, onStop, onDiscard }: Props) {
+export function StopDialog({ name, files, commits = false, waiting, discardTells, comments, summary, writing, onKeep, onStop, onDiscard }: Props) {
   const asks = comments > 0 || summary
   return (
     <Dialog title={waiting ? COPY.stopTitle(name) : COPY.closeTitleOf(name)} closeLabel={COPY.close} closeTitle={COPY.closeTitle(COPY.keyEscape)} onClose={onKeep}>
@@ -43,7 +45,7 @@ export function StopDialog({ name, files, waiting, discardTells, comments, summa
       {comments === 0 && summary && <p className="cancel-text">{COPY.stopAskSummary}</p>}
       {asks && <p className="cancel-text">{COPY.stopKeptLater}</p>}
       {asks && !waiting && discardTells && <p className="cancel-text">{COPY.closeTellsOfDiscard(discardTells.target)}</p>}
-      {writing && <p className="cancel-text">{COPY.stopDraftLost}</p>}
+      {writing > 0 && <p className="cancel-text">{writing === 1 ? COPY.stopDraftLost : COPY.stopDraftsLost(writing)}</p>}
       <DialogFoot>
         <span className="dialog-actions">
           <Button onClick={onKeep}>{COPY.keepReviewing}</Button>
@@ -58,7 +60,7 @@ export function StopDialog({ name, files, waiting, discardTells, comments, summa
             </>
           ) : (
             <Button variant="primary" onClick={onStop}>
-              {waiting ? COPY.stopReviewing : COPY.closeFile(files)}
+              {waiting ? COPY.stopReviewing : commits ? COPY.closeCommits : COPY.closeFile(files)}
             </Button>
           )}
         </span>

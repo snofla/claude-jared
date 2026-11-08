@@ -3,7 +3,8 @@
 # file in the one-file Jared, which is a page opened from a path, with the request in a script beside it; or, with --serve, put the file
 # in a review folder that a small service on this computer serves over http, so that a browser tool can show it.
 # Uses only sh, perl (JSON::PP, MIME::Base64, IO::Socket::INET, IO::Select and POSIX are in perl's core) and the common tools wc, date, basename
-# and tr, for --file and --serve also dirname, mkdir, mktemp, find, ln, cp, rm, kill and sleep, and for --rev git, cut, mkdir, mktemp, find, rm and mv.
+# and tr, for --file and --serve also dirname, mkdir, mktemp, find, ln, cp, rm, kill and sleep, and for --rev, --branch and --from git, cut, mkdir, mktemp, find,
+# rm and mv.
 # Run it with --help for the options and the exit statuses.
 
 usage() {
@@ -13,6 +14,9 @@ Usage: jared-link <file> [--jared <address>] [--open] [--max <bytes>]
        jared-link <file>... --serve [--label <words>] [--closes moment|now|never] [--message <words>] [--banner true|false]
                                     [--review-file] [--port <number>] [--page <path>] [--max <bytes>]
        jared-link --rev <commit> [--max <bytes>]
+       jared-link --branch [<name>] [--base <branch>] [--max <bytes>] [--serve and its options]
+       jared-link --from <commit> [--max <bytes>] [--serve and its options]
+       jared-link --what <word>
        jared-link --wait <review> [--after <revision>] [--timeout <seconds>]
        jared-link --check <file>... [--max <bytes>]
        jared-link --stop
@@ -79,16 +83,32 @@ The request also names Claude as the one to tell (submitTarget), which only chan
   --rev <commit>      write the change of one commit of the git repository that this folder is in to a file, which Jared shows as changes, and
                       print its path on one line; give that file to this helper or to Jared as any other. <commit> is whatever git takes for
                       one commit (a hash, an abbreviated hash, a tag, a branch, HEAD~2): a range is not one. The file is in the cache folder,
-                      in diffs/, named for the first 12 characters of the hash. It holds one line, commit <hash>, an empty line, the message,
-                      and the change as git show writes it: against the first parent for a merge, and against the empty tree for the first
-                      commit. It has no author and no date, and none of your own git settings (colour, prefixes, an external diff, lines of
-                      context) reaches it. Files in diffs/ more than an hour old are removed the next time. It takes no file and no option
-                      but --max, and it changes nothing in the repository.
+                      in diffs/, named for the first 12 characters of the hash. It holds a line commit <hash>, a line Author: and the author's
+                      name (never the address), a line Date: and the author's date in strict ISO 8601, an empty line, the message with each
+                      line indented by four spaces, as git log shows it, and the change as git show writes it: against the first parent for a
+                      merge, and against the empty tree for the first commit. None of your own git settings (a .mailmap, the form of a date,
+                      colour, prefixes, an external diff, lines of context) reaches it. Files in diffs/ more than an hour old are removed the
+                      next time. It takes no file and no option but --max, and it changes nothing in the repository.
+  --branch [<name>]   write each commit of the branch <name> (default: the one that is checked out) since it left its base, as --rev writes
+                      one, leaving merge commits out, and print their paths, one to a line, in the order in which the commits apply. The base
+                      is --base, or else main, else master, else what origin/HEAD names. How many merge commits were left out is said on the
+                      error output. With --serve the texts open as one review, each named for the first 12 characters of its hash, with the
+                      branch's name and its base for the page; a branch of one commit opens as one diff. At most 400 commits, each at most --max bytes,
+                      and four times --max together (2 MB by default).
+  --base <branch>     for --branch: the branch or the commit that the branch left; its commits are not taken
+  --from <commit>     as --branch, for the commits from <commit> to the one that is checked out, <commit> included, and only those that come
+                      after it (not those of a branch that was merged in on the way); <commit> must be on the branch that is checked out
+  --what <word>       say what git takes <word> for, on one line, so that a word given alone is reviewed as a branch or as one commit: branch
+                      (a local or a remote-tracking branch with commits since its base, which --branch takes), empty-branch (a branch with no
+                      commit but merges since its base, such as main itself, whose latest commit --rev takes), tag-and-branch (a name that is
+                      both a tag and a branch, which git takes for the tag: one commit) or commit (any other word that git takes for one
+                      commit: a hash, a tag, HEAD~2). The base is found as for --branch; when none is found, it says branch, and --branch then
+                      asks for --base. It takes no file and no other option, and changes nothing in the repository.
 
 Exit status of --wait: 0 a review is in the file, 3 none came in time, 4 the reviewer gave the review up, 5 the reviewer skipped it, 1 an error, 2 a mistake in the command line.
-Exit status of the others (--check: 0 whenever the line is printed, 1 when the files could not be checked, 2 a mistake in the command line): 0 done; 1 a file cannot be read, or, with --rev, the commit cannot be taken (the message says why); 2 a mistake in the command line (also a name given twice, and several files without --serve or with --rev); 3 too big (for a link, or for Jared: one file, or several together, or more than 100 files);
-4 a file is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
-6 --file or --serve, and the one-file page is not there; 7 --file, --serve or --rev, and a folder or a file for the review cannot be made;
+Exit status of the others (--check: 0 whenever the line is printed, 1 when the files could not be checked, 2 a mistake in the command line): 0 done; 1 a file cannot be read, or, with --rev or --what, the commit cannot be taken (the message says why), or, with --branch or --from, the commits cannot be taken, also when there are none since the base or only merges; 2 a mistake in the command line (also a name given twice, and several files without --serve or with --rev); 3 too big (for a link, or for Jared: one file, or several together, or more than 100 files or 400 commits);
+4 a file, or the change of a commit of a branch, is not UTF-8 text; 5 --open or --file, and there is no way to open a browser here, or the page could not be opened;
+6 --file or --serve, and the one-file page is not there; 7 --file, --serve, --rev, --branch or --from, and a folder or a file for the review cannot be made;
 8 --serve, and the service could not be started (the port is in use, or sockets cannot be opened).
 USAGE
 }
@@ -111,6 +131,11 @@ status=0
 version=0
 check=0
 rev=
+what=
+branch=0
+branchname=
+basegiven=
+from=
 waitfor=
 after=
 timeout=
@@ -137,6 +162,26 @@ while [ $# -gt 0 ]; do
     --rev)
       [ $# -ge 2 ] && [ -n "$2" ] || fail '--rev needs a commit.' 2
       rev=$2
+      shift
+      ;;
+    --what)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--what needs a word.' 2
+      what=$2
+      shift
+      ;;
+    --branch)
+      branch=1
+      # The name is optional: a word that follows and is not an option is the branch's name.
+      case ${2-} in '' | -*) ;; *) branchname=$2; shift ;; esac
+      ;;
+    --base)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--base needs a branch or a commit.' 2
+      basegiven=$2
+      shift
+      ;;
+    --from)
+      [ $# -ge 2 ] && [ -n "$2" ] || fail '--from needs a commit.' 2
+      from=$2
       shift
       ;;
     --wait)
@@ -236,11 +281,28 @@ if [ -n "$waitfor" ]; then
 elif [ -n "$after$timeout" ]; then
   fail '--after and --timeout are for --wait.' 2
 fi
+if [ -n "$what" ]; then
+  # The word goes to git, as for --rev.
+  case $what in -*) fail "A branch or a commit does not begin with a hyphen, and \"$what\" does." 2 ;; esac
+  { [ -z "$file$rev$from$basegiven$waitfor" ] && [ "$branch" = 0 ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ "$check" = 0 ] && [ -z "$label$closes$message$banner$port" ]; } \
+    || fail '--what takes one word and nothing else.' 2
+fi
 if [ -n "$rev" ]; then
   # What the commit is called goes to git, which would take a word that begins with a hyphen for an option of its own.
   case $rev in -*) fail "A commit does not begin with a hyphen, and \"$rev\" does." 2 ;; esac
+  { [ "$branch" = 0 ] && [ -z "$from$basegiven" ]; } || fail '--rev takes one commit, and --branch (with --base) and --from take several: give one or the other.' 2
   { [ -z "$file" ] && [ "$serve" = 0 ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ -z "$label$closes$message$banner$port" ]; } || fail '--rev takes no file and no option but --max.' 2
 fi
+if [ "$branch" = 1 ] || [ -n "$from" ]; then
+  [ "$branch" = 0 ] || [ -z "$from" ] || fail '--branch and --from are two ways to choose the commits: give one.' 2
+  # What names a branch or a commit goes to git, as for --rev.
+  for word in "$basegiven" "$from"; do
+    case $word in -*) fail "A branch or a commit does not begin with a hyphen, and \"$word\" does." 2 ;; esac
+  done
+  { [ -z "$file" ] && [ "$fileway" = 0 ] && [ "$open" = 0 ] && [ "$stop" = 0 ] && [ "$status" = 0 ] && [ "$version" = 0 ] && [ "$check" = 0 ] && [ -z "$waitfor" ]; } \
+    || fail '--branch and --from take no file, and no option but --base (for --branch), --max and, with --serve, the options of --serve.' 2
+fi
+[ -z "$basegiven" ] || [ "$branch" = 1 ] || fail '--base is for --branch.' 2
 if [ "$serve" = 0 ] && { [ -n "$label$closes$message$banner$port" ] || [ "$reviewfile" = 1 ]; }; then
   fail '--label, --closes, --message, --banner, --review-file and --port are for --serve.' 2
 fi
@@ -550,7 +612,7 @@ service_started() {
       my ($revision, $review, $changes);
       if ($kind eq "submit") {
         $review = $data->{review};
-        # Version 1 is a review of one file (a "file" with a name), version 2 of a set of 2 to 100 files (a "files" list of entries that each have a name).
+        # Version 1 is a review of one file (a "file" with a name), version 2 of a set of 2 to 100 files, or of 2 to 400 commits of a branch (a "files" list of entries that each have a name).
         my $named = sub { ref $_[0] eq "HASH" && defined $_[0]{name} && !ref $_[0]{name} };
         ref $review eq "HASH" && defined $review->{version} && !ref $review->{version} && ref $review->{comments} eq "ARRAY"
           && (($review->{version} eq "1" && $named->($review->{file}))
@@ -889,22 +951,77 @@ PERL
   exit $?
 fi
 
-if [ -n "$rev" ]; then
-  command -v git > /dev/null 2>&1 || fail 'git is not installed here, and a commit needs it.' 1
-  git rev-parse --git-dir > /dev/null 2>&1 || fail 'This folder is not in a git repository, so there is no commit to take.' 1
-  # One commit: a range or a name of something else does not pass, and what passes is the full hash, which is all that goes to git below.
-  hash=$(git rev-parse --verify --quiet "$rev^{commit}" 2> /dev/null) || fail "\"$rev\" is not one commit in this repository." 1
+# The text of one commit, as git writes it for anyone, whatever the settings of the user or of the repository: the options say what a setting might
+# change. Its head is the hash, the author's name (never the address, and as the commit has it, not as a .mailmap would change it), the author's date in
+# strict ISO 8601 with the author's own offset (which neither log.date nor the time zone changes), an empty line and the message; then the change, against
+# the first parent for a merge and against the empty tree for the first commit. The same commit always gives the same text.
+# Each line of the message is indented by four spaces, %w(0,4,4): no wrapping, and four spaces before the first line and before every other, as git
+# log indents a message. So no line of a message (a patch that it quotes, say) can be taken for the start of the diff, which begins unindented. The
+# page's reader of a commit depends on this number: it takes the message as the lines that are empty or begin with four spaces, and takes those
+# spaces off, so when one changes, the other must. git writes a blank line inside a message as four spaces, and the page reads it either way.
+show_commit() {
+  git show --format='commit %H%nAuthor: %an%nDate: %aI%n%n%w(0,4,4)%B' -m --first-parent --no-color --no-textconv \
+    --find-renames -U3 --src-prefix=a/ --dst-prefix=b/ "$1"
+}
 
+# The folder diffs/ in the cache, made if it is not there, with the texts of commits more than an hour old taken out. Sets base.
+diffs_folder() {
   cache_base
   umask 077
   mkdir -p "$base/diffs" 2> /dev/null || fail "The cache folder \"$base\" cannot be made. Set JARED_CACHE to another folder." 7
   find "$base/diffs" -maxdepth 1 -name '*.diff' -mmin +60 2> /dev/null | while IFS= read -r old; do
     rm -f "$old"
   done
+}
+
+need_git() {
+  command -v git > /dev/null 2>&1 || fail 'git is not installed here, and a commit needs it.' 1
+  git rev-parse --git-dir > /dev/null 2>&1 || fail 'This folder is not in a git repository, so there is no commit to take.' 1
+}
+
+# The base of a branch when none is given: main, else master, else what origin/HEAD names. Sets basehash and bbase, and fails when there is none.
+default_base() {
+  bbase=
+  for candidate in main master; do
+    basehash=$(git rev-parse --verify --quiet "refs/heads/$candidate^{commit}" 2> /dev/null) && { bbase=$candidate; return 0; }
+  done
+  if candidate=$(git symbolic-ref --short -q refs/remotes/origin/HEAD 2> /dev/null); then
+    basehash=$(git rev-parse --verify --quiet "$candidate^{commit}" 2> /dev/null) && { bbase=$candidate; return 0; }
+  fi
+  return 1
+}
+
+# --what: a word that git resolves to a local or a remote-tracking branch is a branch, unless a tag of that name comes first, as git takes a tag
+# before a branch; any other word that git takes for one commit is one commit. Git decides what the word is, and not how it looks.
+if [ -n "$what" ]; then
+  need_git
+  hash=$(git rev-parse --verify --quiet "$what^{commit}" 2> /dev/null) || fail "\"$what\" is not one commit in this repository." 1
+  isbranch=0
+  for ref in "refs/heads/$what" "refs/remotes/$what"; do
+    git show-ref --verify --quiet "$ref" 2> /dev/null && isbranch=1
+  done
+  if git show-ref --verify --quiet "refs/tags/$what" 2> /dev/null; then
+    [ "$isbranch" = 1 ] && echo tag-and-branch || echo commit
+    exit 0
+  fi
+  # A ref that git takes before a branch (refs/<word>, or HEAD and its kind in the git folder) makes the word that ref, and so one commit.
+  full=$(git rev-parse --symbolic-full-name "$what" 2> /dev/null) || full=
+  case $full in "refs/heads/$what" | "refs/remotes/$what") ;; *) isbranch=0 ;; esac
+  [ "$isbranch" = 1 ] || { echo commit; exit 0; }
+  default_base || { echo branch; exit 0; }
+  ahead=$(git rev-list --count --no-merges "$basehash..$hash" 2> /dev/null) || ahead=0
+  [ "$ahead" -gt 0 ] && echo branch || echo empty-branch
+  exit 0
+fi
+
+if [ -n "$rev" ]; then
+  need_git
+  # One commit: a range or a name of something else does not pass, and what passes is the full hash, which is all that goes to git below.
+  hash=$(git rev-parse --verify --quiet "$rev^{commit}" 2> /dev/null) || fail "\"$rev\" is not one commit in this repository." 1
+
+  diffs_folder
   tmp=$(mktemp "$base/diffs/.rev.XXXXXX" 2> /dev/null) || fail "A file for the commit cannot be made in \"$base/diffs\"." 7
-  # The text as git writes it for anyone, whatever the settings of the user or of the repository: the options say what a setting might change.
-  git show --format='commit %H%n%n%B' -m --first-parent --no-color --no-textconv \
-    --find-renames -U3 --src-prefix=a/ --dst-prefix=b/ "$hash" > "$tmp" 2> /dev/null || {
+  show_commit "$hash" > "$tmp" 2> /dev/null || {
     rm -f "$tmp"
     fail "git could not show \"$rev\"." 1
   }
@@ -920,6 +1037,122 @@ if [ -n "$rev" ]; then
   }
   printf '%s\n' "$out"
   exit 0
+fi
+
+# --branch and --from: the commits of a branch, or from a commit on, each written as --rev writes one, in the order in which they apply, and merges left
+# out. Without --serve the paths are printed, one to a line; with --serve the texts open as one review, each named for the first 12 characters of its
+# hash, with the branch's name and where its commits start, or as one diff when there is only one.
+setnames=
+if [ "$branch" = 1 ] || [ -n "$from" ]; then
+  need_git
+  tip=$(git rev-parse --verify --quiet 'HEAD^{commit}' 2> /dev/null)
+  shown=$(git symbolic-ref --short -q HEAD 2> /dev/null)
+  # The name that the page is given: a branch's name, or none. A word that git takes for a commit but not for a branch's name (feature~2,
+  # feature@{1 minute ago}) names no branch, and the review opens without one, as on a detached head.
+  bname=$shown
+  bbase=
+  bfrom=
+  if [ "$branch" = 1 ]; then
+    if [ -n "$branchname" ]; then
+      tip=$(git rev-parse --verify --quiet "$branchname^{commit}" 2> /dev/null) || fail "\"$branchname\" is not a branch or a commit in this repository." 1
+      shown=$branchname
+      bname=$(git check-ref-format --branch "$branchname" 2> /dev/null) || bname=
+    fi
+    [ -n "$tip" ] || fail 'No commit is checked out here, so there is no branch to take: give its name.' 1
+    if [ -n "$basegiven" ]; then
+      basehash=$(git rev-parse --verify --quiet "$basegiven^{commit}" 2> /dev/null) || fail "\"$basegiven\" is not a branch or a commit in this repository." 1
+      bbase=$basegiven
+    else
+      default_base || fail 'This repository has no main, no master and no origin/HEAD, so the base of the branch is not known: give it with --base <branch>.' 1
+    fi
+    list=$(git rev-list --reverse --topo-order --no-merges "$basehash..$tip" 2> /dev/null) || fail "git could not list the commits of \"${shown:-HEAD}\"." 1
+    nmerges=$(git rev-list --merges --count "$basehash..$tip" 2> /dev/null) || nmerges=0
+    since="since $bbase"
+  else
+    start=$(git rev-parse --verify --quiet "$from^{commit}" 2> /dev/null) || fail "\"$from\" is not one commit in this repository." 1
+    [ -n "$tip" ] || fail 'No commit is checked out here, and --from takes the commits up to the one that is.' 1
+    git merge-base --is-ancestor "$start" "$tip" 2> /dev/null || fail "\"$from\" is not on the branch that is checked out: --from takes a commit from which that branch goes on." 1
+    # Only the commits that come after the start, and not those of a branch that was merged in on the way.
+    list=$(git rev-list --reverse --topo-order --no-merges --ancestry-path "$start..$tip" 2> /dev/null) || fail "git could not list the commits of \"${shown:-HEAD}\"." 1
+    nmerges=$(git rev-list --merges --count --ancestry-path "$start..$tip" 2> /dev/null) || nmerges=0
+    if git rev-parse --verify --quiet "$start^2" > /dev/null 2>&1; then
+      nmerges=$((nmerges + 1))
+    else
+      list=$start$nl$list
+    fi
+    bfrom=$(printf '%s' "$start" | cut -c1-7)
+    since="from $bfrom"
+  fi
+  count=0
+  for hash in $list; do count=$((count + 1)); done
+  if [ "$count" = 0 ]; then
+    [ "$nmerges" -gt 0 ] || fail "${shown:-HEAD} has no commits $since." 1
+    [ "$nmerges" = 1 ] && fail "${shown:-HEAD} has 1 merge commit $since and nothing else, and merges are left out." 1
+    fail "${shown:-HEAD} has $nmerges merge commits $since and nothing else, and merges are left out." 1
+  fi
+  # A branch holds more than a set of files, since Jared draws it one commit at a time: 400 commits, and four times --max together (2 MB by default), each
+  # commit keeping --max. What stops more is the browser's storage, which keeps the text of every commit and is shared by every review that the browser keeps.
+  most_commits=400
+  most_total=$((max * 4))
+  [ "$count" -le "$most_commits" ] || fail "${shown:-HEAD} has $count commits $since, and $most_commits is the most that Jared opens in one review: give --from a later commit." 3
+
+  diffs_folder
+  # Each text is written beside its place first, and moved there only when all of them fit, so that a branch that does not fit leaves no file.
+  tmps=
+  total=0
+  # The paths are split on line breaks only, and not globbed, so that a cache folder with a space in its path stays one path.
+  drop() {
+    set -f
+    IFS=$nl
+    for one in $tmps; do rm -f "$one"; done
+    unset IFS
+    set +f
+  }
+  for hash in $list; do
+    tmp=$(mktemp "$base/diffs/.rev.XXXXXX" 2> /dev/null) || { drop; fail "A file for the commit cannot be made in \"$base/diffs\"." 7; }
+    tmps=$tmps$tmp$nl
+    show_commit "$hash" > "$tmp" 2> /dev/null || {
+      drop
+      fail "git could not show $(printf '%s' "$hash" | cut -c1-7)." 1
+    }
+    size=$(wc -c < "$tmp" | tr -d ' ')
+    [ "$size" -le "$max" ] || {
+      drop
+      fail "The change of $(printf '%s' "$hash" | cut -c1-7) is $size bytes, and $max is the most that Jared opens for one commit." 3
+    }
+    total=$((total + size))
+    [ "$total" -le "$most_total" ] || {
+      drop
+      fail "With $(printf '%s' "$hash" | cut -c1-7) the commits of ${shown:-HEAD} $since are $total bytes, and $most_total is the most that Jared opens in one review: give --from a later commit." 3
+    }
+  done
+  paths=
+  set -f
+  IFS=$nl
+  set -- $tmps
+  unset IFS
+  set +f
+  for hash in $list; do
+    out=$base/diffs/$(printf '%s' "$hash" | cut -c1-12).diff
+    mv -f "$1" "$out" 2> /dev/null || {
+      drop
+      fail "A file for the commit cannot be made in \"$base/diffs\"." 7
+    }
+    shift
+    paths=$paths$out$nl
+    [ -n "$file" ] || file=$out
+  done
+  if [ "$nmerges" -gt 0 ]; then
+    if [ "$nmerges" = 1 ]; then echo 'jared-link: 1 merge commit was left out.' >&2; else echo "jared-link: $nmerges merge commits were left out." >&2; fi
+  fi
+  if [ "$serve" = 0 ]; then
+    printf '%s' "$paths"
+    exit 0
+  fi
+  # On to --serve with these texts, named for their hashes.
+  filelist=$paths
+  nfiles=$count
+  setnames=hash
 fi
 
 # --check: what Jared would take of these files, as one line of JSON, and nothing opened: the size and the status of each, in the order given, the names that
@@ -977,8 +1210,14 @@ fi
 
 if [ "$nfiles" -gt 1 ]; then
   # A set: 2 to 100 files, none more than $max bytes and all together not more than $max, which is what Jared opens for one review. A name given twice
-  # is refused, and so is the first file that goes over a limit, by its name.
-  [ "$nfiles" -le 100 ] || fail "$nfiles files are more than the 100 that Jared opens in one review." 3
+  # is refused, and so is the first file that goes over a limit, by its name. The commits of a branch have their own limits, which were checked above, as each text was written.
+  most_files=100
+  most_set=$max
+  if [ "$setnames" = hash ]; then
+    most_files=400
+    most_set=$((max * 4))
+  fi
+  [ "$nfiles" -le "$most_files" ] || fail "$nfiles files are more than the $most_files that Jared opens in one review." 3
   seen=$nl
   total=0
   while IFS= read -r one; do
@@ -989,7 +1228,7 @@ if [ "$nfiles" -gt 1 ]; then
     one_size=$(wc -c < "$one" | tr -d ' ')
     [ "$one_size" -le "$max" ] || fail "\"$one\" is $one_size bytes, and $max is the most that Jared opens." 3
     total=$((total + one_size))
-    [ "$total" -le "$max" ] || fail "With \"$one\" the files are $total bytes, and $max is the most that Jared opens in one review." 3
+    [ "$total" -le "$most_set" ] || fail "With \"$one\" the files are $total bytes, and $most_set is the most that Jared opens in one review." 3
   done <<LIST
 $filelist
 LIST
@@ -1044,13 +1283,14 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
   # The request, as the script that sets window.__JARED_BOOT: perl does the JSON, in ASCII, so that no byte of the file is for the browser to decode.
   # With --serve the request also has the button's words and what happens when the review is taken (empty words are left out).
   # One file is the request's name and text; several are its files, each with its name as it was given, and a file that is not text is named on stdout.
+  # The commits of a branch are named for their hashes, which are their files' names, and the request holds the branch's name and where its commits start.
   set -f
   IFS=$nl
   set -- $filelist
   unset IFS
   set +f
   bad=$(perl -MJSON::PP -e '
-    my ($now, $out, $label, $closes, $message, $banner, $name, @files) = @ARGV;
+    my ($now, $out, $label, $closes, $message, $banner, $setnames, $bname, $bbase, $bfrom, $name, @files) = @ARGV;
     utf8::decode($name); # the bytes of the name as the characters that they spell, as for the names of a set
     my $read = sub {
       my ($path) = @_;
@@ -1062,7 +1302,24 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
     };
     my $request = { protocol => 1, id => "boot1", type => "open", review => undef, now => $now, submitTarget => "Claude" };
     if (@files > 1) {
-      $request->{files} = [map { my $path = $_; utf8::decode($path); +{ name => $path, text => $read->($_) } } @files];
+      $request->{files} = [map { my $path = $_; $path =~ s{.*/}{} if $setnames eq "hash"; utf8::decode($path); +{ name => $path, text => $read->($_) } } @files];
+      if ($setnames eq "hash") {
+        my %branch;
+        for my $field (["name", $bname], ["base", $bbase], ["from", $bfrom]) {
+          my ($key, $value) = @$field;
+          next unless length $value;
+          utf8::decode($value);
+          # As the page takes a name (src/engine/protocol.ts, branchOf): 1 to 255 characters, none of them a control character, a space or an
+          # invisible character. The rule is stricter than git on purpose, since the page draws the name in its header, where a space, an invisible
+          # character or one that turns the text round could mislead the reviewer. A name or a base that git takes and the page would refuse is left
+          # out, so that the review opens without it.
+          # The page counts a name in units of UTF-16, as JavaScript does, so a character beyond the first plane (an emoji) counts as two.
+          my $units = length($value) + (() = $value =~ /[\x{10000}-\x{10FFFF}]/g);
+          next if $units > 255 || $value =~ /[\p{Cc}\p{Cf}\p{Z}]/;
+          $branch{$key} = $value;
+        }
+        $request->{branch} = \%branch;
+      }
     } else {
       $request->{name} = $name;
       $request->{text} = $read->($files[0]);
@@ -1092,11 +1349,26 @@ if [ "$fileway" = 1 ] || [ "$serve" = 1 ]; then
     open(my $o, ">", $out) or exit 7;
     print $o "window.__JARED_BOOT = $json\n";
     close($o) or exit 7;
-  ' "$now" "$dir/jared-boot.js" "$label" "$closes" "$message" "$banner" "$name" "$@") || {
+  ' "$now" "$dir/jared-boot.js" "$label" "$closes" "$message" "$banner" "$setnames" "${bname-}" "${bbase-}" "${bfrom-}" "$name" "$@") || {
     status=$?
     rm -rf "$dir"
     case $status in
-      4) fail "\"${bad:-$file}\" is not text in UTF-8." 4 ;;
+      4)
+        # A commit of a branch is named by its hash and the first line of its message, and not by the path of its text in the cache.
+        if [ "$setnames" = hash ]; then
+          one=$(basename "${bad:-$file}" .diff)
+          what=$(git log -1 --format='%h "%s"' "$one" 2> /dev/null) || what=$one
+          # From the last commit there is no later one to start from.
+          set -f
+          IFS=$nl
+          for last in $paths; do :; done
+          unset IFS
+          set +f
+          [ "$(basename "$last" .diff)" = "$one" ] && fail "The change of $what is not text in UTF-8, and it is the branch's last commit, so the commits cannot be opened together." 4
+          fail "The change of $what is not text in UTF-8, so the commits cannot be opened together: give --from a commit that comes after it." 4
+        fi
+        fail "\"${bad:-$file}\" is not text in UTF-8." 4
+        ;;
       7) fail "The script for the review cannot be written in \"$dir\"." 7 ;;
       9) fail '--label must be 1 to 40 characters, with no control or invisible characters, and must not start with two hyphens.' 2 ;;
       10) fail '--message must be 1 to 80 characters, with no control or invisible characters, and must not start with two hyphens.' 2 ;;

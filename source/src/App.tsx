@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type CSSProperties } from 'react'
 import { CodeViewer } from './components/CodeViewer'
+import { CommitsPane, type CommitRow } from './components/CommitsPane'
 import { DeliveryStrip } from './components/DeliveryStrip'
 import { FilesPane } from './components/FilesPane'
 import { Header, STOP_IN_MENU_QUERY } from './components/Header'
 import { Alert, IconCheck, Splitter } from './ui'
 import { Landing } from './components/Landing'
-import { ReviewPanel } from './components/ReviewPanel'
+import { ReviewPanel, type PanelCommit } from './components/ReviewPanel'
 import { StopDialog } from './components/StopDialog'
 import { SubmitDialog } from './components/SubmitDialog'
 import { openHash } from './engine/page-host'
@@ -18,6 +19,7 @@ import { usePageApi } from './hooks/usePageApi'
 import { useDiffTokens, useLatest, useSetTokens, useTokens } from './hooks/useTokens'
 import { COPY } from './lib/copy'
 import { afterSentSettings, closesAtPress, deliveryOf, mustTellProgram, programWaits, stopWords, takenAsItIs, tellsOfDiscard, toldOfCancel, waitingWords } from './lib/delivery'
+import { commitPaths, commitPlaces, commitsOf, commitStats, otherOrder, shortHash, type CommitOrder } from './lib/commits'
 import { diffOf } from './lib/diff'
 import { setEntries, viewComments } from './lib/set-view'
 import { autoFilesMode, commentCounts, fileEntries, hasFileList, stepFile, toggled, totals, type FilesMode } from './lib/files'
@@ -26,7 +28,8 @@ import { SERVICE_KEY, hostFromSearch, serviceAddress } from './lib/host-link'
 import type { Platform, Picked } from './lib/platform'
 import { PLAIN_TEXT } from './lib/language'
 import { CODE_ROOM, commentsLetGo, filesLetGo, heldWidth, RAIL_WIDTH, shownWidths } from './lib/panels'
-import { draftHasText } from './lib/review'
+import { diffEntries } from './lib/review-files'
+import { writingCount } from './lib/review'
 import { SAMPLE_CODE, SAMPLE_DIFF, SAMPLE_DIFF_NAME, SAMPLE_NAME } from './lib/sample'
 import { COMMENTS_WIDTH, FILES_WIDTH } from './lib/settings'
 import type { LayoutChange } from './lib/settings-service'
@@ -34,7 +37,7 @@ import { buildSource, prepareSource } from './lib/source'
 import { nextTheme, type Theme } from './lib/theme'
 import { cancelReview, closeFile, keepBeforeLeaving, keepOpen, keepReview, leftBehind, loadOpensFile, mayDiscard, mustAskBeforeCancel, openFile, openPicked, openPickedMany, openRecent, openText, replaceQuestion, restoreLast, type OpenOutcome } from './state/flows'
 import { expiredNotice } from './state/expired'
-import { emptyState, reducer, type AppState } from './state/reducer'
+import { emptyState, reducer, writingIds, type AppState } from './state/reducer'
 import type { ReviewComment } from './types'
 
 /** The width at which the comments panel stops being an overlay: the breakpoint of `.side` in styles.css. */
@@ -125,14 +128,23 @@ export default function App() {
 
   // A text whose language is diff, and that has a hunk, is shown as a diff: then its colours come row by row, from the file each row is in.
   const diff = useMemo(() => (file ? diffOf(file.language, file.lines) : null), [file])
-  // Several files open together are drawn as one list of rows, a header for each file and then its lines; the comments are then in those rows too.
-  const layout = state.set?.layout ?? null
-  const comments = useMemo(() => (review ? (layout ? viewComments(layout, review.comments) : review.comments) : []), [review, layout])
+  // Several files open together are drawn as one list of rows, a header for each file and then its lines; the comments are then in those rows too. A set of
+  // commits is drawn one commit at a time, as one diff: `file` is then the chosen commit's text, and its comments are those whose file is that commit.
+  const commit = state.set && state.chosen !== null ? state.set.layout.texts[state.chosen] : null
+  const layout = state.set && !commit ? state.set.layout : null
+  const comments = useMemo(
+    () => (review ? (layout ? viewComments(layout, review.comments) : commit ? review.comments.filter((c) => c.file === commit.id) : review.comments) : []),
+    [review, layout, commit],
+  )
 
   // The list of the files of a diff of two files or more: how it is shown follows the window width until the reviewer chooses, and below the width of the
   // comments panel it is a drawer, opened and closed by hand like that panel. The marks for the files that the reviewer has looked at are the page's own, kept by the review's hash.
-  const entries = useMemo(() => (layout ? setEntries(layout) : fileEntries(diff)), [layout, diff])
-  const hasList = hasFileList(entries)
+  const entries = useMemo(() => (layout ? setEntries(layout) : commit ? (diff ? diffEntries(diff, commit.id) : []) : fileEntries(diff)), [layout, commit, diff])
+  // A set of commits always has its list, of the commits, whatever the chosen one holds.
+  const hasList = commit !== null || hasFileList(entries)
+  // A set in which every text is a commit is a list of commits: the list beside the code lists them, and a press chooses the one that the middle shows. The ids are the
+  // set's own, so that a mark for viewed and a comment keep their commit when the order changes.
+  const commits = useMemo(() => (state.set ? commitsOf(state.set.files) : null), [state.set])
   const fileTotals = useMemo(() => totals(entries), [entries])
   const roomToOpen = useMediaQuery(OPEN_FILES_QUERY)
   const [filesDrawer, setFilesDrawer] = useState(false)
@@ -152,6 +164,34 @@ export default function App() {
     () => (viewedState && viewedState.hash === hash ? viewedState.ids : new Set(file ? services.reviews.viewed(hash) : [])),
     [viewedState, hash, file, services],
   )
+  // The order that the list shows the commits in, kept for the review's hash and forgotten when it changes: the branch's own or its reverse, which starts as the
+  // branch's and is not saved. The commit that is chosen is the page's state, `chosen`, by its place in the set.
+  const [orderAt, setOrderAt] = useState<{ hash: string; order: CommitOrder }>({ hash: '', order: 'branch' })
+  const commitOrder = orderAt.hash === hash ? orderAt.order : 'branch'
+  const commitRows = useMemo<CommitRow[] | null>(() => {
+    if (!commits || review?.version !== 2) return null
+    return commits.map((commit, place) => {
+      const id = review.files[place].id
+      return { id, commit, count: review.comments.filter((c) => c.file === id).length }
+    })
+  }, [commits, review])
+  const commitTotals = useMemo(
+    () =>
+      commits && state.set
+        ? state.set.files.map((text) => commitStats(text.lines)).reduce((sum, stats) => ({ added: sum.added + stats.added, deleted: sum.deleted + stats.deleted }), { added: 0, deleted: 0 })
+        : null,
+    [commits, state.set],
+  )
+  // The commit that each text of a review of a branch is, by the id of its text, for the Markdown of the review.
+  const commitHeadsById = useMemo(() => (commitRows ? new Map(commitRows.map((row) => [row.id, row.commit])) : undefined), [commitRows])
+  // The commits as the panel names them over their comments, in the order that the list shows them.
+  const panelCommits = useMemo<PanelCommit[] | undefined>(
+    () => (commitRows ? commitPlaces(commitRows.length, commitOrder).map((place) => ({ id: commitRows[place].id, short: shortHash(commitRows[place].commit.hash), subject: commitRows[place].commit.subject })) : undefined),
+    [commitRows, commitOrder],
+  )
+  const commitPathLists = useMemo(() => (commits && state.set ? state.set.files.map((text) => commitPaths(text.lines)) : null), [commits, state.set])
+  // The commits that have a comment being written, open in the chosen one or put aside in another, which the list marks.
+  const writing = useMemo(() => writingIds(state), [state])
   // By their place in the diff, for the header of each file in the code: the marks themselves are kept by the ids that name the files.
   const viewedFiles = useMemo(() => new Set(entries.flatMap((e, i) => (viewed.has(e.id) ? [i] : []))), [entries, viewed])
   const fileCounts = useMemo(() => commentCounts(entries, comments), [entries, comments])
@@ -372,7 +412,7 @@ export default function App() {
     // A program that waits for the review is not left waiting in silence: the question of stopping comes first.
     const { review: current, sentAt } = stateRef.current
     if (current && programWaits(delivery, sentAt)) return setStopOpen(true)
-    if (!mayDiscard(services, draftRef.current)) return
+    if (!mayDiscard(services, draftRef.current, stateRef.current.aside)) return
     closeFile(services)
     setSubmitOpen(false)
     clearSent()
@@ -425,12 +465,13 @@ export default function App() {
   const openSample = (name: string, text: string) => applyOutcome(openFile(services, stateRef.current, buildSource(name, text)))
 
   // The comments panel goes to the first line of a comment; a click on a comment bar in the gutter goes to its card, which is under its last line.
-  const goToFile = (index: number) => {
+  // A press on a file in the list goes to it and closes the drawer; a key pressed in the list steps through the files and leaves the drawer open, with the focus in it.
+  const goToFile = (index: number, keepDrawer = false) => {
     const entry = entries[index]
     if (!entry) return
     setScrollRequest({ line: entry.startRow, nonce: Date.now(), block: 'start' })
     setFileInView(index)
-    setFilesDrawer(false)
+    if (!keepDrawer) setFilesDrawer(false)
   }
   const toggleViewed = (index: number) => {
     const entry = entries[index]
@@ -439,8 +480,34 @@ export default function App() {
     setViewedState({ hash, ids })
     services.reviews.setViewed(hash, [...ids])
   }
-  const onFileKey = (key: 'next' | 'previous' | 'viewed') =>
-    key === 'viewed' ? toggleViewed(fileInView) : goToFile(stepFile(entries.length, fileInView, key === 'next' ? 1 : -1))
+  // Another commit is shown from its top, or where its comment being written is, which comes back with it; `at` is a place in it to go to instead.
+  const chooseCommit = (place: number, at?: { line: number; comment?: string }) => {
+    if (!state.set || state.chosen === null) return
+    if (place !== state.chosen) {
+      const back = state.aside[state.set.layout.texts[place]?.id ?? '']
+      dispatch({ type: 'choose', place })
+      setFileInView(0)
+      if (!at) return setScrollRequest({ line: back?.range.start ?? 0, nonce: Date.now(), block: 'center' })
+    }
+    if (at) setScrollRequest({ line: at.line, nonce: Date.now(), ...(at.comment ? { comment: at.comment } : {}) })
+  }
+  const stepCommit = (delta: 1 | -1) => {
+    if (!state.set || state.chosen === null) return
+    const places = commitPlaces(state.set.files.length, commitOrder)
+    chooseCommit(places[stepFile(places.length, places.indexOf(state.chosen), delta)])
+  }
+  const toggleCommitViewed = (place: number) => {
+    if (!state.set) return
+    const ids = toggled(viewed, state.set.layout.texts[place].id)
+    setViewedState({ hash, ids })
+    services.reviews.setViewed(hash, [...ids])
+  }
+  const onFileKey = (key: 'next' | 'previous' | 'viewed') => {
+    if (state.chosen !== null) return key === 'viewed' ? toggleCommitViewed(state.chosen) : stepCommit(key === 'next' ? 1 : -1)
+    return key === 'viewed' ? toggleViewed(fileInView) : goToFile(stepFile(entries.length, fileInView, key === 'next' ? 1 : -1))
+  }
+  const onListKey = (key: 'next' | 'previous' | 'viewed') =>
+    key === 'viewed' ? toggleViewed(fileInView) : goToFile(stepFile(entries.length, fileInView, key === 'next' ? 1 : -1), true)
   const toggleFiles = () => {
     if (wide) return keepLayout({ files: { mode: filesMode === 'closed' ? 'open' : 'closed' } })
     setFilesDrawer(!filesDrawer)
@@ -476,6 +543,9 @@ export default function App() {
   }
 
   const jumpTo = (comment: ReviewComment, toCard = false) => {
+    const place = state.set && state.chosen !== null ? state.set.layout.texts.findIndex((text) => text.id === comment.file) : -1
+    if (place >= 0 && place !== state.chosen) dispatch({ type: 'choose', place })
+    if (place >= 0 && place !== state.chosen) setFileInView(0)
     setScrollRequest({ line: comment.startLine, nonce: Date.now(), ...(toCard ? { comment: comment.id } : {}) })
     setFlashId(comment.id)
     window.clearTimeout(flashTimer.current)
@@ -500,6 +570,7 @@ export default function App() {
                     lines: layout ? layout.texts.reduce((n, text) => n + text.lines.length, 0) : file.lines.length,
                     open: filesShown,
                     onToggle: toggleFiles,
+                    commits: commitRows && commitTotals ? { count: commitRows.length, ...commitTotals, branch: state.set?.branch } : undefined,
                   }
                 : null
             }
@@ -522,32 +593,58 @@ export default function App() {
             words={waitingWords(waitingSince !== null, late, delivery?.target ?? null, changedSincePress, update)}
             late={late}
             onStop={takenAsItIs(review, state.sentAt) ? null : askToStop}
-            stopLabel={stopWords(delivery, state.sentAt, review).label}
-            stopTip={stopWords(delivery, state.sentAt, review).tip}
+            stopLabel={stopWords(delivery, state.sentAt, review, state.chosen !== null).label}
+            stopTip={stopWords(delivery, state.sentAt, review, state.chosen !== null).tip}
             onOtherWays={() => setSubmitOpen(true)}
           />
           <SentBanner message={sentText} drawn={afterSentSettings(state.submitOptions).banner} onDismiss={clearSent} />
           <div className={held.files === undefined && held.comments === undefined ? 'main' : 'main is-resizing'} style={panelWidths}>
-            {hasList && filesShown && (
-              <FilesPane
-                entries={entries}
-                counts={fileCounts}
+            {hasList && filesShown && commitRows && commitPathLists ? (
+              <CommitsPane
+                rows={commitRows}
+                paths={commitPathLists}
+                order={commitOrder}
+                onOrder={() => setOrderAt({ hash, order: otherOrder(commitOrder) })}
+                chosen={state.chosen ?? 0}
+                onChoose={(place) => chooseCommit(place)}
                 viewed={viewed}
-                current={Math.min(fileInView, entries.length - 1)}
+                writing={writing}
+                onToggleViewed={toggleCommitViewed}
+                entries={entries}
+                current={Math.min(fileInView, Math.max(entries.length - 1, 0))}
+                onPick={goToFile}
+                onKey={onFileKey}
                 rail={wide && filesMode === 'rail'}
                 drawer={!wide}
                 query={filesQuery}
                 onQuery={(text) => setFilesFilter({ hash, text })}
-                onPick={goToFile}
-                onToggleViewed={toggleViewed}
                 onRail={() => keepLayout({ files: { mode: filesMode === 'rail' ? 'open' : 'rail' } })}
                 onClose={() => setFilesDrawer(false)}
               />
+            ) : (
+              hasList &&
+              filesShown && (
+                <FilesPane
+                  entries={entries}
+                  counts={fileCounts}
+                  viewed={viewed}
+                  current={Math.min(fileInView, entries.length - 1)}
+                  rail={wide && filesMode === 'rail'}
+                  drawer={!wide}
+                  query={filesQuery}
+                  onQuery={(text) => setFilesFilter({ hash, text })}
+                  onPick={goToFile}
+                  onToggleViewed={toggleViewed}
+                  onKey={onListKey}
+                  onRail={() => keepLayout({ files: { mode: filesMode === 'rail' ? 'open' : 'rail' } })}
+                  onClose={() => setFilesDrawer(false)}
+                />
+              )
             )}
             {wide && hasList && filesShown && (
               <Splitter
-                label={COPY.filesEdge}
-                title={COPY.filesEdgeTip}
+                label={commitRows ? COPY.commitsEdge : COPY.filesEdge}
+                title={commitRows ? COPY.commitsEdgeTip : COPY.filesEdgeTip}
                 width={shown.files}
                 min={filesMode === 'rail' ? RAIL_WIDTH : FILES_WIDTH.min} // the rail's own width is its least, so that the edge's value is never below it
                 max={FILES_WIDTH.max}
@@ -566,6 +663,16 @@ export default function App() {
               file={file}
               diff={diff}
               layout={layout}
+              commit={
+                commits && state.set && state.chosen !== null
+                  ? {
+                      short: shortHash(commits[state.chosen].hash),
+                      subject: commits[state.chosen].subject || COPY.commitNoMessage,
+                      viewed: viewed.has(state.set.layout.texts[state.chosen].id),
+                      onViewed: () => toggleCommitViewed(state.chosen ?? 0),
+                    }
+                  : null
+              }
               tokens={tokens}
               comments={comments}
               selection={selection}
@@ -603,12 +710,13 @@ export default function App() {
             )}
             {panelOpen && (
               <ReviewPanel
-                comments={comments}
+                comments={panelCommits ? review.comments : comments}
                 marks={marks}
                 hoveredId={hoveredId}
                 onHover={setHoveredId}
                 onJump={jumpTo}
                 files={hasList ? entries : undefined}
+                commits={panelCommits}
                 onClose={() => (wide ? keepLayout({ comments: { open: false } }) : setPanelDrawer(false))}
               />
             )}
@@ -616,6 +724,8 @@ export default function App() {
           {submitOpen && (
             <SubmitDialog
               review={review}
+              commits={commitHeadsById}
+              writing={writing.size}
               onSummary={(summary) => dispatch({ type: 'setSummary', summary, now: services.environment.now() })}
               onSubmitted={() => dispatch({ type: 'markSubmitted', now: services.environment.now() })}
               delivery={delivery}
@@ -640,11 +750,12 @@ export default function App() {
             <StopDialog
               name={file.name}
               files={review.version === 2 ? review.files.length : 1}
+              commits={state.chosen !== null}
               waiting={programWaits(delivery, state.sentAt) ? { target: delivery?.target ?? null } : null}
               discardTells={tellsOfDiscard(toldOfCancel(delivery, review, state.sentAt))}
               comments={review.comments.length}
               summary={review.summary.trim() !== ''}
-              writing={draftHasText(draft)}
+              writing={writingCount(draft, state.aside)}
               onKeep={() => setStopOpen(false)}
               onStop={stopCurrent}
               onDiscard={cancelCurrent}

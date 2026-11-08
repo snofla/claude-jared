@@ -2,10 +2,13 @@ import type { AnyReview, Draft, LineSelection, Review, SetReview, SourceFile } f
 import { handle, type EngineState } from '../engine/engine'
 import { toEngineState } from '../engine/page-host'
 import { PROTOCOL_VERSION, type Request, type SubmitOptions } from '../engine/protocol'
+import { listKind } from '../lib/commits'
+import { COPY } from '../lib/copy'
 import { clampToFile, diffOf } from '../lib/diff'
+import { DIFF_LANGUAGE } from '../lib/language'
 import { openSet, type OpenSet } from '../lib/set-open'
 import { clampToFile as clampToSetFile, savedPlace, viewComments } from '../lib/set-view'
-import { codeForRange, rangeOf } from '../lib/review'
+import { codeForRange, draftHasText, rangeOf } from '../lib/review'
 import { moveSelection } from '../lib/selection'
 
 export interface AppState {
@@ -30,9 +33,28 @@ export interface AppState {
    * which `submittedAt` of the review also records. The header says sent only for this. Not stored: it is of this page's session.
    */
   sentAt: string | null
+  /**
+   * In a set of commits, the place of the commit that the middle shows, an index of `set.files`; `null` for anything else. While it is set, `file` is that commit's
+   * text with the set's name and hash, the selection and the draft are in its lines, and its comments are the ones whose `file` is its id.
+   */
+  chosen: number | null
+  /** The comments being written in the other commits of a set, put aside by the id of their text when another commit was chosen: at most one each. */
+  aside: Readonly<Record<string, Draft>>
 }
 
-export const emptyState: AppState = { file: null, review: null, set: null, selection: null, draft: null, submitLabel: null, submitTarget: null, submitOptions: null, sentAt: null }
+export const emptyState: AppState = {
+  file: null,
+  review: null,
+  set: null,
+  selection: null,
+  draft: null,
+  submitLabel: null,
+  submitTarget: null,
+  submitOptions: null,
+  sentAt: null,
+  chosen: null,
+  aside: {},
+}
 
 export type Action =
   /**
@@ -49,6 +71,8 @@ export type Action =
   /** Set the words for delivering the review, with the file that is open (for a receiver that brought them with the file). */
   | { type: 'setDelivery'; submitLabel: string | null; submitTarget: string | null; submitOptions: SubmitOptions | null }
   | { type: 'setLanguage'; language: string }
+  /** In a set of commits, show the commit at this place of the set: the comment being written is put aside with its commit, and one put aside with this one comes back. */
+  | { type: 'choose'; place: number }
   /** `commit: false` is used while dragging: the highlight follows the pointer but an open draft stays put. */
   | { type: 'select'; selection: LineSelection | null; commit?: boolean }
   /**
@@ -101,6 +125,12 @@ function adoptedFrom({ source, review }: EngineState, refused: boolean, current:
   return { file, review }
 }
 
+/** A draft that the reviewer has changed: it is no longer one that came back with its commit, so a field drawn again for it takes the focus as any field does. */
+function changed(draft: Draft): Draft {
+  const { returned: _returned, ...rest } = draft
+  return rest
+}
+
 /** Move an open draft onto the current selection. */
 function syncDraft(state: AppState, selection: LineSelection | null): Draft | null {
   const { draft, file } = state
@@ -109,7 +139,40 @@ function syncDraft(state: AppState, selection: LineSelection | null): Draft | nu
   if (range.start === draft.range.start && range.end === draft.range.end) return draft
   const suggestion =
     draft.suggestion !== null && !draft.suggestionDirty ? codeForRange(file.lines, range) : draft.suggestion
-  return { ...draft, range, suggestion }
+  return { ...changed(draft), range, suggestion }
+}
+
+/** The set that the page draws whole, as one list of rows: a set of files. A set of commits is drawn one commit at a time, as one diff, and has none. */
+const drawnWhole = (state: AppState): OpenSet | null => (state.set && state.chosen === null ? state.set : null)
+
+/** The id of the text at a place of the set: "f1", "f2" and so on. */
+const idAt = (set: OpenSet, place: number): string => set.layout.texts[place].id
+
+/**
+ * The file that stands for a set of commits while the commit at `place` is shown: that commit's text, with the hash of the set, and named as the review of a branch
+ * is: by the branch's name, or by how many commits there are when it has none.
+ */
+function commitView(set: OpenSet, place: number, of: { hash: string }): SourceFile {
+  const text = set.files[place]
+  return { name: set.branch?.name ?? COPY.commitCount(set.files.length), content: text.content, lines: text.lines, language: text.language, hash: of.hash }
+}
+
+/**
+ * The state with its set drawn as it should be: a set of commits shows the commit at `chosen` (the first when none, or when the place is not in the set). Anything
+ * else is left as it is, since it comes from an empty state or keeps its own set, and has no commit chosen and nothing put aside.
+ */
+function withCommits(state: AppState): AppState {
+  const { set, file } = state
+  if (!set || !file || listKind(set.files) !== 'commits') return state
+  const chosen = state.chosen !== null && state.chosen < set.files.length ? state.chosen : 0
+  return { ...state, chosen, file: commitView(set, chosen, file) }
+}
+
+/** The ids of the texts of a set of commits in which a comment is being written: the chosen one, when its draft has words, and each that has one put aside. */
+export function writingIds(state: AppState): Set<string> {
+  const ids = new Set(Object.keys(state.aside))
+  if (state.set && state.chosen !== null && draftHasText(state.draft)) ids.add(idAt(state.set, state.chosen))
+  return ids
 }
 
 /**
@@ -133,7 +196,8 @@ const inDiffFile = (set: OpenSet, row: number): boolean => {
 function withSelection(state: AppState, wanted: LineSelection | null, commit = true): AppState {
   // On a diff, and in a set of files, a selection stays in the file it began in, so that a comment is about one file.
   const diff = state.file && diffOf(state.file.language, state.file.lines)
-  const next = wanted && state.set ? clampToSetFile(state.set.layout, wanted) : wanted && diff ? clampToFile(diff, wanted) : wanted
+  const whole = drawnWhole(state)
+  const next = wanted && whole ? clampToSetFile(whole.layout, wanted) : wanted && diff ? clampToFile(diff, wanted) : wanted
   const prev = state.selection
   if (prev === next || (prev && next && prev.anchor === next.anchor && prev.focus === next.focus)) return state
   return { ...state, selection: next, draft: commit ? syncDraft(state, next) : state.draft }
@@ -152,7 +216,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'openSet': {
       const request = { type: 'open', files: action.files, now: action.now } as const
       const opened = viaEngine(emptyState, { ...request, review: action.review }) ?? viaEngine(emptyState, { ...request, review: null })
-      return opened ? { ...emptyState, file: opened.file, review: opened.review, set: opened.set } : state
+      return opened ? withCommits({ ...emptyState, file: opened.file, review: opened.review, set: opened.set }) : state
     }
 
     case 'setDelivery':
@@ -166,11 +230,16 @@ export function reducer(state: AppState, action: Action): AppState {
       const delivery = { submitLabel: action.submitLabel ?? null, submitTarget: action.submitTarget ?? null, submitOptions: action.submitOptions ?? null }
       // Another file starts a new view, as opening one does. The same file keeps what the reviewer is doing, unless it is
       // about a comment that is no longer there.
-      if (action.file.hash !== file?.hash) return { file: action.file, review: action.review, set: action.set ?? null, selection: null, draft: null, sentAt: null, ...delivery }
+      if (action.file.hash !== file?.hash) {
+        return withCommits({ ...emptyState, file: action.file, review: action.review, set: action.set ?? null, ...delivery })
+      }
       const comments = action.review.comments
+      const kept = (one: Draft | null) => one && (one.id === null || comments.some((c) => c.id === one.id))
       // A review older than the one the page had is another review, and what was sent is not it.
       const sentAt = review && action.review.updatedAt >= review.updatedAt ? state.sentAt : null
-      return { ...state, ...delivery, sentAt, file: action.file, review: action.review, set: action.set ?? state.set, draft: draft && draft.id !== null && !comments.some((c) => c.id === draft.id) ? null : draft }
+      // A comment being written, open or put aside, that edits a comment which is no longer there goes with it.
+      const aside = Object.fromEntries(Object.entries(state.aside).filter(([, one]) => kept(one)))
+      return withCommits({ ...state, ...delivery, sentAt, file: action.file, review: action.review, set: action.set ?? state.set, draft: kept(draft) ? draft : null, aside })
     }
 
     case 'setLanguage': {
@@ -184,7 +253,8 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'moveSelection': {
       if (!file) return state
       const moved = moveSelection(state.selection, action.delta, action.extend, file.lines.length)
-      return withSelection(state, state.set && !action.extend ? hopHeaders(state.set, moved, action.delta) ?? state.selection : moved)
+      const whole = drawnWhole(state)
+      return withSelection(state, whole && !action.extend ? hopHeaders(whole, moved, action.delta) ?? state.selection : moved)
     }
 
     case 'commitSelection':
@@ -199,7 +269,12 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'editComment': {
-      const target = (state.set && review ? viewComments(state.set.layout, review.comments) : review?.comments)?.find((c) => c.id === action.id)
+      // A comment of another commit is edited in its commit: that commit is chosen first.
+      const of = state.set && state.chosen !== null ? review?.comments.find((c) => c.id === action.id)?.file : undefined
+      const place = of && state.set ? state.set.layout.texts.findIndex((text) => text.id === of) : -1
+      if (place >= 0 && place !== state.chosen) return reducer(reducer(state, { type: 'choose', place }), action)
+      const whole = drawnWhole(state)
+      const target = (whole && review ? viewComments(whole.layout, review.comments) : review?.comments)?.find((c) => c.id === action.id)
       if (!target) return state
       return {
         ...state,
@@ -220,7 +295,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         draft: {
-          ...draft,
+          ...changed(draft),
           comment: comment ?? draft.comment,
           suggestion: suggestion ?? draft.suggestion,
           suggestionDirty: suggestion !== undefined ? true : draft.suggestionDirty,
@@ -231,7 +306,9 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'toggleSuggestion': {
       if (!draft || !file) return state
       // A diff gets no suggestion, there being no file to replace lines of; one that is already there can still be taken away. A file of a set that is a diff is the same.
-      if (draft.suggestion === null && (diffOf(file.language, file.lines) || (state.set && inDiffFile(state.set, draft.range.start)))) return state
+      const whole = drawnWhole(state)
+      const commitsDiff = state.chosen !== null && file.language === DIFF_LANGUAGE
+      if (draft.suggestion === null && (diffOf(file.language, file.lines) || commitsDiff || (whole && inDiffFile(whole, draft.range.start)))) return state
       const suggestion = draft.suggestion === null ? codeForRange(file.lines, draft.range) : null
       return { ...state, draft: { ...draft, suggestion, suggestionDirty: false } }
     }
@@ -239,7 +316,13 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'saveDraft': {
       if (!draft) return state
       // In a set the rows of the draft are saved as the lines of one file, which the comment names; rows that are not lines of one file name none, and the engine refuses them.
-      const place = state.set ? savedPlace(state.set.layout, draft.range.start, draft.range.end) : null
+      // A commit's rows are the lines of its text, which the comment names.
+      const whole = drawnWhole(state)
+      const place = whole
+        ? savedPlace(whole.layout, draft.range.start, draft.range.end)
+        : state.set && state.chosen !== null
+          ? { file: idAt(state.set, state.chosen), startLine: draft.range.start, endLine: draft.range.end }
+          : null
       const saved = viaEngine(state, {
         type: 'saveComment',
         commentId: draft.id ?? action.id,
@@ -258,7 +341,27 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'deleteComment': {
       const deleted = viaEngine(state, { type: 'deleteComment', commentId: action.id, now: action.now })
-      return deleted ? { ...state, ...deleted, draft: draft?.id === action.id ? null : draft } : state
+      const aside = Object.fromEntries(Object.entries(state.aside).filter(([, one]) => one.id !== action.id))
+      return deleted ? { ...state, ...deleted, draft: draft?.id === action.id ? null : draft, aside } : state
+    }
+
+    case 'choose': {
+      const { set } = state
+      if (!set || !file || state.chosen === null || action.place === state.chosen || action.place < 0 || action.place >= set.files.length) return state
+      // The comment being written goes aside with its commit, if it has words; one that was put aside with the chosen commit comes back, open on its lines.
+      const aside: Record<string, Draft> = { ...state.aside }
+      if (draft && draftHasText(draft)) aside[idAt(set, state.chosen)] = draft
+      const to = idAt(set, action.place)
+      const back = aside[to] ?? null
+      delete aside[to]
+      return {
+        ...state,
+        chosen: action.place,
+        file: commitView(set, action.place, file),
+        aside,
+        draft: back && { ...back, returned: true },
+        selection: back && { anchor: back.range.start, focus: back.range.end },
+      }
     }
 
     case 'setSummary': {

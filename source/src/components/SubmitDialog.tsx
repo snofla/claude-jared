@@ -3,6 +3,7 @@ import { usePlatform } from '../hooks/usePlatform'
 import { useLatest } from '../hooks/useTokens'
 import { COPY } from '../lib/copy'
 import { buttonLabel, destinationLine, emptyReviewNotice, lastDelivery, sendLabel, stopWords, takenAsItIs, waitingWords, type Delivery } from '../lib/delivery'
+import type { Commit } from '../lib/commits'
 import { reviewFileName, toJson, toMarkdown } from '../lib/export'
 import {
   busy,
@@ -24,6 +25,10 @@ import { Button, Dialog, DialogFoot, Disclosure, IconCheck, IconCopy, IconDownlo
 
 interface Props {
   review: AnyReview
+  /** For a review of a branch, whose texts are commits: the commit that each is, by the id of its text, so that the Markdown names the commit of each comment. */
+  commits?: ReadonlyMap<string, Commit>
+  /** For a review of a branch: how many comments are being written, in the commit that is shown or put aside with another, which the review does not hold and is sent without. */
+  writing?: number
   onSummary: (summary: string) => void
   /** Called once the review has actually left the app by being copied or downloaded: a delivery is marked by whoever runs it. */
   onSubmitted: () => void
@@ -75,7 +80,7 @@ const FORMATS: readonly SegmentedOption<Format>[] = [
   { value: 'json', label: 'JSON' },
 ]
 
-export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, deliver, waitingSince, late, changedSincePress, changes, update, onNothingNew, closesAtPress, sentAt, forClaude, linkTarget, onClose, onSentClosed, onStop }: Props) {
+export function SubmitDialog({ review, commits, writing = 0, onSummary, onSubmitted, delivery, to, deliver, waitingSince, late, changedSincePress, changes, update, onNothingNew, closesAtPress, sentAt, forClaude, linkTarget, onClose, onSentClosed, onStop }: Props) {
   const { submit } = usePlatform()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [state, dispatch] = useReducer(submitReducer, initialSubmitState)
@@ -94,11 +99,11 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
 
   const way = wayOf(delivery, forClaude)
   const shown = shownFormat(way, state.format)
-  const text = shown === 'md' ? toMarkdown(review) : toJson(review)
+  const text = shown === 'md' ? toMarkdown(review, commits) : toJson(review)
   const count = review.comments.length
   const empty = emptyReviewNotice(count, review.summary, delivery)
   const label = buttonLabel(delivery)
-  const stopText = stopWords(delivery, sentAt, review)
+  const stopText = stopWords(delivery, sentAt, review, commits !== undefined)
   const waiting = waitingSince !== null
   const taken = takenAsItIs(review, sentAt)
   const last = lastDelivery(review, delivery, sentAt)
@@ -110,7 +115,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
   const groupIsOpen = groupOpen(state, late)
 
   const download = () => {
-    const name = reviewFileName(review, shown)
+    const name = reviewFileName(review, shown, commits)
     submit.download(name, text, mimeOf(shown))
     dispatch({ type: 'downloaded', name })
     onSubmitted()
@@ -160,7 +165,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
       title={label}
       subtitle={
         <>
-          <code>{review.version === 2 ? COPY.fileCount(review.files.length) : review.file.name}</code> · {COPY.commentCount(count)}
+          <code>{review.version === 2 ? (commits ? COPY.commitCount(review.files.length) : COPY.fileCount(review.files.length)) : review.file.name}</code> · {COPY.commentCount(count)}
         </>
       }
       closeLabel={COPY.close}
@@ -170,6 +175,7 @@ export function SubmitDialog({ review, onSummary, onSubmitted, delivery, to, del
       onPointerDownCapture={() => dispatch({ type: 'closingCancelled' })}
     >
       {empty && <Notice tone="info">{empty}</Notice>}
+      {writing > 0 && <Notice tone="warn">{COPY.writtenNotSent(writing)}</Notice>}
 
       <TextField
         className="summary-field"

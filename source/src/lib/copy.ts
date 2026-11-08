@@ -150,6 +150,60 @@ export const COPY = {
   /** The key hints at the foot of the list: each beside its key, so each is a whole message. */
   filesKeys: { next: 'next file', previous: 'previous file', viewed: 'viewed' },
   /**
+   * The list of the commits of a review of a branch, beside the code. It has the places of the list of files, and these are its words for them: its name, the buttons of the
+   * header and of the list, the edge, the filter, the keys, and what a commit's row and the files under the chosen one say. English-only plurals, like the ones above.
+   */
+  commits: 'Commits',
+  commitsToggle: 'Show or hide the list of commits',
+  commitsCollapse: 'Collapse the list of commits',
+  commitsExpand: 'Expand the list of commits',
+  commitsClose: 'Close the list of commits',
+  commitsEdge: 'Width of the list of commits',
+  commitsEdgeTip: 'Drag or use the arrow keys to resize the list of commits; double-click for the usual width',
+  commitsViewed: (viewed: number, total: number): string => `${viewed} of ${total} viewed`,
+  commitsFilterLabel: 'Filter commits by message, author or file',
+  commitsFilterPlaceholder: 'Message, author or file',
+  commitsFilterCount: (shown: number, total: number): string => `${shown} of ${total}`,
+  commitsFilterSpoken: (shown: number, total: number): string => (shown === 0 ? 'No commit matches' : `${shown} of ${total} commits shown`),
+  commitsFilterNone: (query: string): string => `No commit matches "${query}".`,
+  commitsKeys: { next: 'next commit', previous: 'previous commit', viewed: 'viewed' },
+  /** The order of the list: the button's name says which commit is at the top, and what a press does. The order is the branch's own, not the dates', and it is not kept. */
+  commitsOrder: (reversed: boolean): string =>
+    reversed ? 'The last commit is at the top; press to put the first one there.' : 'The first commit is at the top; press to put the last one there.',
+  /** The name of a commit whose message is empty, where its row would say nothing. */
+  commitNoMessage: '(no message)',
+  /** The mark for viewed on a commit's row, as `viewedMark` is for a file. */
+  commitViewedMark: (subject: string): string => `Viewed: ${subject}`,
+  /** The name of the button in the head of the commit that the code shows, which marks the commit as viewed: by its short hash and the first line of its message. */
+  commitHeadViewed: (short: string, subject: string): string => `Viewed: commit ${short}, ${subject}`,
+  /** The name of the list of the files of the chosen commit, which is under its row; `hash` is its short hash. */
+  commitFiles: (hash: string): string => `Files of commit ${hash}`,
+  /** How many commits a branch has, English-only plural like the ones above. */
+  commitCount: (count: number): string => (count === 1 ? '1 commit' : `${count} commits`),
+  /**
+   * The header's line for the commits of a branch, in one message so that a language can put its parts in its own order: how many commits, where they start (`base`, the
+   * branch or commit that the branch left, or `from`, the first commit, which is among them) and the lines added and removed. With the branch's name beside it the line says how
+   * many commits there are; with none, `count` is `null`, since the count is the header's title.
+   */
+  branchLine: (count: number | null, base: string | undefined, from: string | undefined, added: number, deleted: number): string => {
+    const where = base !== undefined ? `since ${base}` : from !== undefined ? `from ${from}` : null
+    const start = [count === null ? null : COPY.commitCount(count), where].filter(Boolean).join(' ')
+    return start === '' ? `+${added} −${deleted}` : `${start}, +${added} −${deleted}`
+  },
+  /** The same line for a screen reader, which is not to read the signs: the lines said in words. */
+  branchLineName: (count: number | null, base: string | undefined, from: string | undefined, added: number, deleted: number): string => {
+    const where = base !== undefined ? `since ${base}` : from !== undefined ? `from ${from}` : null
+    const start = [count === null ? null : COPY.commitCount(count), where].filter(Boolean).join(' ')
+    const lines = `${added} ${added === 1 ? 'line' : 'lines'} added and ${deleted} removed`
+    return start === '' ? lines : `${start}, ${lines}`
+  },
+  /** In the send window of a review of a branch, when comments are being written, open or put aside with another commit: the review is sent without them, and this says how many. */
+  writtenNotSent: (count: number): string => (count === 1 ? 'A comment is being written and will not be sent.' : `${count} comments are being written and will not be sent.`),
+  /** The small mark on a commit's row, and in the rail, when a comment is being written on it, or was put aside there when another commit was chosen: its name, and its tooltip. */
+  commitWriting: 'A comment is being written',
+  /** What a file of a commit has changed, for a screen reader, beside `+added −removed`. */
+  commitFileLines: (added: number, deleted: number): string => `${added} ${added === 1 ? 'line' : 'lines'} added and ${deleted} removed`,
+  /**
    * The banner of a page that loaded to open a file when the last review, of another file, had comments that were not sent, copied or downloaded.
    * The review was kept, so nothing needs doing now. `name` is the name of its file, or `fileCount` for a review of several files.
    * `changedSince` says that it left the page once and was changed after: the page cannot say which comments went, so it counts none of them.
@@ -171,9 +225,13 @@ export const COPY = {
   /** The button that stops a review while a program waits for it, and the one that closes the files when nobody does; the first item of the menu of more actions in a narrow window. */
   stopReviewing: 'Stop reviewing',
   closeFile: (files: number): string => (files === 1 ? 'Close file' : 'Close files'),
+  /** The same for the commits of a branch. */
+  closeCommits: 'Close commits',
   /** Their tooltips: a phrase, no full stop, as the header's others are. */
   stopReviewingTip: (target: string | null): string => (target === null ? 'Stop reviewing, and let the program that opened Jared know' : `Stop reviewing, and let ${target} know`),
   closeFileTip: (files: number): string => (files === 1 ? 'Close this file and go back to the start page' : 'Close these files and go back to the start page'),
+  /** The same for the commits of a branch. */
+  closeCommitsTip: 'Close these commits and go back to the start page',
   /** The title of the question of stopping: while a program waits, and when nobody does. The name is the file's, or the set's ("3 files"). */
   stopTitle: (name: string): string => `Stop reviewing ${name}?`,
   closeTitleOf: (name: string): string => `Close ${name}?`,
@@ -187,6 +245,8 @@ export const COPY = {
   stopKeptLater: 'Kept, the review stays on the start page, and you can go on with it later.',
   /** In every state, when a comment is being written: neither choice keeps it. */
   stopDraftLost: 'The comment you are writing will be discarded.',
+  /** The same, for more than one: comments being written in several commits of a branch. */
+  stopDraftsLost: (count: number): string => `The ${count} comments you are writing will be discarded.`,
   /** In the question of Close file, when a program has taken an earlier version of the review: only discarding tells it. */
   closeTellsOfDiscard: (target: string | null): string =>
     target === null
@@ -259,6 +319,8 @@ export const COPY = {
   notSent: (cause: string, again: boolean): string => (again ? `The review was not sent. ${cause} Open the review dialog to try again or to copy or download the review.` : `The review was not sent. ${cause}`),
   /** The question before something replaces the comment that is being written. */
   discardComment: 'Discard the comment you are writing?',
+  /** The same, for more than one. */
+  discardWritten: (count: number): string => `Discard the ${count} comments you are writing?`,
   /**
    * What goes wrong with the receiver of a delivery, each as two whole messages: with the name that the sender gave (`target`), and
    * without one, for "the program that opened Jared". `address` is where Jared looked; `message` is the engine's own sentence.

@@ -1,4 +1,5 @@
 import type { ReviewComment } from '../types.ts'
+import { COPY } from './copy.ts'
 import type { ParsedDiff } from './diff.ts'
 import { diffEntries, ONLY_TEXT, type FileEntry } from './review-files.ts'
 
@@ -9,6 +10,9 @@ import { diffEntries, ONLY_TEXT, type FileEntry } from './review-files.ts'
  */
 
 export type { FileEntry, FileLetter } from './review-files.ts'
+
+/** What the letter of a file's status stands for, in words; a file that is not in a diff has none. */
+export const statusWord = (entry: FileEntry): string | undefined => (entry.status ? COPY.fileStatus[entry.status] : undefined)
 
 /** One entry for each file of the diff; none when the text is not a diff. */
 export function fileEntries(diff: ParsedDiff | null): FileEntry[] {

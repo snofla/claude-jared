@@ -2,6 +2,19 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.19.0 — 2026-11-08
+
+- **Review a branch.** `/jared:review --branch` reviews the commits of the branch that is checked out, or of the one you name, since it left its base: `main`, else `master`, else what `origin/HEAD` names, or the branch that you give with `--base`. `--from <commit>` reviews that commit and the ones after it, and a branch's name given alone, as in `/jared:review feature/x`, does what `--branch` does.
+  - Merge commits are left out. A review of a branch holds up to 400 commits and 2 MB in all, each commit up to 512 KB; several files keep their limits of 100 files and 512 KB.
+  - The list beside the code holds the commits, in the branch's order: each with its message, short hash, date, author and comments, and the files of the chosen commit under it. The list can put the last commit at the top, filter by message, author, file or the start of a hash, fold into a rail, and slide over the code on a narrow screen. The header names the branch, its base and the lines that its commits change.
+  - The middle shows one commit at a time, under a head with its short hash, the first line of its message and its own **Viewed**. A press on a commit in the list, `]` and `[`, or a jump to a comment chooses it. A comment being written goes aside with its commit and comes back when that commit is chosen again; a reload loses it.
+  - The comments panel puts each comment under its commit, the exported Markdown names each comment's commit, and a saved review is named `review-of-<n>-commits`. The send window says how many comments being written will not be sent.
+  - A branch with no commits of its own, such as `main`, still opens its latest commit, and a name that is both a tag and a branch opens the tag's commit, as git takes it.
+- **A commit's text now holds its author, its date and its message, indented.** So a review of a commit that you kept with an earlier version opens as a new review, and the old one stays under **Continue reviewing**.
+- **The list of files hears `]`, `[` and `V` with the focus in it,** after a press on a file, as the list of commits does, and the focus follows the file in view. In a narrow window's drawer a key leaves the drawer open.
+- **A file's header and a commit's head stay in view** at the left edge while the code scrolls sideways, so their **Viewed** toggle stays in reach, at 375 px too. A path too long for its header is cut at its start, so that the file's name shows.
+- **The README** shows a review of a branch, and the list beside the code in four states.
+
 ## 0.18.1 — 2026-11-02
 
 - **The next review opens its own file.** After a review with comments, the next review on a running Jared service could stay on the old file, even after a reload, and the button could send the old review to Claude as the review of the new file. Now the new file opens, and nothing is asked.

@@ -64,9 +64,11 @@ export function ReviewComposer({ draft, lines, language, label, canSuggest, warn
     setView(next)
   }
 
-  // Runs when the composer first appears and whenever it re-anchors to a new range.
+  // Runs when the composer first appears and whenever it re-anchors to a new range. A comment that came back with its commit is shown and not focused: the focus
+  // stays where the press was, so that the keys go on working, and the reviewer clicks into the field to go on.
+  const returned = useRef(draft.returned)
   useEffect(() => {
-    commentRef.current?.focus({ preventScroll: true })
+    if (!returned.current) commentRef.current?.focus({ preventScroll: true })
     rootRef.current?.scrollIntoView({ block: 'nearest' })
   }, [])
 

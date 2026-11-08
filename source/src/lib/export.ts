@@ -1,4 +1,5 @@
 import type { Review, ReviewComment, SetReview } from '../types.ts'
+import { shortHash, type Commit } from './commits.ts'
 import { placeParts } from './diff.ts'
 import { rangeLabel } from './review.ts'
 
@@ -127,12 +128,20 @@ function commentSections(comments: readonly ReviewComment[], language: string, l
   return out
 }
 
-/** A review of several files: the summary, then a heading for each file, in the order of the files, with its comments under it. */
-function setToMarkdown(review: SetReview): string {
+/** Whether the texts of a set are the commits of a branch: `heads` has the commit of every one of them. */
+const ofCommits = (review: SetReview, heads: ReadonlyMap<string, Commit> | undefined): heads is ReadonlyMap<string, Commit> => heads !== undefined && review.files.every((file) => heads.has(file.id))
+
+/**
+ * A review of several files: the summary, then a heading for each file, in the order of the files, with its comments under it. When `heads` has the commit that each
+ * text is (a review of a branch), each text is a commit and is headed so: its short hash and the first line of its message, and its whole hash, author and date, so that a
+ * change that a comment asks for lands in the commit that it is about.
+ */
+function setToMarkdown(review: SetReview, heads?: ReadonlyMap<string, Commit>): string {
   const { files, comments } = review
+  const commits = ofCommits(review, heads)
   const out: string[] = []
 
-  out.push(`# Code review: ${files.length} files`, '')
+  out.push(`# Code review: ${files.length} ${commits ? 'commits' : 'files'}`, '')
   out.push(`- **Comments:** ${comments.length}`)
   out.push('')
 
@@ -142,9 +151,17 @@ function setToMarkdown(review: SetReview): string {
 
   for (const file of files) {
     const mine = comments.filter((c) => c.file === file.id)
-    out.push(`## \`${file.name}\``, '')
-    out.push(`- **Language:** ${file.language}`)
-    out.push(`- **Lines:** ${file.lineCount}`)
+    const commit = commits ? heads.get(file.id) : undefined
+    if (commit) {
+      out.push(commit.subject === '' ? `## Commit \`${shortHash(commit.hash)}\`` : `## Commit \`${shortHash(commit.hash)}\`: ${commit.subject}`, '')
+      out.push(`- **Commit:** ${commit.hash}`)
+      out.push(`- **Author:** ${commit.author}`)
+      out.push(`- **Date:** ${commit.date}`)
+    } else {
+      out.push(`## \`${file.name}\``, '')
+      out.push(`- **Language:** ${file.language}`)
+      out.push(`- **Lines:** ${file.lineCount}`)
+    }
     out.push(`- **Comments:** ${mine.length}`)
     out.push('')
     if (mine.length === 0) out.push('_No comments._', '')
@@ -153,8 +170,12 @@ function setToMarkdown(review: SetReview): string {
   return out.join('\n').trimEnd() + '\n'
 }
 
-export function toMarkdown(review: Review | SetReview): string {
-  if (review.version === 2) return setToMarkdown(review)
+/**
+ * The Markdown of a review. `heads` is for a review of a branch, whose texts are commits: the commit that each text is, by the id of the text, which the page and the engine
+ * have from the texts that are open, since the review holds none. A review of several files that has no head for every text is written as any set of files is.
+ */
+export function toMarkdown(review: Review | SetReview, heads?: ReadonlyMap<string, Commit>): string {
+  if (review.version === 2) return setToMarkdown(review, heads)
   const { file, comments } = review
   const out: string[] = []
 
@@ -177,7 +198,10 @@ export function toMarkdown(review: Review | SetReview): string {
   return out.join('\n').trimEnd() + '\n'
 }
 
-/** The name a saved review is given: its file's, and for a review of several files the number of them, since no file's name is theirs. */
-export function reviewFileName(review: Review | SetReview, ext: 'json' | 'md'): string {
-  return review.version === 2 ? `review-of-${review.files.length}-files.review.${ext}` : `${review.file.name}.review.${ext}`
+/**
+ * The name a saved review is given: its file's, and for a review of several files the number of them, since no file's name is theirs; the commits of a branch are
+ * counted as commits, when `heads` has them as for `toMarkdown`.
+ */
+export function reviewFileName(review: Review | SetReview, ext: 'json' | 'md', heads?: ReadonlyMap<string, Commit>): string {
+  return review.version === 2 ? `review-of-${review.files.length}-${ofCommits(review, heads) ? 'commits' : 'files'}.review.${ext}` : `${review.file.name}.review.${ext}`
 }

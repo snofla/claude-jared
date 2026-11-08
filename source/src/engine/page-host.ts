@@ -1,11 +1,11 @@
 import type { AnyReview, Draft, Review, SetReview, SourceFile } from '../types.ts'
 import { setHashOf } from '../lib/hash.ts'
-import { draftHasText } from '../lib/review.ts'
+import { writingCount } from '../lib/review.ts'
 import { openSet, type OpenSet } from '../lib/set-open.ts'
 import { prepareSource } from '../lib/source.ts'
 import { emptyEngineState, handle, type EngineState } from './engine.ts'
 import type { Outbox, OutboxRules } from './outbox.ts'
-import { errorReply, parseRequest, PROTOCOL_VERSION, sameSubmitOptions, type Event, type Reply, type SubmitOptions } from './protocol.ts'
+import { errorReply, parseRequest, PROTOCOL_VERSION, sameSubmitOptions, type BranchOf, type Event, type Reply, type SubmitOptions } from './protocol.ts'
 
 /**
  * The protocol on a page: what a script on the page (a browser tool, a test, a console) can ask of the interface the way
@@ -21,6 +21,8 @@ export interface PageSession {
   set?: OpenSet | null
   /** The comment being written, which the engine knows nothing of. Only used to see whether there is work to lose. */
   draft: Draft | null
+  /** The comments being written in other commits of a set, put aside with them: work to lose, as the open one is. */
+  aside?: Readonly<Record<string, Draft>>
   /** What the caller that opened the file told Jared to call the delivery of the review, and who receives it (see `OpenRequest`). */
   submitLabel?: string | null
   submitTarget?: string | null
@@ -54,6 +56,7 @@ export function toEngineState({ file, review, set, submitLabel, submitTarget, su
         ...(submitLabel ? { submitLabel } : {}),
         ...(submitTarget ? { submitTarget } : {}),
         ...(submitOptions ? { submitOptions } : {}),
+        ...(set.branch ? { branch: set.branch } : {}),
       },
     }
   }
@@ -74,7 +77,7 @@ export function toEngineState({ file, review, set, submitLabel, submitTarget, su
 export function fromEngineState({ source, review, set }: EngineState): Adopted {
   if (set) {
     return {
-      ...openSet(set.files, set.review),
+      ...openSet(set.files, set.review, set.branch),
       review: set.review,
       submitLabel: set.submitLabel ?? null,
       submitTarget: set.submitTarget ?? null,
@@ -92,8 +95,11 @@ export function fromEngineState({ source, review, set }: EngineState): Adopted {
   }
 }
 
+/** Whether two branches of a set are the same: the same name, the same base and the same start, each absent in both or equal. */
+const sameBranch = (a: BranchOf | undefined, b: BranchOf | undefined): boolean => a?.name === b?.name && a?.base === b?.base && a?.from === b?.from
+
 /** Whether replacing the session would throw away a reviewer's work: a comment that is saved or one being written. */
-const hasWork = ({ review, draft }: PageSession): boolean => (review?.comments.length ?? 0) > 0 || draftHasText(draft)
+const hasWork = ({ review, draft, aside }: PageSession): boolean => (review?.comments.length ?? 0) > 0 || writingCount(draft, aside) > 0
 
 /** The hash of what an `open` request brings, a file or a set of files, as the page will know it once it is open; `null` for any other request, and for what cannot be opened. */
 export function openHash(value: unknown): string | null {
@@ -140,10 +146,14 @@ export function handleAppMessage(
       const target = request.submitTarget ?? session.submitTarget ?? null
       // Settings that are given replace the whole of the old ones; none given leaves them as they are.
       const options = request.submitOptions ?? session.submitOptions ?? null
-      const changed = label !== (session.submitLabel ?? null) || target !== (session.submitTarget ?? null) || !sameSubmitOptions(options, session.submitOptions)
+      // So is the branch of a set of commits: one that is given replaces the one there is, and none given leaves it.
+      const branch = (request.files !== undefined ? request.branch : undefined) ?? session.set?.branch
+      const newBranch = !sameBranch(branch, session.set?.branch)
+      const changed = label !== (session.submitLabel ?? null) || target !== (session.submitTarget ?? null) || !sameSubmitOptions(options, session.submitOptions) || newBranch
+      const set = session.set && newBranch && branch ? { ...session.set, branch } : (session.set ?? null)
       return {
         replies: handle(before, { protocol: PROTOCOL_VERSION, id: request.id, type: 'getSession' }).replies,
-        adopt: changed && session.file && session.review ? { file: session.file, review: session.review, set: session.set ?? null, submitLabel: label, submitTarget: target, submitOptions: options } : null,
+        adopt: changed && session.file && session.review ? { file: session.file, review: session.review, set, submitLabel: label, submitTarget: target, submitOptions: options } : null,
       }
     }
     // A file that cannot be opened is the engine's to refuse, with its words; only a good one can be declined.

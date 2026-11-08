@@ -31,7 +31,7 @@ import {
 import { commentAtLane, commentLanes, commentsByEnd, hasOverlap, laneAtOffset, laneMasks, maxColumns, pressesBar } from '../lib/viewer'
 import type { Action } from '../state/reducer'
 import type { Draft, LineSelection, ReviewComment, SourceFile } from '../types'
-import { Button, FloatingToolbar, IconButton, IconMessage, IconX, Kbd } from '../ui'
+import { Button, FloatingToolbar, IconButton, IconCheck, IconMessage, IconX, Kbd } from '../ui'
 import { CodeLine } from './CodeLine'
 import { DiffLine } from './DiffLine'
 import { ReviewCard } from './ReviewCard'
@@ -49,7 +49,7 @@ interface Props {
   draft: Draft | null
   hoveredId: string | null
   flashId: string | null
-  /** Bump `nonce` to scroll `line` into view, or, when `comment` is given, the card of that comment. */
+  /** Bump `nonce` to scroll `line` into view, or, when `comment` is given, the card of that comment; line 0 is the very top, above the first row. */
   scrollRequest: { line: number; nonce: number; comment?: string; block?: 'start' | 'center' } | null
   onHover: (id: string | null) => void
   /** A press on a comment bar in the gutter: go to that comment's card. */
@@ -66,6 +66,11 @@ interface Props {
    * for each row, `comments` are in rows, and a file's header is a row with its own *Viewed* button (`viewedFiles` and `onToggleViewed` are by file).
    */
   layout?: SetLayout | null
+  /**
+   * In a set of commits, the commit that is shown: its head is drawn above its rows, with its short hash, the first line of its message and a button that marks the
+   * commit as viewed, and scrolls away with them. The code is named by it.
+   */
+  commit?: { short: string; subject: string; viewed: boolean; onViewed: () => void } | null
   dispatch: Dispatch<Action>
 }
 
@@ -117,6 +122,7 @@ export function CodeViewer({
   viewedFiles,
   onToggleViewed,
   layout = null,
+  commit = null,
   dispatch,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -334,6 +340,12 @@ export function CodeViewer({
   useEffect(() => {
     if (!scrollRequest) return
     const scroller = scrollerRef.current
+    // The very top, with what is drawn above the first row: a commit that is chosen starts there, whatever was scrolled or left before it.
+    // The call is not returned: a browser may give back a promise for it, which React would take for this effect's cleanup.
+    if (scrollRequest.line === 0) {
+      scroller?.scrollTo({ top: 0 })
+      return
+    }
     const card = scrollRequest.comment ? scroller?.querySelector(`[data-comment="${CSS.escape(scrollRequest.comment)}"]`) : null
     const target = card ?? scroller?.querySelector(`[data-line="${scrollRequest.line}"]`)
     if (!scroller || !target) return
@@ -389,13 +401,24 @@ export function CodeViewer({
     <div className="viewer">
       <div className="viewer-main">
         <div className={dragging ? 'scroller is-dragging' : 'scroller'} ref={scrollerRef}>
+          {commit && (
+            <div className="commit-head">
+              <code className="commit-head-hash">{commit.short}</code>
+              <span className="commit-head-subject" title={commit.subject}>
+                {commit.subject}
+              </span>
+              <Button size="sm" className="file-viewed" pressed={commit.viewed} aria-label={COPY.commitHeadViewed(commit.short, commit.subject)} icon={<IconCheck />} onClick={commit.onViewed}>
+                {COPY.viewed}
+              </Button>
+            </div>
+          )}
           <div
             className={diff ? 'inner is-diff' : 'inner'}
             ref={innerRef}
             style={innerStyle}
             tabIndex={0}
             role="group"
-            aria-label={`${layout ? 'Text' : diff ? 'Diff' : 'Source'} of ${file.name}. Arrow keys select lines, C adds a comment.`}
+            aria-label={`${layout ? 'Text' : diff ? 'Diff' : 'Source'} of ${commit ? `commit ${commit.short}, ${commit.subject}` : file.name}. Arrow keys select lines, C adds a comment.`}
             onKeyDown={onKeyDown}
             onMouseDown={onMouseDown}
             onMouseUp={onMouseUp}

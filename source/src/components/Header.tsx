@@ -1,6 +1,7 @@
 import { COPY } from '../lib/copy'
 import { sendLabel, statusOf, stopWords, type Delivery } from '../lib/delivery'
 import { LANGUAGE_OPTIONS } from '../lib/language'
+import type { BranchOf } from '../engine/protocol'
 import type { AnyReview, SourceFile } from '../types'
 import { THEMES, type Theme } from '../lib/theme'
 import { Badge, Button, IconBrand, IconDownload, IconFile, IconMessage, IconMore, IconPanel, IconSend, IconUpload, Menu, MenuGroup, MenuItem, MenuRadioItem, MenuSeparator, Select } from '../ui'
@@ -21,7 +22,7 @@ interface Props {
    * The files of a diff of two files or more, or a set of files: their number, the lines added and removed (`null` for a set of files that is not a diff),
    * the lines in all, and whether the list is shown. `null` when there is no list.
    */
-  files: { count: number; added: number | null; deleted: number | null; lines: number; open: boolean; onToggle: () => void } | null
+  files: { count: number; added: number | null; deleted: number | null; lines: number; open: boolean; onToggle: () => void; commits?: { count: number; added: number; deleted: number; branch: BranchOf | undefined } } | null
   onHome: () => void
   onOpen: () => void
   onLanguage: (language: string) => void
@@ -52,7 +53,18 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
   const state = statusOf(review, handedOver, sentAt)
   const label = sendLabel(delivery, changes)
   const count = review.comments.length
-  const stopText = stopWords(delivery, sentAt, review)
+  const stopText = stopWords(delivery, sentAt, review, files?.commits !== undefined)
+  // A list of commits: the branch's name is the title, and with none the number of commits is.
+  const commits = files?.commits
+  const branchName = commits?.branch?.name
+  const branchTitle = commits ? (branchName ?? COPY.commitCount(commits.count)) : null
+  const branchLine = commits?.branch
+    ? (() => {
+        const count = branchName === undefined ? null : commits.count
+        const { base, from } = commits.branch
+        return { text: COPY.branchLine(count, base, from, commits.added, commits.deleted), name: COPY.branchLineName(count, base, from, commits.added, commits.deleted) }
+      })()
+    : null
 
   return (
     <header className="header">
@@ -62,10 +74,17 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
 
       <div className="file">
         <IconFile />
-        <span className="file-name" title={file.name}>
-          {file.name}
+        <span className="file-name" title={branchTitle ?? file.name}>
+          {branchTitle ?? file.name}
         </span>
-        {files && files.added !== null && files.deleted !== null ? (
+        {commits ? (
+          // a review of a branch: the branch's name is the title and this is its line; with no field the count is the title and there is no line
+          branchLine && (
+            <span className="muted file-lines" role="img" aria-label={branchLine.name} title={branchLine.name}>
+              {branchLine.text}
+            </span>
+          )
+        ) : files && files.added !== null && files.deleted !== null ? (
           <span className="muted file-lines" role="img" aria-label={COPY.filesChipName(files.count, files.added, files.deleted)} title={COPY.filesChipName(files.count, files.added, files.deleted)}>
             {COPY.filesChip(files.count, files.added, files.deleted)}
           </span>
@@ -91,8 +110,15 @@ export function Header({ file, review, panelOpen, onTogglePanel, files, onHome, 
       </Badge>
 
       {files && (
-        <Button className="files-toggle" icon={<IconPanel />} pressed={files.open} onClick={files.onToggle} title={COPY.filesToggle} aria-label={COPY.files}>
-          <span className="files-toggle-label">{COPY.files}</span>
+        <Button
+          className="files-toggle"
+          icon={<IconPanel />}
+          pressed={files.open}
+          onClick={files.onToggle}
+          title={files.commits ? COPY.commitsToggle : COPY.filesToggle}
+          aria-label={files.commits ? COPY.commits : COPY.files}
+        >
+          <span className="files-toggle-label">{files.commits ? COPY.commits : COPY.files}</span>
         </Button>
       )}
       <Button icon={<IconPanel />} pressed={panelOpen} onClick={onTogglePanel} title="Toggle comment list">

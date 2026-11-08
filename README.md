@@ -4,7 +4,7 @@ Jared /ˈdʒær.əd/ is not Gerrit /ˈɡɛr.ɪt/.
 
 Syntax-highlighted, file-based review for Claude.
 
-A Claude Code plugin. It opens a source file, several files, a diff or a commit in Jared, a line-by-line review app, and brings your review back into the session.
+A Claude Code plugin. It opens a source file, several files, a diff, a commit or a branch in Jared, a line-by-line review app, and brings your review back into the session.
 
 ## What it looks like
 
@@ -27,6 +27,18 @@ A diff is shown as changes. A comment on it says which file it is about, and whi
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="screenshots/diff-dark.png">
   <img alt="Jared showing a diff of src/retry.ts, with the removed lines in red, the added lines in green and two comments, one with a block of code." src="screenshots/diff-light.png">
+</picture>
+
+The list beside the code holds files or commits, and what it holds decides what a press does. Several files (a wildcard such as `src/*.ts`, or a list) open in one scroll, and a press on a file scrolls to it. A branch (`--branch`, `--from <commit>`, or "review branch feature/x in Jared") opens as its commits, in the order they apply, and a press on a commit shows that commit alone, with its files under it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/branch-dark.png">
+  <img alt="Jared showing a review of the branch feature/retry-backoff, three commits since main: the commits listed on the left, the second chosen with its two files under it, that commit's diff in the middle under its head, with a comment, and the comments grouped by commit on the right." src="screenshots/branch-light.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/pane-dark.png">
+  <img alt="The list beside the code in four states, side by side: a list of two files; a list of three commits, the second chosen with its files under it; the commits filtered by the word delay, which leaves one; and the list folded into a narrow rail, with a mark for each commit and a count of its comments." src="screenshots/pane-light.png">
 </picture>
 
 ## Requirements
@@ -58,7 +70,7 @@ A commit is opened as its change, with its message above it; the plugin looks it
 
 To review several files together, give a wildcard, a list separated by spaces or commas, or both: `/jared:review src/lib/*.ts`, or `/jared:review a.ts, b.ts`. Put a path with a space in quotes. Claude finds the files and tells you how many it found, and asks before it opens more than 20. It leaves out a file that is empty, is not text, or is more than 512 KB, and says so.
 
-Jared opens at most 100 files, and 512 KB in all. When the files are together more than that, Claude says the total and offers the first files that fit. Several files open only in your session's browser: if your session has none, or you gave `--jared` or set `jared_url`, Claude says so and stops.
+Jared opens at most 100 files, and 512 KB in all. The commits of a branch can be more: up to 400 commits and 2 MB, since Jared shows one commit at a time. When the files are together more than that, Claude says the total and offers the first files that fit. Several files open only in your session's browser: if your session has none, or you gave `--jared` or set `jared_url`, Claude says so and stops.
 
 You can also pick several files on the start page, or drop several files or a folder on it. They open in one scroll, with a list of the files beside the code (the **Files** button), where you can mark each file as **Viewed**.
 
@@ -96,6 +108,9 @@ All of these are optional. Add them after the file, the diff or the commit.
 | Option | What it does |
 |---|---|
 | `--rev <commit>` | Reads the word you gave as a commit, even if a file has that name. |
+| `--branch [<name>]` | Reviews the commits of a branch, the one that is checked out unless you name another, since it left its base, as one review with a diff for each commit, in the order in which they apply. |
+| `--base <branch>` | With `--branch`, where the branch starts. The default is `main`, else `master`, else what `origin/HEAD` names. |
+| `--from <commit>` | Reviews the commits from this one on, up to the one that is checked out. |
 | `--jared <address>` | Uses the Jared that runs at that address, for this review. The plugin setting `jared_url` does the same for every review. Use it only for a Jared that you run yourself or trust. |
 | `--via <way>` | Chooses how the file gets to Jared and how the review comes back. The default, `auto`, takes the first way in the next table that fits. Name a way, and only that way is tried. |
 | `--block` | For a run that cannot end its turn, such as `claude -p`: it waits in place. It is not available in this plugin; if you give it, Claude says so and stops. |

@@ -88,7 +88,9 @@ export const DiffLine = memo(function DiffLine({
       <div className="code" data-note={uncoloured ? LONG_LINE_NOTE : undefined}>
         {kind === 'file' ? (
           <>
-            <span className="file-path">{title}</span>
+            <span className="file-path">
+              <bdi dir="ltr">{title}</bdi>
+            </span>
             {badge && <Badge className="file-badge">{badge}</Badge>}
             {onViewed && (
               <Button
