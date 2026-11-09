@@ -2,6 +2,11 @@
 
 What changed in each release of the Jared plugin, newest first.
 
+## 0.19.1 — 2026-11-09
+
+- **A file's name stays whole in its header when the room is short.** When the middle is narrower than about 640 px, the header starts at its left edge, not after the line numbers. The folders of its path give way first, then its badge, which shows at least three letters and an ellipsis, or nothing, and keeps its words as its title; a name longer than its room is cut at its end, last. When the middle is 640 px or wider and the header has room, nothing changes.
+- **The README** now says that a branch's name given alone opens its commits, beside `--branch`, `--from` and "review branch …".
+
 ## 0.19.0 — 2026-11-08
 
 - **Review a branch.** `/jared:review --branch` reviews the commits of the branch that is checked out, or of the one you name, since it left its base: `main`, else `master`, else what `origin/HEAD` names, or the branch that you give with `--base`. `--from <commit>` reviews that commit and the ones after it, and a branch's name given alone, as in `/jared:review feature/x`, does what `--branch` does.

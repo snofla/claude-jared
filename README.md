@@ -29,7 +29,7 @@ A diff is shown as changes. A comment on it says which file it is about, and whi
   <img alt="Jared showing a diff of src/retry.ts, with the removed lines in red, the added lines in green and two comments, one with a block of code." src="screenshots/diff-light.png">
 </picture>
 
-The list beside the code holds files or commits, and what it holds decides what a press does. Several files (a wildcard such as `src/*.ts`, or a list) open in one scroll, and a press on a file scrolls to it. A branch (`--branch`, `--from <commit>`, or "review branch feature/x in Jared") opens as its commits, in the order they apply, and a press on a commit shows that commit alone, with its files under it.
+The list beside the code holds files or commits, and what it holds decides what a press does. Several files (a wildcard such as `src/*.ts`, or a list) open in one scroll, and a press on a file scrolls to it. A branch (`--branch`, `--from <commit>`, "review branch feature/x in Jared", or just the branch's name) opens as its commits, in the order they apply, and a press on a commit shows that commit alone, with its files under it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="screenshots/branch-dark.png">

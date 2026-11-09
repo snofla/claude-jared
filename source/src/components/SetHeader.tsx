@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { COPY } from '../lib/copy'
-import { Badge, Button, IconCheck } from '../ui'
+import { Button, IconCheck } from '../ui'
+import { FileTitle } from './FileTitle'
 
 interface Props {
   n: number
@@ -18,10 +19,7 @@ export const SetHeader = memo(function SetHeader({ n, name, badge, viewed, onVie
     <div className="row is-file" data-line={n}>
       <div className="gutter" />
       <div className="code">
-        <span className="file-path">
-          <bdi dir="ltr">{name}</bdi>
-        </span>
-        {badge && <Badge className="file-badge">{badge}</Badge>}
+        <FileTitle path={name} badge={badge} />
         {onViewed && (
           <Button
             size="sm"

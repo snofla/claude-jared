@@ -3,7 +3,8 @@ import { bodyOf, rowName, signOf, type RowKind } from '../lib/diff'
 import type { LineTokens } from '../lib/highlight'
 import { cx } from '../lib/util'
 import { COPY } from '../lib/copy'
-import { Badge, Button, IconCheck, IconPlus } from '../ui'
+import { Button, IconCheck, IconPlus } from '../ui'
+import { FileTitle } from './FileTitle'
 import { Tokens } from './Tokens'
 
 interface Props {
@@ -88,10 +89,7 @@ export const DiffLine = memo(function DiffLine({
       <div className="code" data-note={uncoloured ? LONG_LINE_NOTE : undefined}>
         {kind === 'file' ? (
           <>
-            <span className="file-path">
-              <bdi dir="ltr">{title}</bdi>
-            </span>
-            {badge && <Badge className="file-badge">{badge}</Badge>}
+            <FileTitle path={title ?? ''} badge={badge} />
             {onViewed && (
               <Button
                 size="sm"
